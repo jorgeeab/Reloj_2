@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "types": {
+    "protocolo_inline": {"engine": "inline"}
+  }
+}

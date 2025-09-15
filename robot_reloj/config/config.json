@@ -1,0 +1,41 @@
+{
+  "robot": {
+    "serial_port": "COM4",
+    "baudrate": 115200,
+    "timeout": 5.0
+  },
+  "protocols": {
+    "default_timeout": 60.0,
+    "tick_hz": 50.0,
+    "max_steps": 1000
+  },
+  "tasks": {
+    "max_concurrent": 3,
+    "default_duration": 10.0,
+    "retry_attempts": 3
+  },
+  "rewards": {
+    "max_reward": 1000.0,
+    "min_reward": -100.0,
+    "distance_weight": 0.4,
+    "volume_weight": 0.3,
+    "time_weight": 0.1,
+    "efficiency_weight": 0.1,
+    "completion_weight": 0.1
+  },
+  "logging": {
+    "level": "INFO",
+    "max_file_size": 10485760,
+    "retention_days": 7
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 5001,
+    "debug": false
+  },
+  "hardware": {
+    "motor_max_energy": 255,
+    "bomba_max_energy": 255,
+    "position_threshold": 1.0
+  }
+}

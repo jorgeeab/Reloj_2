@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Reloj Labs — Cabina Única</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/static/styles.css?v=2">
+</head>
+<body class="theme-blue" id="bodyRoot">
+  <header class="topbar">
+    <div class="brand">
+      <div class="dot"></div>
+      <h1>Reloj Labs<span class="muted"> — Cabina Única</span></h1>
+    </div>
+    <div class="pill" id="pill-serial">Serial: —</div>
+    <button class="pill" id="btn_settings">Settings</button>
+    <div class="pill warn" id="pill-rx">RX: SIN DATOS</div>
+    <a class="pill" href="/manage">Gestión</a>
+  </header>
+
+  <main class="wrap">
+    <nav class="tabs" style="margin-bottom:10px">
+      <button id="tab_op" data-tab="op">Operación</button>
+      <button id="tab_set" data-tab="set">Settings</button>
+      
+      <button id="tab_cal" data-tab="cal">Calendario</button>
+      <div style="margin-left:auto; display:flex; gap:6px; align-items:center">
+        <select id="themeSel" title="Tema" style="background:var(--tab-bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 8px">
+          <option value="theme-blue">Azul</option>
+          <option value="theme-teal">Turquesa</option>
+          <option value="theme-purple">Morado</option>
+        </select>
+        <a class="pill" href="/manage">Gestión</a>
+      </div>
+    </nav>
+    <!-- Ventana de ejecución eliminada - ahora todo está en la pestaña de protocolos -->
+    <!-- MODAL SETTINGS (Serial, Calibraciones, Flujo) -->
+    <section class="card tabview" id="settings_modal" data-tab="set">
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <h2 style="margin:0">Settings</h2>
+        <button id="btn_close_settings">Cerrar</button>
+      </div>
+        <div class="card" style="margin-top:10px">
+          <h3>Conexión Serial</h3>
+          <div class="row">
+            <div class="field">
+              <label>Puerto</label>
+              <select id="sel_port"></select>
+            </div>
+            <div class="field">
+              <label>Baudios</label>
+              <input type="number" id="sel_baud" value="115200" step="1200">
+            </div>
+            <button id="btn_toggle_serial">Conectar</button>
+            <span class="muted">Tip: cierra el IDE/monitor mientras usas esta UI.</span>
+          </div>
+          <div id="serial_status" class="muted"></div>
+          <details class="card" style="margin-top:10px">
+            <summary>Depuración Serial (RX/TX)</summary>
+            <div class="row" style="justify-content:flex-start; gap:8px">
+              <span>RX edad: <b id="rx_age_ms">0</b> ms</span>
+              <span>TX edad: <b id="tx_age_ms">0</b> ms</span>
+              <button id="btn_refresh_dbg">Refrescar</button>
+              <button id="btn_copy_tx">Copiar último TX</button>
+              <button id="btn_clear_dbg" class="warn">Limpiar</button>
+            </div>
+            <pre class="log small" id="dbg_serial"></pre>
+          </details>
+        </div>
+
+        <div class="grid two" style="margin-top:10px">
+          <div class="card">
+            <h3>Calibraciones & Flujo</h3>
+            <div class="row">
+              <div class="field"><label>pasos/mm</label><input type="number" id="steps_mm" step="0.001" value="0"></div>
+              <div class="field"><label>pasos/grado</label><input type="number" id="steps_deg" step="0.001" value="0"></div>
+              <div class="field"><label>Z mm/°</label><input type="number" id="z_mm_por_grado" step="0.001" value="1"></div>
+              <button id="btn_apply_steps">Aplicar Calibración</button>
+            </div>
+            <div class="row">
+              <label class="chk"><input type="checkbox" id="chk_sensor_flujo" checked> Usar sensor de flujo</label>
+              <div class="field"><label>Caudal por tiempo (ml/s)</label><input type="number" id="caudal" step="0.1" value="50"></div>
+              <button id="btn_apply_flujo">Aplicar Flujo</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>PID por defecto</h3>
+            <div class="row">
+              <div class="field"><label>kpX</label><input type="number" id="def_kpX" step="0.01" value="1.00"></div>
+              <div class="field"><label>kiX</label><input type="number" id="def_kiX" step="0.01" value="1.00"></div>
+              <div class="field"><label>kdX</label><input type="number" id="def_kdX" step="0.01" value="0.20"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>kpA</label><input type="number" id="def_kpA" step="0.01" value="1.00"></div>
+              <div class="field"><label>kiA</label><input type="number" id="def_kiA" step="0.01" value="1.00"></div>
+              <div class="field"><label>kdA</label><input type="number" id="def_kdA" step="0.01" value="0.20"></div>
+            </div>
+            <div class="mini-actions"><button id="btn_apply_pid_defaults">Aplicar ahora</button></div>
+          </div>
+        </div>
+
+        <div class="grid two" style="margin-top:10px">
+          <div class="card">
+            <h3>Políticas & Planificador</h3>
+            <div class="row">
+              <div class="field"><label>command_policy</label>
+                <select id="sel_policy">
+                  <option value="stop_only">stop_only</option>
+                  <option value="all">all</option>
+                  <option value="none">none</option>
+                </select>
+              </div>
+              <label class="chk"><input type="checkbox" id="chk_scheduler"> Scheduler habilitado</label>
+              <button id="btn_apply_policy">Aplicar políticas</button>
+            </div>
+          </div>
+        </div>
+        <div class="mini-actions" style="justify-content:flex-end; margin-top:8px">
+          <button id="btn_save_settings">Guardar Settings</button>
+        </div>
+    </section>
+
+    <!-- OPERACIÓN + TELEMETRÍA (fusionado) -->
+    <section class="grid two tabview" data-tab="op">
+      <div class="card">
+        <h2>Telemetría</h2>
+        <div class="telemetry">
+          <div><label>X (mm)</label><span id="t_x">0.00</span></div>
+          <div><label>A (°)</label><span id="t_a">0.00</span></div>
+          <div><label>Z (mm)</label><span id="t_z">0.00</span></div>
+          <div><label>Volumen (ml)</label><span id="t_vol">0.00</span></div>
+          <div><label>Caudal est. (ml/s)</label><span id="t_flow">0.00</span></div>
+          <div><label>Reward</label><span id="t_reward">0.000</span></div>
+          <div><label>Lím. X/A</label><span>X:<b id="t_limx">0</b> A:<b id="t_lima">0</b></span></div>
+          <div><label>Homing X/A</label><span>X:<b id="t_homx">0</b> A:<b id="t_homa">0</b></span></div>
+          <div><label>Puerto</label><span id="t_port">—</span></div>
+          <div><label>Modo (TX)</label><span id="t_modo_tx">—</span></div>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><span class="lbl">pasos/mm</span><span class="val" id="k_steps_mm">0</span></div>
+          <div class="kpi"><span class="lbl">pasos/°</span><span class="val" id="k_steps_deg">0</span></div>
+          <div class="kpi"><span class="lbl">sensor flujo</span><span class="val" id="k_usar_flujo">—</span></div>
+          <div class="kpi"><span class="lbl">caudal bomba</span><span class="val" id="k_caudal_bomba">0</span></div>
+          <div class="kpi"><span class="lbl">kpX</span><span class="val" id="k_kpX">0</span></div>
+          <div class="kpi"><span class="lbl">kiX</span><span class="val" id="k_kiX">0</span></div>
+          <div class="kpi"><span class="lbl">kdX</span><span class="val" id="k_kdX">0</span></div>
+          <div class="kpi"><span class="lbl">kpA</span><span class="val" id="k_kpA">0</span></div>
+          <div class="kpi"><span class="lbl">kiA</span><span class="val" id="k_kiA">0</span></div>
+          <div class="kpi"><span class="lbl">kdA</span><span class="val" id="k_kdA">0</span></div>
+        </div>
+        <div class="gauges">
+          <div class="gauge"><label>Energy X</label><div class="bar"><div id="g_ex"></div></div></div>
+          <div class="gauge"><label>Energy A</label><div class="bar"><div id="g_ea"></div></div></div>
+          <div class="gauge"><label>Bomba</label><div class="bar"><div id="g_eb"></div></div></div>
+          <div class="gauge"><label>Progreso Volumen</label><div class="bar"><div id="g_vol_goal"></div></div></div>
+        </div>
+
+        <div class="svg-gauges">
+          <div class="svg-gauge">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="48" class="bg" />
+              <circle id="sg_x_fg" cx="60" cy="60" r="48" class="fg c1" transform="rotate(-90 60 60)" />
+              <text id="sg_x_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
+              <text x="60" y="100" text-anchor="middle" class="lbl">X (mm)</text>
+            </svg>
+          </div>
+          <div class="svg-gauge">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="48" class="bg" />
+              <circle id="sg_a_fg" cx="60" cy="60" r="48" class="fg c2" transform="rotate(-90 60 60)" />
+              <text id="sg_a_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
+              <text x="60" y="100" text-anchor="middle" class="lbl">A (°)</text>
+            </svg>
+          </div>
+          <div class="svg-gauge">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="48" class="bg" />
+              <circle id="sg_vol_fg" cx="60" cy="60" r="48" class="fg c3" transform="rotate(-90 60 60)" />
+              <text id="sg_vol_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
+              <text x="60" y="100" text-anchor="middle" class="lbl">Vol (ml)</text>
+            </svg>
+          </div>
+          <div class="svg-gauge">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="48" class="bg" />
+              <circle id="sg_z_fg" cx="60" cy="60" r="48" class="fg c4" transform="rotate(-90 60 60)" />
+              <text id="sg_z_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
+              <text x="60" y="100" text-anchor="middle" class="lbl">Z (mm)</text>
+            </svg>
+          </div>
+          <div class="svg-gauge">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="48" class="bg" />
+              <circle id="sg_flow_fg" cx="60" cy="60" r="48" class="fg c4" transform="rotate(-90 60 60)" />
+              <text id="sg_flow_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
+              <text x="60" y="100" text-anchor="middle" class="lbl">Flow (ml/s)</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Visualización y Gráfico</h2>
+        <div class="row" style="gap:20px;align-items:center;flex-wrap:wrap">
+          <svg id="robot_svg" width="220" height="220" viewBox="0 0 220 220">
+            <defs>
+              <filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.5"/></filter>
+            </defs>
+            <circle cx="110" cy="110" r="100" fill="#0b1023" stroke="#273059" />
+            <!-- pista corredera -->
+            <rect x="55" y="105" width="110" height="10" rx="5" fill="#101736" stroke="#273059" />
+            <!-- carro corredera -->
+            <rect id="carro" x="55" y="100" width="14" height="20" rx="4" fill="#7ab6ff" filter="url(#shadow)" />
+            <!-- aguja ángulo -->
+            <line id="aguja" x1="110" y1="110" x2="110" y2="30" stroke="#7affc2" stroke-width="4" stroke-linecap="round" />
+            <circle cx="110" cy="110" r="5" fill="#7affc2" />
+          </svg>
+          <canvas id="chart" width="640" height="240"></canvas>
+        </div>
+        <div class="legend">
+          <span class="c1">X(mm)</span>
+          <span class="c2">A(°)</span>
+          <span class="c3">Vol(ml)</span>
+          <span class="c4">Flow(ml/s, auto)</span>
+          <span class="muted" style="margin-left:8px">Autoescala por serie</span>
+        </div>
+        <div class="mini-actions">
+          <button id="btn-freeze">Pausar</button>
+          <button id="btn-clear">Limpiar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Cámara</h2>
+        <div class="row" style="align-items:center; flex-wrap:wrap">
+          <button id="btn_cam_start">Iniciar</button>
+          <button id="btn_cam_snapshot">Snapshot</button>
+        </div>
+        <div style="margin-top:8px">
+          <img id="cam_img" alt="camera" style="max-width:100%; border:1px solid var(--border); border-radius:10px" />
+        </div>
+      </div>
+    </section>
+
+    <!-- OPERACIÓN COMPLETA (setpoints + manual + resets) -->
+    <section class="card tabview" data-tab="op" style="position:relative; display:none">
+      <div id="op_overlay" class="overlay-block" hidden>
+        <div class="overlay-content"><span id="overlay_msg">Ejecución en curso…</span> <button id="btn_overlay_reconnect" style="margin-left:8px; display:none">Reconectar</button></div>
+      </div>
+      <h2>Operación</h2>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="chk_manual_x"> X Manual</label>
+        <label class="chk"><input type="checkbox" id="chk_manual_a"> A Manual</label>
+        <button id="btn_pid_on" title="Ambos automáticos">PID ON</button>
+        <span class="muted">La UI no forzará los checks con /status (evita el “rebote” sin RX).</span>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Setpoint X (mm)</label>
+          <div class="row" style="gap:8px; align-items:center">
+            <button id="btn_x_dec10">−10</button>
+            <button id="btn_x_dec1">−1</button>
+            <input type="number" id="sp_x" step="0.5" value="0" min="0" max="400" style="width:90px">
+            <button id="btn_x_inc1">+1</button>
+            <button id="btn_x_inc10">+10</button>
+          </div>
+          <input type="range" id="sl_x" min="0" max="400" step="0.5" value="0" style="width:100%">
+          <span class="reading">X: <b id="rd_x_mm">0.00</b> mm</span>
+        </div>
+        <div class="field">
+          <label>Setpoint A (°)</label>
+          <div class="row" style="gap:8px; align-items:center">
+            <button id="btn_a_dec10">−10°</button>
+            <button id="btn_a_dec1">−1°</button>
+            <input type="number" id="sp_a" step="0.5" value="0" min="0" max="300" style="width:90px">
+            <button id="btn_a_inc1">+1°</button>
+            <button id="btn_a_inc10">+10°</button>
+          </div>
+          <input type="range" id="sl_a" min="0" max="300" step="0.5" value="0" style="width:100%">
+          <span class="reading">A: <b id="rd_a_deg">0.00</b> °</span>
+        </div>
+        <div class="field">
+          <label>Volumen objetivo (ml)</label>
+          <div class="row" style="gap:8px; align-items:center">
+            <button id="btn_v_dec10">−10</button>
+            <button id="btn_v_dec1">−1</button>
+            <input type="number" id="sp_vol" step="1" value="0" min="0" max="100" style="width:90px">
+            <button id="btn_v_inc1">+1</button>
+            <button id="btn_v_inc10">+10</button>
+          </div>
+          <input type="range" id="sl_vol" min="0" max="100" step="1" value="0" style="width:100%">
+          <span class="reading">Actual: <b id="rd_vol_ml">0.00</b> ml</span>
+        </div>
+        <div class="field">
+          <label>Setpoint Z (mm)</label>
+          <div class="row" style="gap:8px; align-items:center">
+            <button id="btn_z_dec10">−10</button>
+            <button id="btn_z_dec1">−1</button>
+            <input type="number" id="sp_z" step="0.5" value="0" min="0" max="200" style="width:90px">
+            <button id="btn_z_inc1">+1</button>
+            <button id="btn_z_inc10">+10</button>
+          </div>
+          <input type="range" id="sl_z" min="0" max="200" step="0.5" value="0" style="width:100%">
+          <span class="reading">Actual: <b id="rd_z_mm">0.00</b> mm</span>
+        </div>
+        <div class="field">
+          <label>Velocidad Z (deg/s)</label>
+          <input type="number" id="sp_z_speed" step="1" value="90">
+        </div>
+        <button id="btn_apply_sp">Aplicar Setpoints</button>
+        <button id="btn_reset_vol">Reset Volumen</button>
+      </div>
+
+      <div class="row">
+        <div class="slider">
+          <label>Energy X</label>
+          <input type="range" id="en_x" min="-255" max="255" value="0">
+          <output id="en_x_o">0</output>
+          <span class="reading">Lectura: <b id="rd_en_x">0</b></span>
+        </div>
+        <div class="slider">
+          <label>Energy A</label>
+          <input type="range" id="en_a" min="-255" max="255" value="0">
+          <output id="en_a_o">0</output>
+          <span class="reading">Lectura: <b id="rd_en_a">0</b></span>
+        </div>
+        <div class="slider">
+          <label>Energy Bomba</label>
+          <input type="range" id="en_b" min="0" max="255" value="0">
+          <output id="en_b_o">0</output>
+          <span class="reading">Lectura: <b id="rd_en_b">0</b></span>
+        </div>
+        <!-- Botón de aplicar ya no es necesario (auto-aplica) -->
+        <button id="btn_apply_energy" style="display:none">Aplicar Energías</button>
+        <button id="btn_stop_all" class="warn">Paro (energías=0)</button>
+      </div>
+
+      <div class="row">
+        <button id="btn_home_x">Homing X</button>
+        <button id="btn_home_a">Homing A</button>
+        <button id="btn_reset_all" class="warn">Reset X + A + Volumen</button>
+      </div>
+
+      <div class="mini-actions" style="margin-top:8px">
+        <button id="btn_water">Agua</button>
+        <button id="btn_home_global">Home</button>
+        <button id="btn_stop_global" class="warn">Paro inmediato</button>
+      </div>
+
+    </section>
+
+    <!-- REPRODUCTOR DE PROTOCOLOS (sección independiente) -->
+    <section class="card tabview" data-tab="op">
+      <h3 style="margin:0 0 6px 0">Reproductor (Protocolo)</h3>
+      <div class="row">
+        <div class="field"><label>Protocolo</label>
+          <select id="proto_sel"></select>
+        </div>
+        <div class="field" style="margin-left:auto; min-width:220px">
+          <label>Protocolo activo</label>
+          <div id="proto_active" class="muted">—</div>
+        </div>
+      </div>
+      <div id="proto_params" class="card" style="margin-top:8px; background:var(--card-bg-alt)"></div>
+      
+         <!-- Debug Unificado del Protocolo -->
+         <div id="proto_debug" class="card" style="margin-top:8px; background:var(--card-bg-alt);">
+           <h4 style="margin:0 0 8px 0; color:var(--accent)">🐛 Debug del Protocolo & Observaciones</h4>
+           <div id="debug_info" style="font-family:monospace; font-size:11px; background:var(--bg); padding:8px; border-radius:4px; max-height:300px; overflow-y:auto;">
+             <div class="muted">Esperando ejecución...</div>
+           </div>
+         </div>
+      
+      <div class="row" style="margin-top:8px; gap:12px">
+        <div class="field" style="min-width:240px">
+          <label>Sensores visibles / respuesta</label>
+          <div id="sensor_checks" class="row" style="flex-wrap:wrap; gap:8px">
+            <label class="chk"><input type="checkbox" class="sensor_chk" value="x_mm" checked> x_mm</label>
+            <label class="chk"><input type="checkbox" class="sensor_chk" value="a_deg" checked> a_deg</label>
+            <label class="chk"><input type="checkbox" class="sensor_chk" value="volumen_ml" checked> volumen_ml</label>
+            <label class="chk"><input type="checkbox" class="sensor_chk" value="flow_est"> flow_est</label>
+            <label class="chk"><input type="checkbox" class="sensor_chk" value="caudal_est_mls"> caudal_est_mls</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Duración máx (s)</label>
+          <input type="number" id="pp_max_dur" min="1" step="1" value="600">
+        </div>
+        <div class="field" style="display:none">
+          <label>Reward key</label>
+          <input id="pp_reward_key" placeholder="volumen_ml">
+        </div>
+        <div class="field" style="display:none">
+          <label>Reward umbral</label>
+          <input type="number" id="pp_reward_thr" step="0.001" value="0">
+        </div>
+        <div class="field" style="display:none">
+          <label>Reward expr (opcional)</label>
+          <input id="pp_reward_expr" placeholder="obs['volumen_ml'] - ctx['target']">
+        </div>
+        <label class="chk" style="display:none"><input type="checkbox" id="pp_reward_cum" checked> Reward acumulativo</label>
+      </div>
+      <div class="row" style="margin-top:8px; gap:8px">
+        <button id="btn_proto_execute">▶ Ejecutar tarea</button>
+        <button id="btn_proto_stop" style="display:none; background:var(--warn); color:white;">■ Detener</button>
+      </div>
+      <div class="muted">Parámetros generados dinámicamente según el protocolo.</div>
+      <div class="muted" style="margin-top:8px; padding:8px; background:var(--card-bg-alt); border-radius:4px;">
+        <strong>💡 Sistema de Reward:</strong> El protocolo maneja automáticamente el cálculo de reward usando función exponencial para X y A. No es necesario configurar parámetros de reward manualmente.
+      </div>
+    </section>
+
+    <!-- CALENDARIO + HISTORIAL -->
+    <section class="tabview" data-tab="cal" style="display:none">
+      <div class="card">
+        <div class="cal-toolbar">
+          <div class="row">
+            <button id="cal_prev">◀</button>
+            <button id="cal_today">Hoy</button>
+            <button id="cal_next">▶</button>
+            <h2 id="cal_title" style="margin-left:8px">—</h2>
+          </div>
+          <div class="row">
+            <button data-view="day" class="cal_view">Día</button>
+            <button data-view="week" class="cal_view">Semana</button>
+            <button data-view="month" class="cal_view">Mes</button>
+            <button id="cal_reload" style="margin-left:8px">Recargar tareas</button>
+            <div class="field" style="min-width:220px">
+              <label>Área</label>
+              <select id="cal_area"><option value="all">Todas las áreas</option></select>
+            </div>
+            <label class="chk"><input type="checkbox" id="cal_month_only"> Mes exacto</label>
+            <button id="cal_week_create" title="Crear en semana">Crear en semana…</button>
+          </div>
+        </div>
+        <div id="cal_grid" class="cal-grid"></div>
+        <div id="week_popover" class="popover" hidden>
+          <div class="popover-body">
+            <div class="row"><b style="font-size:13px">Crear en semana</b><button id="wp_close" style="margin-left:auto">×</button></div>
+            <div class="row" style="gap:6px">
+              <button class="wp_day" data-dow="0">Lun</button>
+              <button class="wp_day" data-dow="1">Mar</button>
+              <button class="wp_day" data-dow="2">Mié</button>
+              <button class="wp_day" data-dow="3">Jue</button>
+              <button class="wp_day" data-dow="4">Vie</button>
+              <button class="wp_day" data-dow="5">Sáb</button>
+              <button class="wp_day" data-dow="6">Dom</button>
+            </div>
+            <div class="row">
+              <div class="field"><label>Hora</label><input id="wp_time" value="08:00"></div>
+              <button id="wp_create">Crear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="task_modal" style="display:none">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h3 style="margin:0">Tarea</h3>
+          <button id="task_close">Cerrar</button>
+        </div>
+        <div class="row">
+          <div class="field"><label>ID</label><input id="t_id" placeholder="(auto)" /></div>
+          <span id="t_id_msg" class="muted" style="min-width:160px"></span>
+          <button id="t_copy_id" title="Copiar ID">Copiar ID</button>
+          <button id="t_new_id" title="Generar nuevo ID">Nuevo ID</button>
+          <div class="field"><label>Nombre</label><input id="t_nombre" /></div>
+          <div class="field"><label>Volumen (ml)</label><input type="number" id="t_vol" value="0" /></div>
+          <div class="field"><label>Protocolo (opcional)</label><input id="t_protocolo" /></div>
+          <div class="field"><label>Área</label>
+            <select id="t_area"><option value="General">General</option></select>
+          </div>
+          <div class="field"><label>Activo</label>
+            <select id="t_activo"><option value="1">Sí</option><option value="0">No</option></select>
+          </div>
+          <div class="field"><label>Timeout (s)</label><input type="number" id="t_timeout" value="25" min="1" step="1" /></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Vista</label>
+            <select id="t_prog_tipo">
+              <option value="semanal">Semanal</option>
+              <option value="diario">Diario</option>
+              <option value="cada_horas">Cada X horas</option>
+              <option value="cada_dias">Cada X días</option>
+              <option value="cada_semanas">Cada X semanas</option>
+              <option value="una_vez">Una vez</option>
+            </select>
+          </div>
+          <div class="field"><label>Día (0=Lun..6=Dom)</label><input type="number" id="t_prog_dow" min="0" max="6" value="0" /></div>
+          <div class="field"><label>Hora</label><input id="t_prog_hora" value="08:00" /></div>
+          <div class="field"><label>Intervalo</label><input type="number" id="t_prog_intervalo" min="1" value="1" /></div>
+          <div class="field"><label>Hasta (YYYY-MM-DD)</label><input id="t_prog_hasta" placeholder="2025-12-31" /></div>
+          <div class="field"><label>Repeticiones</label><input type="number" id="t_prog_reps" min="0" value="0" /></div>
+        </div>
+        <div class="row">
+          <div class="field" style="min-width:420px;flex:1">
+            <label>Params JSON (opcional)</label>
+            <textarea id="t_params" rows="4" placeholder="{\n  \"accion\": { \"codigoModo\": 3 }\n}"></textarea>
+          </div>
+        </div>
+        <div class="mini-actions" style="justify-content:flex-end">
+          <button id="t_exec">Ejecutar ahora</button>
+          <button id="t_save">Guardar</button>
+          <button id="t_delete" class="warn">Eliminar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Historial de ejecuciones</h3>
+        <div class="row">
+          <button id="tl_reload">Recargar historial</button>
+        </div>
+        <ul class="timeline" id="timeline"></ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Atajos: (M) manual/auto • (H) homing X/A • (V) reset volumen</span>
+    <span id="toast" class="toast" hidden>ok</span>
+  </footer>
+
+  <!-- calendar.js no existe, eliminada la referencia -->
+  <script src="/static/js/reloj.js?v=2"></script>
+  
+  <!-- 🆕 JavaScript para Tareas V2 -->
+  <script>
+    // Variables globales para Tareas V2
+    let currentTaskId = null;
+    let taskStatusInterval = null;
+
+    // Inicializar eventos de Tareas V2
+    document.addEventListener('DOMContentLoaded', function() {
+      // Botones de Tareas V2 (solo si existen en el DOM)
+      const bExec=document.getElementById('btn_execute_task_v2'); if(bExec){ bExec.addEventListener('click', executeTaskV2); }
+      const bStop=document.getElementById('btn_stop_task_v2'); if(bStop){ bStop.addEventListener('click', stopTaskV2); }
+      const bRef=document.getElementById('btn_refresh_tasks_v2'); if(bRef){ bRef.addEventListener('click', refreshTasksV2); }
+      const bCS=document.getElementById('btn_create_schedule_v2'); if(bCS){ bCS.addEventListener('click', createScheduleV2); }
+      const bLS=document.getElementById('btn_list_schedules_v2'); if(bLS){ bLS.addEventListener('click', listSchedulesV2); }
+
+      // Actualizar parámetros según protocolo seleccionado
+      const p1=document.getElementById('task_v2_protocol'); if(p1){ p1.addEventListener('change', updateProtocolParams); }
+      const p2=document.getElementById('schedule_v2_protocol'); if(p2){ p2.addEventListener('change', updateScheduleProtocolParams); }
+
+      // Deshabilitado: no usamos Tareas V2 en esta versión
+    });
+
+    // Ejecutar tarea V2
+    async function executeTaskV2() {
+      const name = document.getElementById('task_v2_name').value || 'Tarea V2';
+      const protocol = document.getElementById('task_v2_protocol').value;
+      const duration = parseFloat(document.getElementById('task_v2_duration').value);
+      const timeout = parseFloat(document.getElementById('task_v2_timeout').value);
+      const mode = document.getElementById('task_v2_mode').value;
+      const autoStop = document.getElementById('task_v2_autostop').checked;
+
+      // Construir parámetros según protocolo
+      const params = {};
+      if (protocol === 'riego_basico') {
+        params.volume_ml = parseFloat(document.getElementById('task_v2_volume_ml').value);
+        params.intensity = parseInt(document.getElementById('task_v2_intensity').value);
+      } else if (protocol === 'movimiento_basico') {
+        params.x_mm = parseFloat(document.getElementById('task_v2_x_mm').value);
+        params.a_deg = parseFloat(document.getElementById('task_v2_a_deg').value);
+        params.threshold = 1.0;
+      }
+
+      const taskData = {
+        name: name,
+        protocol_name: protocol,
+        duration_seconds: duration,
+        timeout_seconds: timeout,
+        params: params,
+        auto_stop: autoStop,
+        mode: mode
+      };
+
+      try {
+        logTaskV2(`🚀 Ejecutando tarea: ${name} (${protocol}) en modo ${mode}`);
+        
+        const response = await fetch('/api/tasks/v2/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(taskData)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          if (mode === 'sync') {
+            // Ejecución síncrona - resultado completo
+            logTaskV2(`✅ Tarea completada: ${result.status}`);
+            logTaskV2(`📊 Duración: ${result.duration}s`);
+            logTaskV2(`📝 Resultado: ${result.result || 'Sin resultado'}`);
+            if (result.log) {
+              result.log.forEach(log => logTaskV2(`📋 ${log}`));
+            }
+          } else {
+            // Ejecución asíncrona - ID de ejecución
+            currentTaskId = result.execution_id;
+            logTaskV2(`⚡ Tarea iniciada asíncronamente: ${currentTaskId}`);
+            document.getElementById('btn_execute_task_v2').style.display = 'none';
+            document.getElementById('btn_stop_task_v2').style.display = 'inline-block';
+            
+            // Iniciar monitoreo
+            startTaskMonitoring(currentTaskId);
+          }
+        } else {
+          logTaskV2(`❌ Error: ${result.error}`);
+        }
+      } catch (error) {
+        logTaskV2(`❌ Error de conexión: ${error.message}`);
+      }
+    }
+
+    // Detener tarea V2
+    async function stopTaskV2() {
+      if (!currentTaskId) return;
+
+      try {
+        const response = await fetch(`/api/tasks/v2/stop/${currentTaskId}`, {
+          method: 'POST'
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+          logTaskV2(`⏹ Tarea detenida: ${currentTaskId}`);
+          stopTaskMonitoring();
+        } else {
+          logTaskV2(`❌ Error deteniendo tarea: ${result.error}`);
+        }
+      } catch (error) {
+        logTaskV2(`❌ Error de conexión: ${error.message}`);
+      }
+    }
+
+    // Monitorear tarea asíncrona
+    function startTaskMonitoring(taskId) {
+      if (taskStatusInterval) clearInterval(taskStatusInterval);
+      
+      taskStatusInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/tasks/v2/status/${taskId}`);
+          const status = await response.json();
+          
+          if (response.ok) {
+            logTaskV2(`📊 Estado: ${status.status} - ${status.progress?.current_action || 'Ejecutando...'}`);
+            
+            if (status.status === 'completed' || status.status === 'error' || status.status === 'stopped') {
+              logTaskV2(`🏁 Tarea finalizada: ${status.status}`);
+              if (status.result) logTaskV2(`📝 Resultado: ${status.result}`);
+              if (status.error) logTaskV2(`❌ Error: ${status.error}`);
+              stopTaskMonitoring();
+            }
+          }
+        } catch (error) {
+          logTaskV2(`❌ Error monitoreando tarea: ${error.message}`);
+        }
+      }, 1000);
+    }
+
+    // Detener monitoreo
+    function stopTaskMonitoring() {
+      if (taskStatusInterval) {
+        clearInterval(taskStatusInterval);
+        taskStatusInterval = null;
+      }
+      currentTaskId = null;
+      document.getElementById('btn_execute_task_v2').style.display = 'inline-block';
+      document.getElementById('btn_stop_task_v2').style.display = 'none';
+      refreshTasksV2();
+    }
+
+    // Actualizar tareas activas
+    async function refreshTasksV2() {
+      try {
+        const response = await fetch('/api/tasks/v2/active');
+        const tasks = await response.json();
+        
+        const container = document.getElementById('active_tasks_v2');
+        
+        if (tasks.length === 0) {
+          container.innerHTML = '<div class="muted">No hay tareas activas</div>';
+        } else {
+          container.innerHTML = tasks.map(task => `
+            <div style="border: 1px solid var(--border); padding: 8px; margin: 4px 0; border-radius: 4px;">
+              <strong>${task.task_id}</strong> - ${task.status}<br>
+              <small>Progreso: ${task.progress?.percentage || 0}% - ${task.progress?.current_action || 'Ejecutando...'}</small>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        document.getElementById('active_tasks_v2').innerHTML = `<div class="muted">Error cargando tareas: ${error.message}</div>`;
+      }
+    }
+
+    // Crear programación V2
+    async function createScheduleV2() {
+      const name = document.getElementById('schedule_v2_name').value || 'Programación V2';
+      const protocol = document.getElementById('schedule_v2_protocol').value;
+      const scheduleType = document.getElementById('schedule_v2_type').value;
+      const duration = parseFloat(document.getElementById('schedule_v2_duration').value);
+      const timeout = 30.0; // Timeout por defecto
+
+      // Construir parámetros según protocolo
+      const params = {};
+      if (protocol === 'riego_basico') {
+        params.volume_ml = parseFloat(document.getElementById('task_v2_volume_ml').value);
+        params.intensity = parseInt(document.getElementById('task_v2_intensity').value);
+      } else if (protocol === 'movimiento_basico') {
+        params.x_mm = parseFloat(document.getElementById('task_v2_x_mm').value);
+        params.a_deg = parseFloat(document.getElementById('task_v2_a_deg').value);
+        params.threshold = 1.0;
+      }
+
+      // Construir parámetros de programación
+      const scheduleParams = {};
+      if (scheduleType === 'diario') {
+        const time = document.getElementById('schedule_v2_time').value;
+        scheduleParams.hour = parseInt(time.split(':')[0]);
+        scheduleParams.minute = parseInt(time.split(':')[1]);
+      } else if (scheduleType === 'cada_segundos') {
+        scheduleParams.interval_seconds = parseInt(document.getElementById('schedule_v2_interval').value);
+      }
+
+      const scheduleData = {
+        name: name,
+        protocol_name: protocol,
+        schedule_type: scheduleType,
+        duration_seconds: duration,
+        timeout_seconds: timeout,
+        params: params,
+        auto_stop: true,
+        schedule_params: scheduleParams,
+        active: true
+      };
+
+      try {
+        logTaskV2(`📅 Creando programación: ${name} (${protocol}) - ${scheduleType}`);
+        
+        const response = await fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scheduleData)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          logTaskV2(`✅ Programación creada: ${result.task_id}`);
+          listSchedulesV2();
+        } else {
+          logTaskV2(`❌ Error: ${result.error}`);
+        }
+      } catch (error) {
+        logTaskV2(`❌ Error de conexión: ${error.message}`);
+      }
+    }
+
+    // Listar programaciones V2
+    async function listSchedulesV2() {
+      try {
+        const response = await fetch('/api/schedules');
+        const schedules = await response.json();
+        
+        const container = document.getElementById('schedules_list_v2');
+        
+        if (schedules.length === 0) {
+          container.innerHTML = '<div class="muted">No hay programaciones activas</div>';
+        } else {
+          container.innerHTML = schedules.map(schedule => `
+            <div style="border: 1px solid var(--border); padding: 8px; margin: 4px 0; border-radius: 4px;">
+              <strong>${schedule.name}</strong> - ${schedule.schedule_type}<br>
+              <small>Protocolo: ${schedule.protocol_name} | Duración: ${schedule.duration_seconds}s</small><br>
+              <small>Próxima: ${schedule.next_execution || 'No programada'} | Ejecuciones: ${schedule.execution_count}</small>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        document.getElementById('schedules_list_v2').innerHTML = `<div class="muted">Error cargando programaciones: ${error.message}</div>`;
+      }
+    }
+
+    // Actualizar parámetros según protocolo seleccionado
+    function updateProtocolParams() {
+      const protocol = document.getElementById('task_v2_protocol').value;
+      const paramsContainer = document.querySelector('#task_v2_protocol').closest('.card').querySelector('.card');
+      
+      if (protocol === 'riego_basico') {
+        paramsContainer.innerHTML = `
+          <h4 style="margin:0 0 8px 0">Parámetros del Protocolo</h4>
+          <div class="row">
+            <div class="field">
+              <label>Volumen (ml)</label>
+              <input type="number" id="task_v2_volume_ml" value="50" min="0" step="1" />
+            </div>
+            <div class="field">
+              <label>Intensidad (0-255)</label>
+              <input type="number" id="task_v2_intensity" value="100" min="0" max="255" step="1" />
+            </div>
+          </div>
+        `;
+      } else if (protocol === 'movimiento_basico') {
+        paramsContainer.innerHTML = `
+          <h4 style="margin:0 0 8px 0">Parámetros del Protocolo</h4>
+          <div class="row">
+            <div class="field">
+              <label>X (mm)</label>
+              <input type="number" id="task_v2_x_mm" value="100" min="0" step="1" />
+            </div>
+            <div class="field">
+              <label>A (grados)</label>
+              <input type="number" id="task_v2_a_deg" value="45" min="0" step="1" />
+            </div>
+          </div>
+        `;
+      } else {
+        paramsContainer.innerHTML = `
+          <h4 style="margin:0 0 8px 0">Parámetros del Protocolo</h4>
+          <div class="row">
+            <div class="field">
+              <label>Tipo de prueba</label>
+              <select id="task_v2_test_type">
+                <option value="basic">Básica</option>
+                <option value="sensors">Sensores</option>
+                <option value="calibration">Calibración</option>
+              </select>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // Actualizar parámetros de programación según protocolo
+    function updateScheduleProtocolParams() {
+      // Similar a updateProtocolParams pero para la sección de programación
+      updateProtocolParams();
+    }
+
+    // Log para Tareas V2
+    function logTaskV2(message) {
+      const logContainer = document.getElementById('task_v2_log');
+      const timestamp = new Date().toLocaleTimeString();
+      logContainer.textContent += `[${timestamp}] ${message}\n`;
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    // Limpiar log de Tareas V2
+    function clearTaskV2Log() {
+      document.getElementById('task_v2_log').textContent = 'Esperando ejecución...\n';
+    }
+  </script>
+  
+  <!-- Script de lógica simplificada para protocolos -->
+  <!-- protocolo_simple.js no existe, eliminada la referencia -->
+</body>
+</html>
