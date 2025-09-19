@@ -209,3 +209,9 @@ button.warn{background:#2a1220;border-color:#4e2236}
 .log-panel{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-radius:14px; padding:14px}
 .log-panel h3{margin:0 0 10px; font-size:14px; color:#cfe1ff; letter-spacing:.3px}
 .log{min-height:120px; max-height:220px; overflow:auto; font-family:ui-monospace,Consolas,monospace; font-size:12px; white-space:pre-wrap; background:#0b1428; border:1px solid #213152; border-radius:12px; padding:10px}
+
+
+.pybullet-box{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px dashed var(--border);border-radius:12px;background:linear-gradient(180deg,var(--panel2),var(--panel));max-width:520px;min-width:360px}
+.pybullet-box.warn{border-color:#844040}
+.pybullet-box img{width:100%;max-width:100%;min-height:300px;border-radius:10px;object-fit:cover;background:rgba(20,26,48,0.6);opacity:.2;transition:opacity .2s ease}
+.pybullet-box span.muted{font-size:12px}

@@ -19,16 +19,57 @@
   // ------------- Serial (toggle único) -------------
   async function refreshPorts(){
     const info = await jget("/api/serial/ports");
-    const sel = $("#sel_port"); sel.innerHTML="";
-    (info.ports||[]).forEach(p=>{ const o=document.createElement("option"); o.value=p; o.textContent=p; if(p===info.current) o.selected=true; sel.appendChild(o); });
-    const status = info.open? `Conectado a ${info.current}` : `Desconectado`;
-    const ports = (info.ports||[]).join(', ');
-    const el = $("#serial_status"); if(el){ el.textContent = `${status} • Puertos: ${ports}`; }
-    const btn=$("#btn_toggle_serial"); if(btn){
-      btn.textContent = info.open?"Desconectar":"Conectar";
-      if(info.open) btn.classList.add('warn'); else btn.classList.remove('warn');
+    const sel = $("#sel_port");
+    if(sel){
+      sel.innerHTML="";
+      if(info.is_virtual){
+        const opt = document.createElement("option");
+        opt.value = info.current || "VIRTUAL";
+        opt.textContent = info.current || "VIRTUAL";
+        opt.selected = true;
+        sel.appendChild(opt);
+        sel.disabled = true;
+      }else{
+        sel.disabled = false;
+        (info.ports||[]).forEach(p=>{
+          const opt=document.createElement("option");
+          opt.value=p; opt.textContent=p; if(p===info.current) opt.selected=true; sel.appendChild(opt);
+        });
+        if(!sel.children.length && info.current){
+          const opt=document.createElement("option");
+          opt.value = info.current;
+          opt.textContent = info.current;
+          opt.selected = true;
+          sel.appendChild(opt);
+        }
+      }
     }
-    const baudEl = document.getElementById('sel_baud'); if(baudEl && window._statusCache && _statusCache.baudrate){ baudEl.value = String(_statusCache.baudrate); }
+    const ports = (info.ports||[]).join(', ');
+    const statusEl = $("#serial_status");
+    if(statusEl){
+      if(info.is_virtual){
+        statusEl.textContent = "Modo virtual activo - Serial simulado";
+      }else{
+        const status = info.open ? `Conectado a ${info.current}` : "Desconectado";
+        statusEl.textContent = `${status} · Puertos: ${ports}`;
+      }
+    }
+    const btn = $("#btn_toggle_serial");
+    if(btn){
+      if(info.is_virtual){
+        btn.textContent = "Virtual";
+        btn.disabled = true;
+        btn.classList.remove('warn');
+      }else{
+        btn.disabled = false;
+        btn.textContent = info.open ? "Desconectar" : "Conectar";
+        if(info.open) btn.classList.add('warn'); else btn.classList.remove('warn');
+      }
+    }
+    const baudEl = document.getElementById('sel_baud');
+    if(baudEl && window._statusCache && _statusCache.baudrate){
+      baudEl.value = String(_statusCache.baudrate);
+    }
   }
   const _btnToggleSerial = document.getElementById('btn_toggle_serial');
   if(_btnToggleSerial) _btnToggleSerial.onclick = async ()=>{
@@ -48,6 +89,81 @@
     }
   };
   refreshPorts();
+
+  const robotSel = document.getElementById('robotSel');
+  const robotSel2 = document.getElementById('robotSel2');
+  const robotPill = document.getElementById('pill-robot');
+  let robotsCache = [];
+
+  async function refreshRobots(){
+    try{
+      const info = await jget('/api/robots');
+      robotsCache = info.robots || [];
+      const syncSelect = (sel)=>{
+        if(!sel) return;
+        sel.innerHTML = '';
+        if(robotsCache.length === 0){
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Sin robots';
+          sel.appendChild(opt);
+          sel.disabled = true;
+        }else{
+          robotsCache.forEach(r=>{
+            const opt = document.createElement('option');
+            opt.value = r.id;
+            opt.textContent = r.label || r.id;
+            sel.appendChild(opt);
+          });
+          if(info.active){ sel.value = info.active; }
+          sel.disabled = false; // siempre visible, incluso si hay un solo perfil
+        }
+      };
+      syncSelect(robotSel);
+      syncSelect(robotSel2);
+      if(robotPill){
+        const active = robotsCache.find(r=>r.id === info.active) || null;
+        if(active){
+          robotPill.textContent = `Robot: ${active.label || active.id}`;
+          robotPill.classList.toggle('warn', !!active.is_virtual);
+        }else{
+          robotPill.textContent = `Robot: ${info.active || '—'}`;
+          robotPill.classList.add('warn');
+        }
+      }
+    }catch(e){
+      if(robotPill){
+        robotPill.textContent = 'Robot: error';
+        robotPill.classList.add('warn');
+      }
+    }
+  }
+
+  const onRobotChange = async (sel)=>{
+    const id = sel && sel.value;
+    if(!id) return;
+    try{
+      await jpost('/api/robots/select', { id });
+      const label = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : id;
+      toast(`Robot activo: ${label}`);
+      // Abrir/cerrar GUI PyBullet automáticamente según perfil
+      try{
+        if(id === 'virtual') await jpost('/api/visual/gui/start',{});
+        else await jpost('/api/visual/gui/stop',{});
+      }catch{}
+      await refreshRobots();
+      try{ await refreshPorts(); }catch{}
+      try{ await refreshPbGui(); }catch{}
+      pollStatus();
+    }catch(e){
+      toast('No se pudo cambiar el robot');
+      await refreshRobots();
+    }
+  };
+  if(robotSel){ robotSel.addEventListener('change', ()=> onRobotChange(robotSel)); }
+  if(robotSel2){ robotSel2.addEventListener('change', ()=> onRobotChange(robotSel2)); }
+
+  refreshRobots();
 
   // ------------- Tabs (simple) -------------
   (function initTabs(){
@@ -70,6 +186,20 @@
       activate(first);
     }
   })();
+
+  // ------------- PyBullet GUI controls -------------
+  const pbGuiStatus = document.getElementById('pb_gui_status');
+  const btnPbStart = document.getElementById('btn_pb_gui_start');
+  const btnPbStop  = document.getElementById('btn_pb_gui_stop');
+  async function refreshPbGui(){
+    try{
+      const s = await jget('/api/visual/gui/status');
+      if(pbGuiStatus) pbGuiStatus.textContent = s.running? 'ejecutándose':'detenida';
+    }catch{ if(pbGuiStatus) pbGuiStatus.textContent = 'error'; }
+  }
+  if(btnPbStart){ btnPbStart.onclick = async ()=>{ try{ await jpost('/api/visual/gui/start',{}); toast('GUI iniciada'); }catch{ toast('No se pudo iniciar GUI'); } await refreshPbGui(); }; }
+  if(btnPbStop){  btnPbStop.onclick  = async ()=>{ try{ await jpost('/api/visual/gui/stop',{});  toast('GUI detenida'); }catch{ toast('No se pudo detener GUI'); } await refreshPbGui(); }; }
+  refreshPbGui();
 
   // Selector de tema (tabs cambian de color)
   const themeSel = document.getElementById('themeSel');
@@ -327,6 +457,14 @@
       $("#t_homx").textContent = s.homing_x||0; $("#t_homa").textContent = s.homing_a||0;
       $("#t_port").textContent = s.serial_port || "—";
       $("#pill-serial").textContent = `Serial: ${s.serial_port} @ ${s.baudrate||''}`;
+      if(robotPill){
+        const label = s.robot_label || s.robot_id || '—';
+        robotPill.textContent = `Robot: ${label}`;
+        robotPill.classList.toggle('warn', !!s.is_virtual);
+      }
+      if(robotSel && s.robot_id && robotSel.value !== s.robot_id){
+        robotSel.value = s.robot_id;
+      }
       isSerialOpen = !!s.serial_open;
       if(isSerialOpen){ lastSerialOpenTs = Date.now(); }
       // Modo en telemetría (desde RX/status)
@@ -478,6 +616,41 @@
     try{ await jpost('/api/camera/snapshot',{}); toast('Snapshot guardado'); }
     catch{ toast('Error snapshot'); }
   }; }
+  // PyBullet visualizer
+  const pbPanel = document.getElementById('pybullet_panel');
+  const pbImg = document.getElementById('pybullet_view');
+  const pbStatus = document.getElementById('pybullet_status');
+  if(pbImg){
+    const pbPlaceholder = pbImg.getAttribute('data-placeholder') || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+    let lastUrl = null;
+    let fetchingFrame = false;
+    async function updatePybulletFrame(){
+      if(fetchingFrame){ return; }
+      fetchingFrame = true;
+      try{
+        const resp = await fetch(`/api/visual/frame?ts=${Date.now()}`, { cache: 'no-store' });
+        if(!resp.ok){ throw new Error(`status ${resp.status}`); }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        if(lastUrl){ URL.revokeObjectURL(lastUrl); }
+        lastUrl = url;
+        pbImg.src = url;
+        pbImg.style.opacity = '1';
+        if(pbStatus){ pbStatus.textContent = `Actualizado ${new Date().toLocaleTimeString()}`; pbStatus.classList.remove('warn'); }
+        if(pbPanel){ pbPanel.classList.remove('warn'); }
+      }catch(e){
+        if(pbStatus){ pbStatus.textContent = 'Visualizador no disponible'; pbStatus.classList.add('warn'); }
+        pbImg.src = pbPlaceholder;
+        pbImg.style.opacity = '0.2';
+        if(pbPanel){ pbPanel.classList.add('warn'); }
+      }finally{
+        fetchingFrame = false;
+      }
+    }
+    updatePybulletFrame();
+    setInterval(updatePybulletFrame, 250);
+    window.addEventListener('beforeunload', ()=>{ if(lastUrl){ URL.revokeObjectURL(lastUrl); } });
+  }
 
   // ------------- Guard de ejecuciones (desactivar controles) -------------
   const execBanner = document.getElementById('exec_banner');
@@ -588,6 +761,8 @@
                                id==='robot_svg' || id==='carro' || id==='aguja' || id==='cam_img' ||
                                id==='debug_info' || id==='proto_debug' || id==='observations_info' || id==='observations_display' || // Mantener debug activo
                                id==='proto_sel' || id.startsWith('pp_') || // Mantener controles de protocolo activos
+                               id==='btn_settings' || id==='robotSel' || id==='robotSel2' || // permitir cambiar robot y abrir Settings
+                               id==='btn_pb_gui_start' || id==='btn_pb_gui_stop' || id==='pb_gui_status' ||
                                el.closest && (el.closest('.telemetry') || el.closest('#proto_debug') || el.closest('#observations_display'));
             if(!isTelemetry && id!=='btn_kill_exec' && id!=='tl_reload') el.disabled=true;
           }else{
@@ -631,6 +806,11 @@
       if(opSection){ opSection.style.opacity='0.5'; }
       setDisabledAll(true);
       const b=document.getElementById('btn_proto_execute'); if(b){ b.disabled=true; }
+      // Forzar que botones clave permanezcan habilitados aunque el overlay esté activo
+      try{
+        ['btn_settings','robotSel','robotSel2','btn_pb_gui_start','btn_pb_gui_stop','pb_gui_status']
+          .forEach(k=>{ const el=document.getElementById(k); if(el){ el.disabled=false; } });
+      }catch{}
     }
   }
 

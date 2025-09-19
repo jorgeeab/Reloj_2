@@ -52,7 +52,6 @@
     },
     "reward": {
       "max_duration_seconds": 60,
-      "reward_key": "x_mm",
       "reward_cumulative": true
     }
   }
