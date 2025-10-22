@@ -1,0 +1,16 @@
+{
+  "robots": {
+    "reloj-local": {
+      "id": "reloj-local",
+      "name": "Reloj Local",
+      "base_url": "http://localhost:5005",
+      "kind": "reloj",
+      "api_key": null,
+      "created_at": "2025-10-22T06:12:19.095277"
+    }
+  },
+  "plants": {},
+  "regimens": [],
+  "activities": [],
+  "tasks": []
+}

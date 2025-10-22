@@ -234,7 +234,7 @@ class PyBulletVisualizer:
                     self.client_id = -1
 
     def _mm_to_joint(self, x_mm: float) -> float:
-        # Reuse the mapping used by the manual slider in pybullet_clock_sim.py
+        # Mapping consistent with the manual slider used in the PyBullet demo
         return float(max(-0.2, min(0.0, -(x_mm / 1000.0) * 0.2)))
 
     def update_from_status(self, status) -> None:

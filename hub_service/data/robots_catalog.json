@@ -1,0 +1,10 @@
+{
+  "robots": [
+    {
+      "id": "reloj-local",
+      "name": "Reloj Local",
+      "base_url": "http://localhost:5005",
+      "kind": "reloj"
+    }
+  ]
+}

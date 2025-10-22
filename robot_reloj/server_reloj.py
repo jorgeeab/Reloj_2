@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from contextlib import nullcontext
 
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, stream_with_context
 
 # Importaciones opcionales
 try:
@@ -805,6 +805,32 @@ def api_status():
     """API para obtener estado del robot"""
     status = get_robot_status()
     return jsonify(asdict(status))
+
+@app.route("/api/status/stream")
+def api_status_stream():
+    """SSE: emite el estado del robot a ~5 Hz en formato event-stream."""
+    def _gen():
+        hb_ts = time.time()
+        while True:
+            try:
+                rs = get_robot_status()
+                payload = json.dumps(asdict(rs), ensure_ascii=False)
+                yield f"data: {payload}\n\n"
+                # Heartbeat cada 10s para mantener vivo detrás de proxies
+                now = time.time()
+                if now - hb_ts > 10.0:
+                    hb_ts = now
+                    yield ":keepalive\n\n"
+                time.sleep(0.2)  # 5 Hz
+            except GeneratorExit:
+                break
+            except Exception as exc:
+                logger.log(f"[SSE] error emitiendo estado: {exc}", "WARNING")
+                time.sleep(1.0)
+    resp = Response(stream_with_context(_gen()), mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
 
 @app.route("/api/status/fresh")
 def api_status_fresh():
