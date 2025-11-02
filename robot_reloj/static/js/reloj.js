@@ -151,6 +151,14 @@
         if(id === 'virtual') await jpost('/api/visual/gui/start',{});
         else await jpost('/api/visual/gui/stop',{});
       }catch{}
+
+      // Mostrar/ocultar tanque solo si hay objetivo definido
+      try{
+        const goal = Number((window._statusCache && _statusCache.volumen_objetivo_ml!=null)? _statusCache.volumen_objetivo_ml : (s && s.volumen_objetivo_ml!=null ? s.volumen_objetivo_ml : 0));
+        const box = document.getElementById('tank_box'); if(box){ box.style.display = (goal>0 ? 'flex' : 'none'); }
+      }catch{}
+
+      // Sin vaciado físico: no hay barra de “vaciado”.
       await refreshRobots();
       try{ await refreshPorts(); }catch{}
       try{ await refreshPbGui(); }catch{}
@@ -534,6 +542,35 @@
       const zMaxGauge = Math.max((history.reduce((m,p)=>Math.max(m,p.z||0),0)) || 1, 1);
       const sgz=document.getElementById('sg_z_fg'); if(sgz){ setGauge('sg_z_fg', zmm, zMaxGauge, 'sg_z_txt'); }
       setGauge('sg_flow_fg', Number((s.caudal_est_mls!=null?s.caudal_est_mls:s.flow_est)||0), Math.max( (history.reduce((m,p)=>Math.max(m,p.flow||0),0)) || 1, 1), 'sg_flow_txt');
+
+      // Tank nivel (relativo a objetivo, o al inicio de vaciado, o al máximo reciente)
+      try{
+        const tank = document.getElementById('tank_level');
+        const tankPct = document.getElementById('tank_pct');
+        if(tank && tankPct){
+          const vol = Number(s.volumen_ml||0);
+          const goal = Number((s.volumen_objetivo_ml!=null)?s.volumen_objetivo_ml:0);
+          let ref = 0;
+          if(goal>0){ ref = goal; }
+          else if(window._drainStartVol){ ref = window._drainStartVol; }
+          else{
+            try{ ref = (history.reduce((m,p)=>Math.max(m,p.vol||0),0)) || 0; }catch{ ref = 0; }
+          }
+          ref = Math.max(ref, 1);
+          const p = clamp(vol/ref, 0, 1);
+          const H = 66, Y0 = 7; // según SVG en reloj.html
+          const h = Math.round(H * p);
+          const y = Y0 + (H - h);
+          tank.setAttribute('y', String(y));
+          tank.setAttribute('height', String(h));
+          tankPct.textContent = `${Math.round(p*100)}%`;
+          // Color por umbral
+          try{
+            const fill = p>0.5? '#29d3b0' : (p>0.2? '#ffb84d' : '#ff6a6a');
+            tank.style.fill = fill;
+          }catch{}
+        }
+      }catch{}
 
       // Actualizar mini panel Control
       const setT=(id,val)=>{ const el=document.getElementById(id); if(el){ el.textContent = fmt(val); } };

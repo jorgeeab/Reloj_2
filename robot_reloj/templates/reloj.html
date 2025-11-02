@@ -175,6 +175,13 @@
           <div class="gauge"><label>Energy A</label><div class="bar"><div id="g_ea"></div></div></div>
           <div class="gauge"><label>Bomba</label><div class="bar"><div id="g_eb"></div></div></div>
           <div class="gauge"><label>Progreso Volumen</label><div class="bar"><div id="g_vol_goal"></div></div></div>
+          <div class="tank" id="tank_box" title="Nivel (relativo)">
+            <svg id="tank_svg" width="40" height="80" viewBox="0 0 40 80" aria-label="Tank level">
+              <rect x="8" y="5" width="24" height="70" rx="6" ry="6" class="tank-body" />
+              <rect id="tank_level" x="10" y="7" width="20" height="66" class="tank-level" />
+            </svg>
+            <div class="tank-label"><span id="tank_pct">0%</span></div>
+          </div>
         </div>
 
         <div class="svg-gauges">
