@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Reloj Hub — Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { font-family: system-ui, sans-serif; }
+    .svg-gauges{ display:grid; grid-template-columns:repeat(2,120px); gap:10px; }
+    .svg-gauge svg{ display:block }
+    .svg-gauge .bg{ fill:none; stroke:#dee2e6; stroke-width:10 }
+    .svg-gauge .fg{ fill:none; stroke:#0d6efd; stroke-width:10; stroke-linecap:round; stroke-dasharray:301.59 999; stroke-dashoffset:301.59; transition:stroke-dashoffset .2s }
+    .svg-gauge .txt{ font-size:14px; fill:#212529 }
+    .svg-gauge .lbl{ font-size:12px; fill:#6c757d }
+  </style>
+  </head>
+<body class="bg-light">
+  <div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h1 class="h5 mb-1" id="title">Reloj Hub — Panel</h1>
+        <div class="text-muted small">Robot: <span id="rb_name">—</span>
+          <span id="rb_status" class="badge bg-secondary ms-2">Offline</span>
+        </div>
+        <div class="text-muted small">URL: <span id="rb_url">—</span></div>
+      </div>
+      <div class="d-flex gap-2 align-items-center">
+        <a id="open_robot_ui" class="btn btn-primary btn-sm" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Abrir robot</a>
+        <button class="btn btn-outline-secondary btn-sm" onclick="location.reload()"><i class="bi bi-arrow-repeat"></i></button>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-header">Estado en vivo</div>
+      <div class="card-body">
+        <div class="svg-gauges mb-3">
+          <div class="svg-gauge text-center">
+            <svg viewBox="0 0 120 120" width="120" height="120">
+              <circle class="bg" cx="60" cy="60" r="48"></circle>
+              <circle id="sg_flow_fg" class="fg" cx="60" cy="60" r="48" style="transform:rotate(-90deg); transform-origin:60px 60px;"></circle>
+              <text id="sg_flow_txt" class="txt" x="60" y="62" text-anchor="middle">0.0</text>
+              <text class="lbl" x="60" y="80" text-anchor="middle">flujo</text>
+            </svg>
+          </div>
+          <div class="svg-gauge text-center">
+            <svg viewBox="0 0 120 120" width="120" height="120">
+              <circle class="bg" cx="60" cy="60" r="48"></circle>
+              <circle id="sg_prog_fg" class="fg" cx="60" cy="60" r="48" style="transform:rotate(-90deg); transform-origin:60px 60px;"></circle>
+              <text id="sg_prog_txt" class="txt" x="60" y="62" text-anchor="middle">0%</text>
+              <text class="lbl" x="60" y="80" text-anchor="middle">progreso</text>
+            </svg>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 kv"><tbody id="st_kv"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const api = location.origin.replace(/\/$/, '');
+    const $ = s => document.querySelector(s);
+    function qp(){ const p=new URLSearchParams(location.search); const o={}; p.forEach((v,k)=>o[k]=v); return o; }
+    let currentRobotId = null;
+    let robotsCache = [];
+    let currentProgress = null;
+
+    function setGauge(id, value, max, fmtTxt){ const R=48, C=2*Math.PI*R; const fg=$('#sg_'+id+'_fg'), txt=$('#sg_'+id+'_txt'); const v=Math.max(0, Math.min(max, Number(value||0))); const frac = max>0? (v/max): 0; if(fg){ fg.style.strokeDashoffset = String(C * (1-frac)); } if(txt){ txt.textContent = typeof fmtTxt==='function'? fmtTxt(v, frac): (id==='prog'? (Math.round(frac*100)+'%') : v.toFixed(1)); } }
+
+    function renderStatusTable(rb){ const tb=$('#st_kv'); if(!tb) return; const stOk = rb && rb.status && rb.status.ok; const badge=$('#rb_status'); if(badge){ badge.className='badge ' + (stOk? 'bg-success':'bg-secondary'); badge.textContent = stOk? 'Online':'Offline'; }
+      $('#rb_name').textContent = rb? (rb.name||rb.id||'—') : '—';
+      $('#rb_url').textContent  = rb? (rb.base_url||'—') : '—';
+      const st = (rb && rb.status && rb.status.data) ? rb.status.data : null;
+      const f = n => (n===undefined||n===null)?'-':(typeof n==='number'?Number(n).toFixed(2):String(n));
+      const rows=[]; const toRow=(k,v)=>`<tr><td class="fw-semibold">${k}</td><td>${v}</td></tr>`;
+      if(st && typeof st==='object'){
+        const sensors = st.sensors || {};
+        if(sensors && typeof sensors==='object'){
+          Object.keys(sensors).forEach(k=> rows.push(toRow(k, f(sensors[k]))));
+        } else {
+          Object.keys(st).forEach(k=>{ if(!/^(sensors|progress)$/i.test(k)) rows.push(toRow(k, f(st[k]))); });
+        }
+      }
+      tb.innerHTML = rows.join('');
+
+      // Gauges
+      let flow = null; if(st){ const sensors=st.sensors||{}; if(typeof sensors==='object' && sensors.ml_per_sec!=null) flow=Number(sensors.ml_per_sec); else if(st.flow_est!=null) flow=Number(st.flow_est); else if(st.caudal_est_mls!=null) flow=Number(st.caudal_est_mls); }
+      setGauge('flow', flow||0, Math.max(1.0,(flow||1)*1.5));
+      const prog = (currentProgress!=null)? Number(currentProgress): (st && st.progress!=null? Number(st.progress): 0);
+      setGauge('prog', prog||0, 1, (v,f)=> Math.round(100*f)+'%');
+    }
+
+    async function fetchJSON(url, opts){ const r = await fetch(url, opts); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+
+    async function refreshRobots(){
+      const data = await fetchJSON(api + '/robots'); robotsCache = data.robots || [];
+      const rb = robotsCache.find(r=>r.id===currentRobotId) || null;
+      if(rb){ $('#open_robot_ui').href = (String(rb.base_url||'').replace(/\/$/,'') + '/'); renderStatusTable(rb); }
+    }
+
+    async function pollProgress(){ try{ const data = await fetchJSON(api + '/tasks'); let prog=null; (data.tasks||[]).some(t=>{ if(t && t.robot_id===currentRobotId && (t.status==='executing'||t.status==='running') && t.progress!=null){ prog = Number(t.progress); return true; } return false; }); currentProgress = prog; const rb=(robotsCache||[]).find(r=>r.id===currentRobotId)||null; if(rb) renderStatusTable(rb); }catch{} }
+    setInterval(pollProgress, 2000);
+
+    // Init
+    (function(){
+      const params = qp();
+      currentRobotId = params.id || null;
+      if(!currentRobotId){ document.getElementById('title').textContent = 'Reloj Hub — Panel (sin ID)'; }
+      refreshRobots();
+      try{
+        const ws = new WebSocket((location.protocol==='https:'?'wss':'ws') + '://' + location.host + '/ws');
+        ws.onmessage = ev => { const d = JSON.parse(ev.data); if(d.type==='robots_status'){ const rb = (d.robots||[]).find(r=> r.id===currentRobotId) || null; if(rb) renderStatusTable(rb); } };
+      }catch{}
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

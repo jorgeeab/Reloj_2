@@ -1,0 +1,26 @@
+{
+  "widgets": [
+    {"id": "flow", "type": "gauge", "title": "Flujo", "unit": "ml/s", "path": "sensors.ml_per_sec|flow.current|metrics.flow_ml_s", "decimals": 1},
+    {"id": "volume", "type": "value", "title": "Volumen", "unit": "ml", "path": "volumen_ml|flow.volume_ml|metrics.volume_ml", "decimals": 0},
+    {
+      "id": "pump_flow",
+      "type": "slider",
+      "title": "Caudal objetivo",
+      "unit": "ml/s",
+      "path": "caudalBombaMLs|flow.target",
+      "decimals": 1,
+      "min": 0,
+      "max": 30,
+      "step": 0.5,
+      "command": { "type": "flow", "field": "caudal_bomba_mls", "override_ms": 2000, "hold_interval_ms": 200, "hold_delay_ms": 400 }
+    },
+    {
+      "id": "reset_volume",
+      "type": "button",
+      "title": "Volumen",
+      "label": "Reiniciar contador",
+      "command": { "type": "control", "payload": { "reset_volumen": 1 } },
+      "confirm": "¿Reiniciar el contador de volumen?"
+    }
+  ]
+}

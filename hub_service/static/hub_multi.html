@@ -1,0 +1,1997 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Control de Robots</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/hub/components/widgets.css" rel="stylesheet">
+  <style>
+    :root {
+      --background: #f8fafc;
+      --border: #e5e7eb;
+    }
+    
+    body { 
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--background);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .svg-gauges{ display:grid; grid-template-columns:repeat(2,120px); gap:10px; }
+    .svg-gauge svg{ display:block }
+    .svg-gauge .bg{ fill:none; stroke:#dee2e6; stroke-width:10 }
+    .svg-gauge .fg{ fill:none; stroke:var(--accent); stroke-width:10; stroke-linecap:round; stroke-dasharray:301.59 999; stroke-dashoffset:301.59; transition:stroke-dashoffset .2s }
+    .svg-gauge .txt{ font-size:14px; fill:#212529 }
+    .svg-gauge .lbl{ font-size:12px; fill:#6c757d }
+
+    /* Control widget styles */
+    .control-widget {
+      padding: 1.25rem;
+      background: #fff;
+      border: 1px solid #e9ecef;
+      border-radius: 0.75rem;
+      width: 100%;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .control-widget.telemetry {
+      background: #f8f9fa;
+      border-color: #dee2e6;
+    }
+    
+    .control-widget.flow {
+      background: #e8f5e9;
+      border-color: #c8e6c9;
+    }
+    
+    .control-widget .section-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #495057;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #dee2e6;
+    }
+
+    /* Contenedor interno del widget */
+    .control-widget > div {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      width: 100%;
+      background: #e3f2fd;
+      border: 2px solid #2196f3;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      border-radius: 4px;
+    }
+    
+    /* Contenedor del formulario */
+    .control-widget .widget-form {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      background: #e8f5e9;
+      border: 2px solid #4caf50;
+      padding: 0.5rem;
+      border-radius: 4px;
+    }
+    
+    /* Input groups y contenedores internos */
+    .control-widget .input-group-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    .control-widget .widget-value {
+      font-size: 1rem;
+      font-weight: 500;
+      color: #212529;
+      margin: 0.5rem 0;
+    }
+
+    .control-widget .control-content {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .control-widget .telemetry-buttons {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 0.5rem;
+    }
+
+    .control-widget:last-child {
+      margin-bottom: 0;
+    }
+
+    @media (min-width: 576px) {
+      .control-widget {
+        flex-direction: row;
+        align-items: center;
+      }
+    }
+
+    .control-widget .control-label {
+      font-size: 0.8125rem;
+      color: #495057;
+      font-weight: 500;
+      width: 140px;
+      min-width: 140px;
+      flex-shrink: 0;
+      margin: 0;
+      padding: 0.5rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .control-widget .control-label i {
+      color: #6c757d;
+      font-size: 1rem;
+    }
+    
+    .control-widget .value-display {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #212529;
+      background: #fff;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      border: 1px solid #dee2e6;
+      text-align: center;
+      min-width: 100px;
+    }
+    
+    .control-widget .value-unit {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #6c757d;
+      margin-left: 0.25rem;
+    }
+
+    .control-widget .control-input {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #fff3e0;
+      border: 2px solid #ff9800;
+      padding: 0.5rem;
+      border-radius: 4px;
+    }
+
+    .control-widget .control-input > * {
+      margin: 0;
+      background: #fce4ec;
+      border: 2px solid #e91e63;
+      padding: 0.25rem;
+      border-radius: 4px;
+    }
+    
+    .control-widget .widget-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .control-widget .input-group-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .control-widget .input-group {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid #dee2e6;
+      border-radius: 0.5rem;
+      background: #fff;
+      width: 160px;
+      min-width: 160px;
+      height: 40px;
+      overflow: hidden;
+    }
+    
+    .control-widget.flow .input-group {
+      background: #fff;
+      border-color: #c8e6c9;
+    }
+
+    .control-widget .input-group .btn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      margin: 0;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      color: #495057;
+      flex: 0 0 auto;
+    }
+
+    .control-widget .input-group .form-control {
+      width: 80px !important;
+      min-width: 80px !important;
+      border: none;
+      border-left: 1px solid rgba(0,0,0,0.1);
+      border-right: 1px solid rgba(0,0,0,0.1);
+      border-radius: 0;
+      padding: 0.375rem;
+      text-align: center;
+      background: white;
+    }
+    
+    .control-widget .input-group .btn:hover {
+      background: #f8f9fa;
+    }
+
+    .control-widget .input-group .btn:not(:last-child) {
+      border-right: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .control-widget .input-group .btn:last-child {
+      border-left: 1px solid rgba(0,0,0,0.1);
+    }
+    
+    /* Estilos para los elementos del widget */
+    .control-widget .form-control {
+      width: 80px !important;
+      min-width: 80px !important;
+      border: none;
+      background: white;
+      box-shadow: none;
+      text-align: center;
+      padding: 0.5rem;
+      font-size: 1rem;
+      font-weight: 500;
+      color: #212529;
+      flex: 0 0 auto;
+    }
+
+    .control-widget .form-control:focus {
+      outline: none;
+      background: #f8f9fa;
+    }
+    
+    .control-widget .form-control::-webkit-inner-spin-button,
+    .control-widget .form-control::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    
+    .control-widget .input-unit {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #6c757d;
+      padding: 0 0.5rem;
+      border-left: 1px solid #dee2e6;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      background: #f8f9fa;
+    }
+
+    @media (min-width: 576px) {
+      .control-widget .control-input {
+        flex: 1;
+        max-width: 200px;
+      }
+    }
+
+    .control-widget .input-group {
+      width: 100%;
+      border: none;
+      background: transparent;
+    }
+
+    .control-widget .input-group .btn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: none;
+      border-radius: 0;
+      color: #495057;
+      flex: 0 0 auto;
+    }
+
+    .control-widget .input-group .btn:hover {
+      background: #f8f9fa;
+    }
+
+    .control-widget .input-group .btn:active {
+      background: #e9ecef;
+    }
+
+    .control-widget .input-group .form-control {
+      width: 70px !important;
+      min-width: 70px;
+      text-align: center;
+      border: 1px solid rgba(0,0,0,0.1);
+      background: white;
+      margin: 0;
+      padding: 0.375rem 0.25rem;
+      font-size: 0.875rem;
+      color: #212529;
+      font-weight: 500;
+      flex: 0 0 auto;
+    }
+
+    .control-widget .input-group .form-control {
+      text-align: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    .control-widget .input-group .btn {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      color: #6c757d;
+    }
+
+    .control-widget .input-group .btn:hover {
+      background: rgba(0,0,0,.03);
+      color: #212529;
+    }
+
+    .control-widget .input-group .form-control {
+      border: none;
+      border-left: 1px solid rgba(0,0,0,.1);
+      border-right: 1px solid rgba(0,0,0,.1);
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .control-widget .input-group .btn i {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .control-widget .input-group .btn:hover {
+      background: #f8f9fa;
+      border-color: rgba(0,0,0,0.2);
+    }
+
+    .control-widget .input-group .btn:active {
+      background: #e9ecef;
+    }
+
+    .control-widget .btn-widget {
+      border: none;
+      background: transparent;
+      color: #212529;
+      padding: 0.375rem 0.75rem;
+      font-size: 0.875rem;
+      height: 32px;
+      border-radius: 4px;
+      flex: 1;
+      min-width: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease-in-out;
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+    }
+    
+    .control-widget .btn-widget:hover {
+      background-color: #e9ecef;
+      border-color: #ced4da;
+    }
+
+    .control-widget .btn-widget:hover {
+      background-color: rgba(0,0,0,0.05);
+    }
+
+    .control-widget .btn-widget:active {
+      background-color: rgba(0,0,0,0.1);
+    }
+    
+    /* Para los botones de Ejecutar/Detener */
+    .control-widget .btn-group {
+      margin-top: 0.5rem;
+    }
+
+    .control-widget .btn-group .btn {
+      font-size: 0.875rem;
+      padding: 0.375rem 0.75rem;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .comp-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 575.98px) {
+      .card-body {
+        padding: 1rem;
+      }
+      
+      .input-group-sm > .form-control,
+      .input-group-sm > .btn {
+        padding: 0.5rem;
+        font-size: 1rem;
+      }
+
+      .control-widget .input-group .btn {
+        width: 44px;
+        height: 44px;
+      }
+
+      .control-widget + .control-widget {
+        padding-top: 0.5rem;
+        border-top: 1px solid rgba(0,0,0,0.05);
+      }
+    }
+    /* Card styles */
+    .card {
+      background: var(--surface);
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: box-shadow 0.2s ease;
+      width: 100%;
+    }
+
+    @media (max-width: 575.98px) {
+      .card {
+        border-radius: 0.5rem;
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+        width: calc(100% + 1rem);
+      }
+    }
+
+    .card:hover {
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+
+    .card-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      font-weight: 500;
+    }
+
+    .card-body {
+      padding: 1.25rem;
+    }
+
+    /* Robot card styles */
+    .robot-card {
+      transition: transform 0.2s ease;
+    }
+
+    .robot-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .robot-card[data-collapsed="true"] > [data-role="body"] { 
+      display: none; 
+    }
+
+    .robot-card .collapse-btn i { 
+      transition: transform 0.2s ease; 
+    }
+
+    .robot-card[data-collapsed="true"] .collapse-btn i { 
+      transform: rotate(180deg); 
+    }
+
+    .robot-card .header-actions { 
+      gap: 0.5rem; 
+    }
+
+    .robot-card .header-actions > * { 
+      flex: 0 0 auto; 
+    }
+
+    .robot-card .header-actions .btn.disabled { 
+      pointer-events: none; 
+      opacity: 0.6; 
+    }
+
+    @media (max-width: 768px) {
+      .robot-card .header-actions { 
+        width: 100%; 
+        justify-content: flex-end; 
+      }
+    }
+    /* Form & Button styles */
+    .form-control,
+    .form-select {
+      border-color: var(--border);
+      transition: border-color 0.15s ease;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 2px rgba(13,110,253,0.15);
+    }
+
+    .form-label {
+      color: #6c757d;
+      margin-bottom: 0.25rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 500;
+    }
+
+    /* Card styles */
+    .card {
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      margin-bottom: 1rem;
+    }
+
+    .card-header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+    }
+
+    /* Status grid */
+    .status-grid { 
+      display: grid; 
+      gap: 1rem; 
+    }
+
+    .status-block { 
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: all 0.2s ease;
+    }
+
+    .status-block:hover {
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+
+    .status-title { 
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .status-title .bi { 
+      font-size: 1rem;
+      color: var(--primary);
+    }
+    .status-cells{ display:grid; gap:8px; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); }
+    .status-cell{ padding:10px; border-radius:8px; background:rgba(13,110,253,0.06); }
+    .status-cell .lbl{ font-size:0.7rem; letter-spacing:0.04em; text-transform:uppercase; color:#6c757d; margin-bottom:4px; }
+    .status-cell .val{ font-size:1.15rem; font-weight:600; color:#0d6efd; }
+    .status-cell[data-variant="flow"]{ background:rgba(25,135,84,0.1); }
+    .status-cell[data-variant="flow"] .val{ color:#198754; }
+    .status-cell[data-variant="neutral"]{ background:rgba(108,117,125,0.08); }
+    .status-cell[data-variant="neutral"] .val{ color:#495057; }
+    .status-block[data-section="movement"] .status-title{ color:#0d6efd; }
+    .status-block[data-section="flow"] .status-title{ color:#198754; }
+    .status-empty{ font-size:0.8rem; color:#6c757d; text-align:center; padding:8px 0; }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar bg-white border-bottom mb-4">
+    <div class="container py-2">
+      <div class="d-flex justify-content-between align-items-center w-100">
+        <div class="d-flex align-items-center gap-3">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-robot text-primary me-2"></i>
+            <h1 class="h5 mb-0">Control de Robots</h1>
+          </div>
+          <div class="badge bg-success" title="Robots activos">
+            <span id="robot_count">0</span> activos
+          </div>
+        </div>
+        <button class="btn btn-outline-primary btn-sm" id="refreshAllBtn">
+          <i class="bi bi-arrow-clockwise me-1"></i>
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </nav>
+  
+  <main class="container-fluid container-lg pb-4">
+    <div class="row g-3">
+      <div class="col-12 col-lg-8">
+        <div id="robots_grid" class="d-flex flex-column gap-3"></div>
+
+        <div class="card shadow-sm mt-3">
+          <div class="card-header">Tareas recientes</div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0" id="tasks">
+              <thead class="table-light"><tr><th>Robot</th><th>Planta</th><th>Acción</th><th>Estado</th><th>Prog</th><th>Inicio</th><th>Fin</th><th>ExecID</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Robots disponibles (archivo)</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="syncFromCatalog()"><i class="bi bi-arrow-repeat"></i></button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0" id="catalog">
+              <thead class="table-light"><tr><th>ID</th><th>URL</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div class="small text-muted px-3 py-2">Edita <code>hub_service/data/robots_catalog.json</code> para cambiar esta lista.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header d-flex align-items-center">
+            <i class="bi bi-gear-fill me-2 text-primary"></i>
+            Configuración de robots
+          </div>
+          <div class="card-body p-0">
+            <!-- Reloj -->
+            <div class="p-3 border-bottom">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-clock me-2 text-primary"></i>
+                  <h6 class="mb-0">Robot Reloj</h6>
+                </div>
+                <button id="btn_reloj" class="btn btn-sm" onclick="toggleReloj()">
+                  <i class="bi bi-power me-1"></i>
+                  <span id="lbl_reloj">Iniciar</span>
+                </button>
+              </div>
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label small">ID</label>
+                  <input id="in_id" class="form-control form-control-sm" placeholder="reloj-local" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Nombre</label>
+                  <input id="in_name" class="form-control form-control-sm" placeholder="Reloj Local" />
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label small">URL</label>
+                  <input id="in_url" class="form-control form-control-sm" placeholder="http://localhost:5005" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Puerto</label>
+                  <input id="in_port" class="form-control form-control-sm" placeholder="5005" value="5005" />
+                </div>
+              </div>
+            </div>
+            
+            <!-- Bomba -->
+            <div class="p-3">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-water me-2 text-primary"></i>
+                  <h6 class="mb-0">Robot Bomba</h6>
+                </div>
+                <button id="btn_pump" class="btn btn-sm" onclick="togglePump()">
+                  <i class="bi bi-power me-1"></i>
+                  <span id="lbl_pump">Iniciar</span>
+                </button>
+              </div>
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label small">ID</label>
+                  <input id="in_pump_id" class="form-control form-control-sm" placeholder="pump-local" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Nombre</label>
+                  <input id="in_pump_name" class="form-control form-control-sm" placeholder="Bomba Local" />
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label small">URL</label>
+                  <input id="in_pump_url" class="form-control form-control-sm" placeholder="http://localhost:5010" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Puerto</label>
+                  <input id="in_pump_port" class="form-control form-control-sm" placeholder="5010" value="5010" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+          <div class="card-header">Agregar robot (manual)</div>
+          <div class="card-body">
+            <div class="row g-2 align-items-end">
+              <div class="col-4">
+                <select id="add_kind" class="form-select">
+                  <option value="reloj">reloj</option>
+                  <option value="pump">pump</option>
+                </select>
+              </div>
+              <div class="col-4"><input id="add_id" class="form-control" placeholder="id" /></div>
+              <div class="col-4"><input id="add_name" class="form-control" placeholder="nombre" /></div>
+              <div class="col-8"><input id="add_url" class="form-control" placeholder="http://ip:puerto" /></div>
+              <div class="col-4"><input id="add_key" class="form-control" placeholder="api key (opcional)" /></div>
+              <div class="col-12"><button class="btn btn-primary" onclick="addRobotManual()"><i class="bi bi-save"></i> Guardar</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const api = location.origin.replace(/\/$/, '');
+    const $ = (sel, ctx = document) => ctx.querySelector(sel);
+    const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
+    const robotsGrid = document.getElementById('robots_grid');
+    const robotCountEl = document.getElementById('robot_count');
+    const refreshAllBtn = document.getElementById('refreshAllBtn');
+    const themeSel = document.getElementById('themeSel');
+    const robotsState = new Map();
+    const DEBUG_UI = (()=>{ try{return localStorage.getItem('hub_debug_ui')==='1';}catch{return false;} })();
+    const COMPONENTS_VERSION = '8';
+    let Widgets = null;
+    const protocolsCache = new Map();
+    const progressByRobot = new Map();
+    let robotsCache = [];
+    let plantsCache = [];
+    const collapsedKeyPrefix = 'hub_robot_card_collapsed:';
+    const JSON_HEADERS = { 'Content-Type': 'application/json' };
+    function postJSON(path, body){
+      return fetch(api + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      }).then(r => r.json()).catch(() => ({}));
+    }
+
+    async function ensureWidgetsLoaded(){
+      if(Widgets) return;
+      const moduleUrl = `/hub/components/widgets.js?v=${COMPONENTS_VERSION}`;
+      Widgets = await import(moduleUrl);
+    }
+
+    async function loadRegistryFor(kind){
+      const base = '/hub/components/registry/';
+      const version = `?v=${COMPONENTS_VERSION}`;
+      const urls = [
+        base + (kind||'default') + '.json' + version,
+        base + 'default.json' + version
+      ];
+      for(const u of urls){ try{ const r=await fetch(u); if(r.ok) return r.json(); }catch{} }
+      return { widgets: [] };
+    }
+
+    async function controlRobot(robotId, payload){
+      if(!robotId) return;
+      try{
+        await fetchJSON(`/robots/${encodeURIComponent(robotId)}/control`, {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(payload || {})
+        });
+      }catch(err){
+        console.warn('[hub] controlRobot failed', err);
+      }
+    }
+
+    function registrySignature(reg){
+      if(!reg || !Array.isArray(reg.widgets)) return '';
+      try{
+        return reg.widgets.map(w => `${w.id||''}:${w.type||''}`).join('|');
+      }catch{
+        return '';
+      }
+    }
+
+    async function buildComponentsIfNeeded(state){
+      if(!state || !state.compGrid) return;
+      await ensureWidgetsLoaded();
+      const reg = await loadRegistryFor(state.kind||'default');
+      const widgets = Array.isArray(reg.widgets) ? reg.widgets : [];
+      const prevSig = registrySignature(state.registry);
+      const nextSig = registrySignature(reg);
+      const needsRebuild = !state.compInstances || state.compInstances.length !== widgets.length || prevSig !== nextSig;
+      if(!needsRebuild) return;
+
+      function createControlWidget(inst) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'control-widget';
+        
+        const label = document.createElement('div');
+        label.className = 'control-label';
+        label.textContent = inst.el.querySelector('label')?.textContent || '';
+        wrapper.appendChild(label);
+
+        const control = document.createElement('div');
+        control.className = 'control-input';
+        
+        // Asegurar que el elemento del widget se expanda
+        inst.el.style.width = '100%';
+        if (inst.el.firstElementChild) {
+          inst.el.firstElementChild.style.width = '100%';
+        }
+        
+        control.appendChild(inst.el);
+        wrapper.appendChild(control);
+        
+        return wrapper;
+      }
+      if(state.compInstances && state.compInstances.length){
+        state.compInstances.forEach(ci=>{ try{ ci.inst.destroy && ci.inst.destroy(); }catch(e){} });
+      }
+      state.compGrid.innerHTML = '';
+      state.registry = reg; state.compInstances = [];
+      (reg.widgets||[]).forEach(w=>{
+        try{
+          const cfg = { ...w };
+          cfg.robotId = state.id;
+          if(cfg.command){
+            const cmd = cfg.command;
+            const field = cmd.field;
+            if(cmd.type === 'setpoint' && field){
+              cfg.onCommand = async (value)=>{
+                const payload = { setpoints: { [field]: Number(value) } };
+                if(cmd.modo != null){
+                  payload.modo = Number(cmd.modo);
+                }
+                await controlRobot(state.id, payload);
+              };
+            }else if(cmd.type === 'energy' && field){
+              cfg.onCommand = async (value)=>{
+                const payload = { energies: { [field]: Number(value) } };
+                await controlRobot(state.id, payload);
+              };
+            }else if(cmd.type === 'flow' && field){
+              cfg.onCommand = async (value)=>{
+                const payload = { flow: { [field]: Number(value) } };
+                await controlRobot(state.id, payload);
+              };
+            }else if(cmd.type === 'flow_control'){
+              const volumeField = cmd.volume_field || cmd.volumeField || null;
+              const flowField = cmd.flow_field || cmd.flowField || null;
+              const extraPayload = cmd.payload ? clonePayload(cmd.payload) : null;
+              const modoValue = cmd.modo != null ? Number(cmd.modo) : null;
+              const resolveNumber = (obj, key, fallback)=>{
+                if(!obj) return 0;
+                if(key && obj[key] != null) return Number(obj[key]);
+                if(fallback && obj[fallback] != null) return Number(obj[fallback]);
+                if(key === 'volume' && obj.volume != null) return Number(obj.volume);
+                if(key === 'flow' && obj.flow != null) return Number(obj.flow);
+                return 0;
+              };
+              const assemblePayload = (values)=>{
+                const out = {};
+                if(volumeField){
+                  const v = resolveNumber(values, 'volume', volumeField);
+                  out.setpoints = out.setpoints || {};
+                  out.setpoints[volumeField] = v;
+                }
+                if(flowField){
+                  const v = resolveNumber(values, 'flow', flowField);
+                  out.flow = out.flow || {};
+                  out.flow[flowField] = v;
+                }
+                if(extraPayload){
+                  mergePayload(out, clonePayload(extraPayload));
+                }
+                if(modoValue != null){
+                  out.modo = modoValue;
+                }
+                return out;
+              };
+              cfg.onExecute = async (values = {})=>{
+                await controlRobot(state.id, assemblePayload(values));
+              };
+              const stopCfg = cmd.stop || {};
+              cfg.onStop = async (values = {})=>{
+                const payload = {};
+                if(stopCfg.volume !== undefined && volumeField){
+                  payload.setpoints = payload.setpoints || {};
+                  payload.setpoints[volumeField] = Number(stopCfg.volume);
+                }else if(stopCfg.setpoints){
+                  payload.setpoints = payload.setpoints || {};
+                  mergePayload(payload.setpoints, clonePayload(stopCfg.setpoints));
+                }else if(volumeField){
+                  payload.setpoints = payload.setpoints || {};
+                  payload.setpoints[volumeField] = 0;
+                }
+                if(stopCfg.flow !== undefined && flowField){
+                  payload.flow = payload.flow || {};
+                  payload.flow[flowField] = Number(stopCfg.flow);
+                }else if(stopCfg.flow_payload || stopCfg.flowPayload){
+                  payload.flow = payload.flow || {};
+                  mergePayload(payload.flow, clonePayload(stopCfg.flow_payload || stopCfg.flowPayload));
+                }else if(flowField){
+                  payload.flow = payload.flow || {};
+                  payload.flow[flowField] = 0;
+                }
+                if(stopCfg.payload){
+                  mergePayload(payload, clonePayload(stopCfg.payload));
+                }
+                if(modoValue != null && stopCfg.keep_modo !== true){
+                  payload.modo = modoValue;
+                }
+                await controlRobot(state.id, payload);
+              };
+              if(cmd.reset_payload || cmd.resetPayload){
+                const resetPayload = clonePayload(cmd.reset_payload || cmd.resetPayload);
+                cfg.onReset = async ()=>{
+                  await controlRobot(state.id, clonePayload(resetPayload));
+                };
+              }
+            }else if(cmd.type === 'control'){
+              cfg.onCommand = async (value)=>{
+                let payload = {};
+                if(cmd.payload){
+                  if(typeof cmd.payload === 'function'){
+                    payload = cmd.payload(value, { state });
+                  }else{
+                    try{
+                      payload = JSON.parse(JSON.stringify(cmd.payload));
+                    }catch{
+                      payload = { ...cmd.payload };
+                    }
+                  }
+                }
+                if(field != null){
+                  payload[field] = Number(value);
+                }
+                await controlRobot(state.id, payload);
+              };
+            }else if(typeof cmd === 'function'){
+              const original = cmd;
+              cfg.onCommand = (value, meta)=> original(value, { meta, state });
+            }
+          }else if(typeof cfg.onCommand === 'function'){
+            const original = cfg.onCommand;
+            cfg.onCommand = (value, meta)=> original(value, { meta, state });
+          }
+          const inst = Widgets.WidgetFactory.create(cfg);
+          const widgetWrapper = createControlWidget(inst);
+          state.compGrid.appendChild(widgetWrapper);
+          state.compInstances.push({def:cfg, inst});
+        }catch(e){}
+      });
+    }
+
+    function updateComponents(state, st){
+      if(!state || !state.compInstances) return;
+      const rawOnline = !!(state.robotData && state.robotData.status && state.robotData.status.ok);
+      const online = (state.online != null) ? state.online : rawOnline;
+      const data = st || state.lastData || null;
+      const payload = { data, online, error: !online && !data };
+      state.compInstances.forEach(ci=>{ try{ ci.inst.update(payload); }catch(e){} });
+    }
+
+    function _openBase(res){
+      try{
+        const rid = (res && (res.id || (res.robot && res.robot.id))) || '';
+        if(rid){
+          const url = '/hub/hub_panel.html?id=' + encodeURIComponent(rid);
+          window.open(url, '_blank');
+          return;
+        }
+        const base = (res && (res.base_url || (res.robot && res.robot.base_url))) || '';
+        const kind = (res && (res.kind || (res.robot && res.robot.kind))) || '';
+        if(base){
+          const root = String(base).replace(/\/$/, '');
+          const isPump = String(kind).toLowerCase() === 'pump';
+          const url = isPump ? (root + '/ui/') : (root + '/');
+          window.open(url, '_blank');
+        }
+      }catch(err){}
+    }
+
+    function sleep(ms){
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function fetchJSON(path, opts){
+      const res = await fetch(api + path, opts);
+      if(!res.ok){
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      return res.json();
+    }
+
+    function clonePayload(obj){
+      if(obj == null) return null;
+      if(typeof structuredClone === 'function'){
+        try{ return structuredClone(obj); }catch(err){}
+      }
+      try{
+        return JSON.parse(JSON.stringify(obj));
+      }catch(err){
+        if(typeof obj !== 'object' || Array.isArray(obj)) return obj;
+        const out = {};
+        Object.keys(obj).forEach(key=>{
+          const val = obj[key];
+          out[key] = (val && typeof val === 'object' && !Array.isArray(val)) ? clonePayload(val) : val;
+        });
+        return out;
+      }
+    }
+
+    function mergePayload(target, source){
+      if(!target || typeof target !== 'object') return target;
+      if(!source || typeof source !== 'object') return target;
+      Object.keys(source).forEach(key=>{
+        const value = source[key];
+        if(value && typeof value === 'object' && !Array.isArray(value)){
+          if(!target[key] || typeof target[key] !== 'object'){
+            target[key] = {};
+          }
+          mergePayload(target[key], value);
+        }else{
+          target[key] = value;
+        }
+      });
+      return target;
+    }
+
+    function loadCollapsedState(id){
+      try{
+        return localStorage.getItem(collapsedKeyPrefix + id) === '1';
+      }catch(err){
+        return false;
+      }
+    }
+
+    function toggleCollapse(state, force, persist = true){
+      if(!state || !state.body) return;
+      const isCollapsed = state.card.dataset.collapsed === 'true';
+      let collapsed;
+      if(typeof force === 'boolean'){
+        collapsed = force;
+      } else {
+        collapsed = !isCollapsed;
+      }
+      state.card.dataset.collapsed = collapsed ? 'true' : 'false';
+      state.body.classList.toggle('d-none', collapsed);
+      if(state.collapseIcon){
+        state.collapseIcon.className = collapsed ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+      }
+      if(persist){
+        try{
+          localStorage.setItem(collapsedKeyPrefix + state.id, collapsed ? '1' : '0');
+        }catch(err){}
+      }
+    }
+
+    function createRobotCard(rb){
+      const card = document.createElement('div');
+      card.className = 'card shadow-sm robot-card';
+      card.dataset.robotId = rb.id;
+      card.innerHTML = `
+        <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+          <div>
+            <div class="h5 mb-0">Robot: <span data-role="name">&mdash;</span>
+              <span class="badge bg-secondary ms-2" data-role="status">Offline</span>
+            </div>
+            <div class="muted">URL: <span data-role="url">&mdash;</span></div>
+          </div>
+          <div class="d-flex flex-wrap align-items-center header-actions">
+            <button class="btn btn-outline-secondary btn-sm collapse-btn" data-action="collapse" title="Minimizar tarjeta"><i class="bi bi-chevron-up"></i></button>
+            <a class="btn btn-outline-secondary btn-sm" data-action="open-native" target="_blank" rel="noopener"><i class="bi bi-globe"></i></a>
+          </div>
+        </div>
+        <div class="card-body" data-role="body">
+          <div class="d-flex flex-column gap-3">
+            <div class="card border-0 bg-light">
+              <div class="card-header bg-transparent py-2">Acciones rápidas</div>
+              <div class="card-body">
+                <div class="mb-2" data-role="plant-group">
+                  <label class="form-label">Planta</label>
+                  <select class="form-select form-select-sm qa-planta"></select>
+                </div>
+                <div class="d-flex align-items-end gap-2 flex-wrap">
+                  <button class="btn btn-success btn-sm qa-move" data-action="move"><i class="bi bi-arrows-move"></i> Mover</button>
+                  <div style="width:160px">
+                    <label class="form-label mb-1 w-100">Volumen (ml)</label>
+                    <div class="input-group input-group-sm flex-nowrap">
+                      <button type="button" class="btn btn-outline-secondary d-flex align-items-center justify-content-center" style="width: 32px" onclick="decrementVolume()">
+                        <i class="bi bi-dash-lg"></i>
+                      </button>
+                      <input type="number" class="form-control qa-vol text-center px-0" value="50" min="0" step="1">
+                      <button type="button" class="btn btn-outline-secondary d-flex align-items-center justify-content-center" style="width: 32px" onclick="incrementVolume()">
+                        <i class="bi bi-plus-lg"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <button class="btn btn-primary btn-sm qa-water" data-action="water"><i class="bi bi-droplet"></i> Regar</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card border-0 bg-light">
+              <div class="card-header bg-transparent py-2">Tarea personalizada</div>
+              <div class="card-body">
+                <div class="row g-2 align-items-center mb-2">
+                  <div class="col-auto"><label class="col-form-label mb-0">Protocolo</label></div>
+                  <div class="col">
+                    <select class="form-select form-select-sm ct-protocol"></select>
+                  </div>
+                </div>
+                <div class="ct-fields"><div class="text-muted">Cargando protocolos...</div></div>
+                <div class="text-end">
+                  <button class="btn btn-outline-success btn-sm" data-action="execute"><i class="bi bi-play-fill"></i> Ejecutar</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card border-0">
+              <div class="card-header bg-transparent py-2">Estado en vivo</div>
+              <div class="card-body p-0">
+                <div class="status-empty" data-role="status-empty">Sin datos disponibles.</div>
+                <div class="status-content">
+                  <!-- Sección de flujo -->
+                  <div class="control-widget flow">
+                    <div class="section-title">Control de flujo</div>
+                    <!-- Volumen objetivo -->
+                    <div class="d-flex align-items-center mb-3">
+                      <div class="control-label">
+                        <i class="bi bi-droplet"></i>
+                        Volumen objetivo
+                      </div>
+                      <div class="input-group">
+                        <input type="number" class="form-control" value="0.0" min="0" step="0.1">
+                        <div class="input-unit">ml</div>
+                      </div>
+                    </div>
+                    <!-- Flujo requerido -->
+                    <div class="d-flex align-items-center mb-3">
+                      <div class="control-label">
+                        <i class="bi bi-water"></i>
+                        Flujo requerido
+                      </div>
+                      <div class="value-display">
+                        0.0<span class="value-unit">ml/s</span>
+                      </div>
+                    </div>
+                    <!-- Flujo restante -->
+                    <div class="d-flex align-items-center">
+                      <div class="control-label">
+                        <i class="bi bi-hourglass-split"></i>
+                        Flujo restante
+                      </div>
+                      <div class="value-display">
+                        0.0<span class="value-unit">ml/s</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Sección de telemetría -->
+                  <div class="control-widget telemetry">
+                    <div class="section-title">Telemetría</div>
+                    <div class="comp-grid d-flex flex-column gap-3" data-role="comp-grid"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>`;
+
+      const state = {
+        id: rb.id,
+        card,
+        body: card.querySelector('[data-role="body"]'),
+        nameEl: card.querySelector('[data-role="name"]'),
+        urlEl: card.querySelector('[data-role="url"]'),
+        statusBadge: card.querySelector('[data-role="status"]'),
+        openHub: null,
+        openNative: card.querySelector('[data-action="open-native"]'),
+        collapseBtn: card.querySelector('[data-action="collapse"]'),
+        collapseIcon: card.querySelector('[data-action="collapse"] i'),
+        plantGroup: card.querySelector('[data-role="plant-group"]'),
+        plantSelect: card.querySelector('.qa-planta'),
+        volumeInput: card.querySelector('.qa-vol'),
+        moveBtn: card.querySelector('[data-action="move"]'),
+        waterBtn: card.querySelector('[data-action="water"]'),
+        protocolSelect: card.querySelector('.ct-protocol'),
+        fieldsBox: card.querySelector('.ct-fields'),
+        executeBtn: card.querySelector('[data-action="execute"]'),
+        statusGrid: null,
+        statusEmpty: card.querySelector('[data-role="status-empty"]'),
+        compGrid: card.querySelector('[data-role="comp-grid"]'),
+        registry: null,
+        compInstances: [],
+        lastData: null,
+        lastDataTs: null,
+        runtime: rb.runtime === true,
+        selectedPlant: null,
+        kind: '',
+        kindRaw: '',
+        protocolsLoaded: false,
+        loadingProtocols: false,
+        robotData: null,
+        lastOnlineTs: null,
+        rawStatusOk: false,
+        online: false,
+        lastStatusTs: null
+      };
+
+      if(state.plantSelect){
+        state.plantSelect.addEventListener('change', () => {
+          state.selectedPlant = state.plantSelect.value;
+        });
+      }
+      if(state.moveBtn){
+        state.moveBtn.addEventListener('click', () => handleMove(state));
+      }
+      if(state.waterBtn){
+        state.waterBtn.addEventListener('click', () => handleWater(state));
+      }
+      if(state.protocolSelect){
+        state.protocolSelect.innerHTML = '<option value="">Cargando...</option>';
+        state.protocolSelect.disabled = true;
+        state.protocolSelect.addEventListener('change', () => renderProtocolFields(state));
+      }
+      if(state.executeBtn){
+        state.executeBtn.disabled = true;
+        state.executeBtn.addEventListener('click', () => handleExecute(state));
+      }
+      if(state.collapseBtn){
+        state.collapseBtn.addEventListener('click', () => toggleCollapse(state));
+      }
+      const collapsed = loadCollapsedState(state.id);
+      toggleCollapse(state, collapsed, false);
+      return state;
+    }
+
+    function populatePlantSelect(state){
+      if(!state || !state.plantSelect) return;
+      const sel = state.plantSelect;
+      const prev = state.selectedPlant || sel.value;
+      sel.innerHTML = '';
+      if(state.kind !== 'reloj'){
+        sel.innerHTML = '<option value="">No aplica</option>';
+        state.selectedPlant = '';
+        return;
+      }
+      if(!plantsCache.length){
+        sel.innerHTML = '<option value="">(sin plantas)</option>';
+        state.selectedPlant = '';
+        return;
+      }
+      plantsCache.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = `${p.era}|${p.id_planta}`;
+        opt.textContent = `${p.era}:${p.id_planta} ${p.nombre}`;
+        sel.appendChild(opt);
+      });
+      if(prev && Array.from(sel.options).some(o => o.value === prev)){
+        sel.value = prev;
+      } else {
+        sel.selectedIndex = 0;
+      }
+      state.selectedPlant = sel.value;
+    }
+
+    function parsePlantValue(value){
+      if(!value) return null;
+      const [era, idStr] = String(value).split('|');
+      const id = Number(idStr);
+      if(!era || Number.isNaN(id)) return null;
+      return { era, id };
+    }
+
+    async function handleMove(state){
+      if(!state) return;
+      if(state.kind !== 'reloj'){
+        alert('Mover solo disponible para robot reloj');
+        return;
+      }
+      const plant = parsePlantValue(state.plantSelect && state.plantSelect.value);
+      if(!plant){
+        alert('Selecciona una planta');
+        return;
+      }
+      try{
+        await fetchJSON('/assign', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ robot_id: state.id, plant_era: plant.era, plant_id: plant.id, action: 'move', params: {} })
+        });
+        await refreshTasks();
+      }catch(err){
+        alert('No se pudo enviar la orden de movimiento.');
+      }
+    }
+
+    async function handleWater(state){
+      if(!state) return;
+      const volume = Number(state.volumeInput ? state.volumeInput.value : 0);
+      if(!Number.isFinite(volume) || volume <= 0){
+        alert('Ingresa un volumen mayor a 0');
+        return;
+      }
+      try{
+        if(state.kind === 'reloj'){
+          const plant = parsePlantValue(state.plantSelect && state.plantSelect.value);
+          if(!plant){
+            alert('Selecciona una planta');
+            return;
+          }
+          await fetchJSON('/assign', {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify({ robot_id: state.id, plant_era: plant.era, plant_id: plant.id, action: 'water', params: { volume_ml: volume } })
+          });
+        } else {
+          const task = { name: 'riego_basico', protocol_name: 'riego_basico', mode: 'async', params: { volume_ml: volume } };
+          await fetchJSON('/execute', {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify({ robot_id: state.id, task })
+          });
+        }
+        await refreshTasks();
+      }catch(err){
+        alert('No se pudo enviar la orden de riego.');
+      }
+    }
+
+    async function handleExecute(state){
+      if(!state || !state.protocolSelect) return;
+      const protocolId = state.protocolSelect.value;
+      if(!protocolId){
+        alert('Selecciona un protocolo');
+        return;
+      }
+      const protocols = protocolsCache.get(state.id) || [];
+      const prot = protocols.find(p => p.id === protocolId);
+      if(!prot){
+        alert('Protocolo no disponible');
+        return;
+      }
+      const task = {
+        name: (prot.label || protocolId) + ' (custom)',
+        protocol_name: protocolId,
+        mode: 'async',
+        params: {}
+      };
+      if(state.fieldsBox){
+        const inputs = state.fieldsBox.querySelectorAll('.ct-param');
+        inputs.forEach(input => {
+          const name = input.dataset.param;
+          if(!name) return;
+          const raw = input.value;
+          if(raw === '') return;
+          const num = Number(raw);
+          if(name === 'duration_seconds'){
+            task.duration_seconds = num;
+          } else {
+            task.params[name] = num;
+          }
+        });
+      }
+      try{
+        await fetchJSON('/execute', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ robot_id: state.id, task })
+        });
+        await refreshTasks();
+      }catch(err){
+        alert('No se pudo ejecutar el protocolo.');
+      }
+    }
+
+    function renderProtocolOptions(state){
+      if(!state || !state.protocolSelect) return;
+      const protocols = protocolsCache.get(state.id) || [];
+      const prev = state.protocolSelect.value;
+      state.protocolSelect.innerHTML = '';
+      if(!protocols.length){
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = state.protocolsLoaded ? 'Sin protocolos' : 'Cargando...';
+        state.protocolSelect.appendChild(opt);
+        state.protocolSelect.disabled = true;
+        if(state.fieldsBox){
+          state.fieldsBox.innerHTML = state.protocolsLoaded ? '<div class="text-muted">Sin protocolos disponibles.</div>' : '<div class="text-muted">Cargando protocolos...</div>';
+        }
+        if(state.executeBtn) state.executeBtn.disabled = true;
+        return;
+      }
+      state.protocolSelect.disabled = false;
+      protocols.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.label || p.id;
+        state.protocolSelect.appendChild(opt);
+      });
+      if(prev && protocols.some(p => p.id === prev)){
+        state.protocolSelect.value = prev;
+      }
+      if(state.executeBtn) state.executeBtn.disabled = false;
+      renderProtocolFields(state);
+    }
+
+    function renderProtocolFields(state){
+      if(!state || !state.fieldsBox || !state.protocolSelect) return;
+      const protocols = protocolsCache.get(state.id) || [];
+      const prot = protocols.find(p => p.id === state.protocolSelect.value);
+      if(!prot){
+        state.fieldsBox.innerHTML = '<div class="text-muted">Sin definición de protocolo.</div>';
+        state.protocolParams = [];
+        return;
+      }
+      const params = Array.isArray(prot.params) ? prot.params : [];
+      state.protocolParams = params;
+      if(!params.length){
+        state.fieldsBox.innerHTML = '<div class="text-muted">Sin parámetros adicionales.</div>';
+        return;
+      }
+      const rows = params.map(prm => {
+        const label = prm.label || prm.name;
+        const unit = prm.unit ? ` (${prm.unit})` : '';
+        const step = prm.step != null ? ` step="${prm.step}"` : '';
+        const min = prm.min != null ? ` min="${prm.min}"` : '';
+        const max = prm.max != null ? ` max="${prm.max}"` : '';
+        const value = prm.default != null ? ` value="${prm.default}"` : '';
+        return `<div class="col-6"><label class="form-label mb-1">${label}${unit}</label><input type="number" class="form-control form-control-sm ct-param" data-param="${prm.name}"${step}${min}${max}${value}></div>`;
+      });
+      state.fieldsBox.innerHTML = `<div class="row g-2">${rows.join('')}</div>`;
+    }
+
+    async function loadRobotProtocols(state){
+      if(!state || state.protocolsLoaded || state.loadingProtocols) return;
+      state.loadingProtocols = true;
+      try{
+        const res = await fetchJSON('/robots/' + encodeURIComponent(state.id) + '/protocols');
+        const protocols = res.protocols || [];
+        protocolsCache.set(state.id, protocols);
+      }catch(err){
+        protocolsCache.set(state.id, []);
+      }finally{
+        state.protocolsLoaded = true;
+        state.loadingProtocols = false;
+        renderProtocolOptions(state);
+      }
+    }
+
+    function renderTelemetry(state){
+      if(!state) return;
+      let st = state.robotData && state.robotData.status && state.robotData.status.data
+        ? state.robotData.status.data
+        : null;
+      if(!st && state.robotData && state.robotData.status && state.robotData.status.raw){
+        try{ st = JSON.parse(state.robotData.status.raw); }
+        catch{} }
+      // Histeresis de UI: si no hay datos nuevos pero tenemos últimos válidos hace <5s, mantenerlos visibles.
+      const nowTs = Date.now();
+      const fresh = (state.lastDataTs && (nowTs - state.lastDataTs) < 5000);
+      if(!st || typeof st !== 'object'){
+        if(state.lastData && fresh){ st = state.lastData; }
+      }
+      if(DEBUG_UI){ console.debug('[telemetry]', state.id, st); }
+      if(!st || typeof st !== 'object'){
+        if(state.statusEmpty) state.statusEmpty.classList.remove('d-none');
+        updateComponents(state, null);
+        return;
+      }
+      // Cachear último paquete válido y mostrar grid
+      state.lastData = st; state.lastDataTs = Date.now();
+      if(state.statusEmpty) state.statusEmpty.classList.add('d-none');
+
+      updateComponents(state, st);
+    }
+
+    function updateRobotCard(state, rb){
+      state.robotData = rb;
+      state.kindRaw = rb.kind || '';
+      state.kind = state.kindRaw.toLowerCase();
+      state.runtime = rb.runtime === true;
+      if(state.nameEl) state.nameEl.textContent = rb.name || rb.id || '—';
+      if(state.urlEl) state.urlEl.textContent = rb.base_url || '—';
+      const nowTs = Date.now();
+      const rawStatusOk = rb.status && rb.status.ok ? true : false;
+      if(rawStatusOk){
+        state.lastOnlineTs = nowTs;
+      }
+      const graceOnline = state.lastOnlineTs != null && (nowTs - state.lastOnlineTs) < 3000;
+      const stOk = rawStatusOk || graceOnline || state.runtime;
+      state.online = stOk;
+      state.rawStatusOk = rawStatusOk;
+      state.lastStatusTs = nowTs;
+      if(state.statusBadge){
+        state.statusBadge.className = 'badge ' + (stOk ? 'bg-success' : 'bg-secondary') + ' ms-2';
+        state.statusBadge.textContent = stOk ? 'Online' : 'Offline';
+      }
+      if(state.openNative){
+        const base = rb.base_url ? String(rb.base_url).replace(/\/$/, '') + '/' : '';
+        if(base){
+          state.openNative.href = base;
+          state.openNative.classList.remove('disabled');
+          state.openNative.setAttribute('title', 'Abrir UI del robot');
+        } else {
+          state.openNative.removeAttribute('href');
+          state.openNative.classList.add('disabled');
+          state.openNative.setAttribute('title', 'Sin URL');
+        }
+      }
+      if(state.plantGroup){
+        state.plantGroup.classList.toggle('d-none', state.kind !== 'reloj');
+      }
+      if(state.moveBtn){
+        state.moveBtn.style.display = state.kind === 'reloj' ? 'inline-flex' : 'none';
+      }
+      populatePlantSelect(state);
+      buildComponentsIfNeeded(state);
+      renderTelemetry(state);
+      if(!state.protocolsLoaded){
+        loadRobotProtocols(state);
+      } else {
+        renderProtocolOptions(state);
+      }
+    }
+
+    function toggleRobotsEmptyState(visible){
+      let empty = document.getElementById('robots_empty_state');
+      if(visible){
+        if(!empty){
+          empty = document.createElement('div');
+          empty.id = 'robots_empty_state';
+          empty.className = 'alert alert-light border text-center text-muted';
+          empty.textContent = 'No hay robots registrados.';
+          robotsGrid.appendChild(empty);
+        }
+      } else if(empty){
+        empty.remove();
+      }
+    }
+
+    function renderRobotsList(list){
+      toggleRobotsEmptyState(false);
+      const seen = new Set();
+      list.forEach(rb => {
+        seen.add(rb.id);
+        let state = robotsState.get(rb.id);
+        if(!state){
+          state = createRobotCard(rb);
+          robotsState.set(rb.id, state);
+        }
+        updateRobotCard(state, rb);
+        robotsGrid.appendChild(state.card);
+      });
+      Array.from(robotsState.entries()).forEach(([id, state]) => {
+        if(!seen.has(id)){
+          state.card.remove();
+          robotsState.delete(id);
+          progressByRobot.delete(id);
+          protocolsCache.delete(id);
+        }
+      });
+      if(!list.length){
+        toggleRobotsEmptyState(true);
+      }
+      if(robotCountEl) robotCountEl.textContent = String(list.length);
+    }
+
+    async function refreshRobots(options){
+      const opts = options || {};
+      const light = !!opts.light;
+      let data;
+      try{
+        data = await fetchJSON('/robots');
+      }catch(err){
+        console.warn('No se pudo cargar la lista de robots', err);
+        data = { robots: [] };
+      }
+      robotsCache = data.robots || [];
+      renderRobotsList(robotsCache);
+      updateStartStopButtons();
+      if(light) return;
+      await Promise.all([refreshTasks(), refreshCatalog()]);
+      await loadPlants();
+    }
+
+    function updateStartStopButtons(){
+      const reloj = robotsCache.find(r => (r.kind || '').toLowerCase() === 'reloj');
+      const pump = robotsCache.find(r => (r.kind || '').toLowerCase() === 'pump');
+      const relojOn = !!(reloj && reloj.runtime === true);
+      const pumpOn = !!(pump && pump.runtime === true);
+      const btnR = $('#btn_reloj');
+      const lblR = $('#lbl_reloj');
+      if(btnR && lblR){
+        btnR.className = relojOn ? 'btn btn-warning w-100' : 'btn btn-outline-secondary w-100';
+        lblR.textContent = relojOn ? 'Detener Reloj' : 'Iniciar Reloj';
+      }
+      const btnP = $('#btn_pump');
+      const lblP = $('#lbl_pump');
+      if(btnP && lblP){
+        btnP.className = pumpOn ? 'btn btn-warning w-100' : 'btn btn-outline-secondary w-100';
+        lblP.textContent = pumpOn ? 'Detener Bomba' : 'Iniciar Bomba';
+      }
+    }
+
+    async function ensureRobotState(kind, shouldBeOnline, timeoutMs = 8000){
+      const deadline = Date.now() + timeoutMs;
+      while(Date.now() < deadline){
+        await refreshRobots({ light: true });
+        const rb = robotsCache.find(r => (r.kind || '').toLowerCase() === kind);
+        const online = !!(rb && rb.runtime === true);
+        if(online === shouldBeOnline) return true;
+        await sleep(400);
+      }
+      return false;
+    }
+
+    function escapeAttr(value){
+      return String(value ?? '').replace(/'/g, '\\\'');
+    }
+
+    async function refreshTasks(){
+      const tbody = $('#tasks tbody');
+      if(!tbody) return;
+      try{
+        const data = await fetchJSON('/tasks');
+        const tasks = data.tasks || [];
+        tbody.innerHTML = '';
+        if(!tasks.length){
+          tbody.innerHTML = '<tr><td colspan="9" class="text-muted">Sin tareas registradas.</td></tr>';
+          return;
+        }
+        tasks.forEach(t => {
+          const stopBtn = t.status && (t.status === 'executing' || t.status === 'running')
+            ? `<button class="btn btn-sm btn-outline-danger" onclick="stopTask('${escapeAttr(t.robot_id)}','${escapeAttr(t.execution_id)}')">Detener</button>`
+            : '';
+          const prog = t.progress != null ? Math.round(100 * Number(t.progress)) + '%' : '';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${t.robot_id || ''}</td><td>${(t.plant_era || '')}:${t.plant_id || ''}</td><td>${t.action || 'custom'}</td><td>${t.status || ''}</td><td>${prog}</td><td>${t.started_at || ''}</td><td>${t.ended_at || ''}</td><td><code>${t.execution_id || ''}</code></td><td>${stopBtn}</td>`;
+          tbody.appendChild(tr);
+        });
+      }catch(err){
+        tbody.innerHTML = '<tr><td colspan="9" class="text-danger">No se pudo cargar la lista de tareas.</td></tr>';
+      }
+    }
+
+    async function stopTask(robotId, execId){
+      if(!robotId || !execId) return;
+      try{
+        await fetchJSON('/tasks/stop', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ robot_id: robotId, execution_id: execId })
+        });
+        await refreshTasks();
+      }catch(err){
+        alert('No se pudo detener la tarea.');
+      }
+    }
+
+    async function refreshCatalog(){
+      const tbody = $('#catalog tbody');
+      if(!tbody) return;
+      try{
+        const res = await fetchJSON('/robots/catalog');
+        const robots = res.robots || [];
+        tbody.innerHTML = '';
+        if(!robots.length){
+          tbody.innerHTML = '<tr><td colspan="2" class="text-muted">Vacío</td></tr>';
+          return;
+        }
+        robots.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.id}</td><td>${r.base_url}</td>`;
+          tbody.appendChild(tr);
+        });
+      }catch(err){
+        tbody.innerHTML = '<tr><td colspan="2" class="text-danger">No se pudo cargar</td></tr>';
+      }
+    }
+
+    async function loadPlants(){
+      try{
+        const data = await fetchJSON('/plants');
+        plantsCache = data.plants || [];
+      }catch(err){
+        plantsCache = [];
+      }
+      robotsState.forEach(state => populatePlantSelect(state));
+    }
+
+    function handleRobotStatusUpdate(list){
+      if(!Array.isArray(list) || !list.length) return;
+      const index = new Map(robotsCache.map((r, i) => [r.id, i]));
+      list.forEach(rb => {
+        if(index.has(rb.id)){
+          const idx = index.get(rb.id);
+          robotsCache[idx] = Object.assign({}, robotsCache[idx], rb);
+        } else {
+          robotsCache.push(rb);
+        }
+      });
+      renderRobotsList(robotsCache);
+      updateStartStopButtons();
+    }
+
+    function setupWebSocket(){
+      try{
+        const ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/ws');
+        ws.onmessage = ev => {
+          try{
+            const data = JSON.parse(ev.data);
+            if(data.type === 'robots_status'){
+              handleRobotStatusUpdate(data.robots || []);
+            } else if(data.type === 'tasks_update' || data.type === 'task_added'){
+              refreshTasks();
+              pollProgress();
+            }
+          }catch(err){}
+        };
+        ws.onclose = () => { setTimeout(setupWebSocket, 3000); };
+        ws.onerror = () => {
+          try{ ws.close(); }catch(err){}
+        };
+      }catch(err){
+        setTimeout(setupWebSocket, 3000);
+      }
+    }
+
+    async function pollProgress(){
+      if(!robotsState.size) return;
+      try{
+        const data = await fetchJSON('/tasks');
+        const active = new Map();
+        (data.tasks || []).forEach(t => {
+          if(t && t.robot_id && (t.status === 'executing' || t.status === 'running') && t.progress != null){
+            active.set(t.robot_id, Number(t.progress));
+          }
+        });
+        robotsState.forEach((state, id) => {
+          if(active.has(id)){
+            progressByRobot.set(id, active.get(id));
+          } else {
+            progressByRobot.delete(id);
+          }
+        });
+      }catch(err){}
+    }
+
+    function applyTheme(theme){
+      const classes = ['theme-blue', 'theme-teal', 'theme-purple'];
+      document.body.classList.remove(...classes);
+      if(classes.includes(theme)){
+        document.body.classList.add(theme);
+      }
+      try{
+        localStorage.setItem('hub_theme', theme || '');
+      }catch(err){}
+    }
+
+    function setupTheme(){
+      let saved = '';
+      try{
+        saved = localStorage.getItem('hub_theme') || '';
+      }catch(err){}
+      applyTheme(saved);
+      if(themeSel){
+        themeSel.value = saved;
+        themeSel.addEventListener('change', ev => applyTheme(ev.target.value));
+      }
+    }
+
+    async function startReloj(){
+      const inId = $('#in_id');
+      const inName = $('#in_name');
+      const inPort = $('#in_port');
+      const inUrl = $('#in_url');
+      const id = inId ? (inId.value.trim() || 'reloj-local') : 'reloj-local';
+      const name = inName ? (inName.value.trim() || 'Reloj Local') : 'Reloj Local';
+      const port = inPort ? Number(inPort.value || 5005) : 5005;
+      const res = await postJSON('/robots/start', { id, name, port, kind: 'reloj' });
+      if(res && res.base_url && inUrl){ inUrl.value = res.base_url; }
+      if(res && res.robot){
+        if(inId) inId.value = res.robot.id || id;
+        if(inName) inName.value = res.robot.name || name;
+      }
+      await refreshRobots();
+    }
+
+    async function stopReloj(){
+      await postJSON('/robots/stop', { kind: 'reloj' });
+      await refreshRobots();
+    }
+
+    async function toggleReloj(){
+      const running = robotsCache.some(r => (r.kind || '').toLowerCase() === 'reloj' && r.status && r.status.ok);
+      const btn = $('#btn_reloj');
+      const lbl = $('#lbl_reloj');
+      if(btn) btn.disabled = true;
+      if(lbl) lbl.textContent = running ? 'Deteniendo...' : 'Iniciando...';
+      let confirmed = false;
+      try{
+        if(running){
+          await stopReloj();
+          confirmed = await ensureRobotState('reloj', false);
+          if(!confirmed){
+            alert('No se pudo confirmar que el robot Reloj se detuvo.');
+          }
+        } else {
+          await startReloj();
+          confirmed = await ensureRobotState('reloj', true);
+          if(!confirmed){
+            alert('No se pudo confirmar que el robot Reloj inició.');
+          }
+        }
+      }catch(err){
+        console.error('toggleReloj error', err);
+        alert('Error al intentar cambiar el estado del robot Reloj.');
+      }finally{
+        if(btn) btn.disabled = false;
+        updateStartStopButtons();
+      }
+    }
+
+    async function startPump(){
+      const inId = $('#in_pump_id');
+      const inName = $('#in_pump_name');
+      const inPort = $('#in_pump_port');
+      const inUrl = $('#in_pump_url');
+      const id = inId ? (inId.value.trim() || 'pump-local') : 'pump-local';
+      const name = inName ? (inName.value.trim() || 'Bomba Local') : 'Bomba Local';
+      const port = inPort ? Number(inPort.value || 5010) : 5010;
+      const res = await postJSON('/robots/start', { id, name, port, kind: 'pump' });
+      if(res && res.base_url && inUrl){ inUrl.value = res.base_url; }
+      if(res && res.robot){
+        if(inId) inId.value = res.robot.id || id;
+        if(inName) inName.value = res.robot.name || name;
+      }
+      await refreshRobots();
+    }
+
+    async function stopPump(){
+      await postJSON('/robots/stop', { kind: 'pump' });
+      await refreshRobots();
+    }
+
+    async function togglePump(){
+      const running = robotsCache.some(r => (r.kind || '').toLowerCase() === 'pump' && r.status && r.status.ok);
+      const btn = $('#btn_pump');
+      const lbl = $('#lbl_pump');
+      if(btn) btn.disabled = true;
+      if(lbl) lbl.textContent = running ? 'Deteniendo...' : 'Iniciando...';
+      let confirmed = false;
+      try{
+        if(running){
+          await stopPump();
+          confirmed = await ensureRobotState('pump', false);
+          if(!confirmed){
+            alert('No se pudo confirmar que la bomba se detuvo.');
+          }
+        } else {
+          await startPump();
+          confirmed = await ensureRobotState('pump', true);
+          if(!confirmed){
+            alert('No se pudo confirmar que la bomba inició.');
+          }
+        }
+      }catch(err){
+        console.error('togglePump error', err);
+        alert('Error al intentar cambiar el estado de la bomba.');
+      }finally{
+        if(btn) btn.disabled = false;
+        updateStartStopButtons();
+      }
+    }
+
+    async function syncFromCatalog(){
+      try{
+        const res = await fetchJSON('/robots/catalog');
+        const robots = res.robots || [];
+        for(const r of robots){
+          try{
+            await fetchJSON('/robots', {
+              method: 'POST',
+              headers: JSON_HEADERS,
+              body: JSON.stringify({ id: r.id, name: r.name || r.id, base_url: r.base_url, kind: r.kind || 'hardware', api_key: r.api_key || null })
+            });
+          }catch(err){}
+        }
+      }catch(err){}
+      await refreshCatalog();
+      await refreshRobots();
+    }
+
+    async function addRobotManual(){
+      const idInput = $('#add_id');
+      const nameInput = $('#add_name');
+      const urlInput = $('#add_url');
+      const kindSelect = $('#add_kind');
+      const keyInput = $('#add_key');
+      const id = idInput ? idInput.value.trim() : '';
+      const name = nameInput ? nameInput.value.trim() : '';
+      const base_url = urlInput ? urlInput.value.trim() : '';
+      const kind = kindSelect ? (kindSelect.value.trim() || 'hardware') : 'hardware';
+      const api_key = keyInput ? keyInput.value.trim() : '';
+      if(!id || !base_url){
+        alert('id y url son obligatorios');
+        return;
+      }
+      try{
+        await fetchJSON('/robots', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ id, name, base_url, kind, api_key: api_key || null })
+        });
+        await refreshRobots();
+      }catch(err){
+        alert('No se pudo guardar el robot.');
+      }
+    }
+
+    function incrementVolume() {
+      const input = document.querySelector('.qa-vol');
+      if (input) {
+        const currentValue = parseInt(input.value) || 0;
+        input.value = currentValue + 1;
+      }
+    }
+
+    function decrementVolume() {
+      const input = document.querySelector('.qa-vol');
+      if (input) {
+        const currentValue = parseInt(input.value) || 0;
+        if (currentValue > 0) {
+          input.value = currentValue - 1;
+        }
+      }
+    }
+
+    if(refreshAllBtn){
+      refreshAllBtn.addEventListener('click', () => { refreshRobots(); });
+    }
+    setupWebSocket();
+    refreshRobots();
+    setInterval(pollProgress, 2000);
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

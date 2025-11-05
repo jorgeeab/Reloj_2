@@ -6,11 +6,96 @@
       "base_url": "http://localhost:5005",
       "kind": "reloj",
       "api_key": null,
-      "created_at": "2025-10-22T06:12:19.095277"
+      "created_at": "2025-11-02T23:24:23.343070+00:00"
+    },
+    "pump-local": {
+      "id": "pump-local",
+      "name": "Bomba Local",
+      "base_url": "http://localhost:5010",
+      "kind": "pump",
+      "api_key": null,
+      "created_at": "2025-11-02T23:24:23.353884+00:00"
     }
   },
   "plants": {},
   "regimens": [],
   "activities": [],
-  "tasks": []
+  "tasks": [
+    {
+      "id": "t_1762113433330",
+      "robot_id": "reloj-local",
+      "plant_era": null,
+      "plant_id": null,
+      "action": "custom",
+      "protocol_name": "riego_basico",
+      "params": {
+        "a_deg": 36.5,
+        "intensity": 100,
+        "volume_ml": 50,
+        "x_mm": 100
+      },
+      "execution_id": "task_00004",
+      "status": "completed",
+      "started_at": "2025-11-02T13:57:12.698556",
+      "ended_at": 1762113432.6187944,
+      "progress": {}
+    },
+    {
+      "id": "t_1762113424709",
+      "robot_id": "reloj-local",
+      "plant_era": null,
+      "plant_id": null,
+      "action": "custom",
+      "protocol_name": "riego_basico",
+      "params": {
+        "a_deg": 36.5,
+        "intensity": 100,
+        "volume_ml": 50,
+        "x_mm": 0
+      },
+      "execution_id": "task_00003",
+      "status": "completed",
+      "started_at": "2025-11-02T13:57:03.668756",
+      "ended_at": 1762113423.6405106,
+      "progress": {}
+    },
+    {
+      "id": "t_1762113418799",
+      "robot_id": "reloj-local",
+      "plant_era": null,
+      "plant_id": null,
+      "action": "custom",
+      "protocol_name": "riego_basico",
+      "params": {
+        "a_deg": 16.5,
+        "intensity": 100,
+        "volume_ml": 50,
+        "x_mm": 0
+      },
+      "execution_id": "task_00002",
+      "status": "completed",
+      "started_at": "2025-11-02T13:56:58.797544",
+      "ended_at": 1762113418.7061038,
+      "progress": {}
+    },
+    {
+      "id": "t_1762113406585",
+      "robot_id": "reloj-local",
+      "plant_era": null,
+      "plant_id": null,
+      "action": "custom",
+      "protocol_name": "riego_basico",
+      "params": {
+        "a_deg": 16.5,
+        "intensity": 100,
+        "volume_ml": 50,
+        "x_mm": 0
+      },
+      "execution_id": "task_00001",
+      "status": "completed",
+      "started_at": "2025-11-02T13:56:46.579489",
+      "ended_at": 1762113406.5544922,
+      "progress": {}
+    }
+  ]
 }

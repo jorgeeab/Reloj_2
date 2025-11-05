@@ -1,0 +1,9 @@
+{
+  "widgets": [
+    {"id": "flow", "type": "gauge", "title": "Flujo", "unit": "ml/s", "path": "sensors.ml_per_sec|flow.current|metrics.flow_ml_s", "decimals": 1},
+    {"id": "progress", "type": "gauge", "title": "Progreso", "percent": true, "path": "progress", "decimals": 0},
+    {"id": "x", "type": "value", "title": "X", "unit": "mm", "path": "x_mm|position.x_mm", "decimals": 1},
+    {"id": "y", "type": "value", "title": "Y", "unit": "mm", "path": "y_mm|position.y_mm", "decimals": 1},
+    {"id": "z", "type": "value", "title": "Z", "unit": "mm", "path": "z_mm|position.z_mm", "decimals": 1}
+  ]
+}

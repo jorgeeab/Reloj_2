@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ROBOTS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/hub/components/widgets.css" rel="stylesheet">
+  <style>
+    body { font-family: system-ui, sans-serif; }
+    .muted{ color:#666; font-size:12px; }
+    :root{ --accent:#0d6efd; }
+    .theme-blue{ --accent:#4ea1ff; }
+    .theme-teal{ --accent:#29d3b0; }
+    .theme-purple{ --accent:#9a7cff; }
+    .svg-gauges{ display:grid; grid-template-columns:repeat(2,120px); gap:10px; }
+    .svg-gauge svg{ display:block }
+    .svg-gauge .bg{ fill:none; stroke:#dee2e6; stroke-width:10 }
+    .svg-gauge .fg{ fill:none; stroke:var(--accent); stroke-width:10; stroke-linecap:round; stroke-dasharray:301.59 999; stroke-dashoffset:301.59; transition:stroke-dashoffset .2s }
+    .svg-gauge .txt{ font-size:14px; fill:#212529 }
+    .svg-gauge .lbl{ font-size:12px; fill:#6c757d }
+    .robot-card[data-collapsed="true"] > [data-role="body"]{ display:none; }
+    .robot-card .collapse-btn i{ transition:transform .2s ease; }
+    .robot-card[data-collapsed="true"] .collapse-btn i{ transform:rotate(180deg); }
+    .robot-card .header-actions{ gap:0.5rem; }
+    .robot-card .header-actions > *{ flex:0 0 auto; }
+    .robot-card .header-actions .btn.disabled{ pointer-events:none; opacity:0.6; }
+    @media (max-width: 768px){
+      .robot-card .header-actions{ width:100%; justify-content:flex-end; }
+    }
+    .status-grid{ display:grid; gap:12px; }
+    .status-block{ background:#ffffff; border:1px solid #e9ecef; border-radius:10px; padding:12px; box-shadow:0 1px 2px rgba(15,23,42,0.04); }
+    .status-title{ font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; color:#6c757d; margin-bottom:8px; display:flex; align-items:center; gap:0.35rem; }
+    .status-title .bi{ font-size:0.9rem; }
+    .status-cells{ display:grid; gap:8px; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); }
+    .status-cell{ padding:10px; border-radius:8px; background:rgba(13,110,253,0.06); }
+    .status-cell .lbl{ font-size:0.7rem; letter-spacing:0.04em; text-transform:uppercase; color:#6c757d; margin-bottom:4px; }
+    .status-cell .val{ font-size:1.15rem; font-weight:600; color:#0d6efd; }
+    .status-cell[data-variant="flow"]{ background:rgba(25,135,84,0.1); }
+    .status-cell[data-variant="flow"] .val{ color:#198754; }
+    .status-cell[data-variant="neutral"]{ background:rgba(108,117,125,0.08); }
+    .status-cell[data-variant="neutral"] .val{ color:#495057; }
+    .status-block[data-section="movement"] .status-title{ color:#0d6efd; }
+    .status-block[data-section="flow"] .status-title{ color:#198754; }
+    .status-empty{ font-size:0.8rem; color:#6c757d; text-align:center; padding:8px 0; }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1 class="h4 mb-0">ROBOTS</h1>
+      <span class="text-muted small">Multi-robot</span>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div id="robots_grid" class="d-flex flex-column gap-3"></div>
+
+        <div class="card shadow-sm mt-3">
+          <div class="card-header">Tareas recientes</div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0" id="tasks">
+              <thead class="table-light"><tr><th>Robot</th><th>Planta</th><th>Acción</th><th>Estado</th><th>Prog</th><th>Inicio</th><th>Fin</th><th>ExecID</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Robots disponibles (archivo)</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="syncFromCatalog()"><i class="bi bi-arrow-repeat"></i></button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0" id="catalog">
+              <thead class="table-light"><tr><th>ID</th><th>URL</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div class="small text-muted px-3 py-2">Edita <code>hub_service/data/robots_catalog.json</code> para cambiar esta lista.</div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm">
+          <div class="card-header">Configurar robots</div>
+          <div class="card-body">
+            <div class="small text-muted mb-2">Reloj</div>
+            <div class="row g-2 align-items-end mb-2">
+              <div class="col-5"><input id="in_id" class="form-control" placeholder="reloj-local" /></div>
+              <div class="col-7"><input id="in_name" class="form-control" placeholder="Reloj Local" /></div>
+              <div class="col-8"><input id="in_url" class="form-control" placeholder="http://localhost:5005" /></div>
+              <div class="col-4"><input id="in_port" class="form-control" placeholder="5005" value="5005" /></div>
+              <div class="col-12"><button id="btn_reloj" class="btn btn-outline-secondary w-100" onclick="toggleReloj()"><i class="bi bi-power"></i> <span id="lbl_reloj">Iniciar Reloj</span></button></div>
+            </div>
+            <hr/>
+            <div class="small text-muted mb-2">Bomba</div>
+            <div class="row g-2 align-items-end">
+              <div class="col-5"><input id="in_pump_id" class="form-control" placeholder="pump-local" /></div>
+              <div class="col-7"><input id="in_pump_name" class="form-control" placeholder="Bomba Local" /></div>
+              <div class="col-8"><input id="in_pump_url" class="form-control" placeholder="http://localhost:5010" /></div>
+              <div class="col-4"><input id="in_pump_port" class="form-control" placeholder="5010" value="5010" /></div>
+              <div class="col-12"><button id="btn_pump" class="btn btn-outline-secondary w-100" onclick="togglePump()"><i class="bi bi-power"></i> <span id="lbl_pump">Iniciar Bomba</span></button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+          <div class="card-header">Agregar robot (manual)</div>
+          <div class="card-body">
+            <div class="row g-2 align-items-end">
+              <div class="col-4">
+                <select id="add_kind" class="form-select">
+                  <option value="reloj">reloj</option>
+                  <option value="pump">pump</option>
+                </select>
+              </div>
+              <div class="col-4"><input id="add_id" class="form-control" placeholder="id" /></div>
+              <div class="col-4"><input id="add_name" class="form-control" placeholder="nombre" /></div>
+              <div class="col-8"><input id="add_url" class="form-control" placeholder="http://ip:puerto" /></div>
+              <div class="col-4"><input id="add_key" class="form-control" placeholder="api key (opcional)" /></div>
+              <div class="col-12"><button class="btn btn-primary" onclick="addRobotManual()"><i class="bi bi-save"></i> Guardar</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ...el resto del script...
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

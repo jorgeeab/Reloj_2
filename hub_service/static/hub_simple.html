@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Reloj Hub — Simple</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { font-family: system-ui, sans-serif; }
+  </style>
+  </head>
+<body class="bg-light">
+  <div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1 class="h5 mb-0">Reloj Hub</h1>
+      <span class="text-muted small">UI simple</span>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-header d-flex gap-2 align-items-center flex-wrap">
+        <div class="me-auto">
+          <span class="fw-semibold">Robot:</span>
+          <span id="rb_name">—</span>
+          <span id="rb_status" class="badge bg-secondary ms-2">Offline</span>
+          <div class="text-muted small">URL: <span id="rb_url">—</span></div>
+        </div>
+        <select id="sel_robot" class="form-select form-select-sm" style="min-width:220px" onchange="onSelectRobot()"></select>
+        <button class="btn btn-outline-secondary btn-sm" onclick="syncFromCatalog()"><i class="bi bi-arrow-repeat"></i> Recargar</button>
+        <a id="rb_open" class="btn btn-primary btn-sm" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Abrir</a>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-auto">
+            <label class="form-label mb-1">Volumen (ml)</label>
+            <input id="in_vol" type="number" class="form-control form-control-sm" value="50" min="0" step="1" style="width:140px" />
+          </div>
+          <div class="col-auto">
+            <button class="btn btn-success" onclick="regar()"><i class="bi bi-droplet"></i> Regar</button>
+          </div>
+          <div class="col text-muted small">
+            Edita <code>hub_service/data/robots_catalog.json</code> para cambiar la lista.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-header">Tareas</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0" id="tasks">
+          <thead class="table-light"><tr><th>Robot</th><th>Acción</th><th>Estado</th><th>Inicio</th><th>Fin</th><th>ExecID</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const api = location.origin.replace(/\/$/, '');
+    const $ = s => document.querySelector(s);
+    let robotsCache = [];
+    let currentRobot = null;
+
+    async function fetchJSON(url, opts){ const r = await fetch(url, opts); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+
+    function setRobotUI(rb){
+      currentRobot = rb || null;
+      $('#rb_name').textContent = rb? (rb.name || rb.id || '—') : '—';
+      $('#rb_url').textContent = rb? (rb.base_url || '—') : '—';
+      const stOk = rb && rb.status && rb.status.ok;
+      const badge = $('#rb_status');
+      badge.className = 'badge ' + (stOk? 'bg-success':'bg-secondary');
+      badge.textContent = stOk? 'Online':'Offline';
+      const base = String(rb?.base_url||'').replace(/\/$/,'');
+      $('#rb_open').href = base? (base + '/') : '#';
+    }
+
+    async function refreshRobots(){
+      let data = await fetchJSON(api + '/robots');
+      robotsCache = data.robots || [];
+      if(robotsCache.length === 0){
+        // intentar importar catálogo completo
+        try{
+          const res = await fetchJSON(api + '/robots/catalog');
+          for(const r of (res.robots||[])){
+            try{ await fetchJSON(api + '/robots', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id:r.id, name:r.name||r.id, base_url:r.base_url, kind:r.kind||'hardware', api_key:r.api_key||null })}); }catch{}
+          }
+          data = await fetchJSON(api + '/robots');
+          robotsCache = data.robots || [];
+        }catch{}
+      }
+      const sel = $('#sel_robot');
+      if(sel){
+        const prev = sel.value; sel.innerHTML = '';
+        robotsCache.forEach(r=>{ const o = document.createElement('option'); o.value = r.id; o.textContent = `${r.id} — ${r.name||''}`.trim(); sel.appendChild(o); });
+        if(prev && robotsCache.some(r=>r.id===prev)) sel.value = prev;
+      }
+      const id = $('#sel_robot')?.value; const rb = (robotsCache.find(r=>r.id===id) || robotsCache[0] || null);
+      if(rb) $('#sel_robot').value = rb.id;
+      setRobotUI(rb);
+      await refreshTasks();
+    }
+
+    function onSelectRobot(){
+      const id = $('#sel_robot')?.value; if(!id) return;
+      const rb = (robotsCache||[]).find(r=>r.id===id) || null;
+      setRobotUI(rb);
+      refreshTasks();
+    }
+
+    async function regar(){
+      if(!currentRobot) return alert('Selecciona un robot');
+      const vol = Number($('#in_vol').value||0);
+      const task = { name: 'riego_basico', protocol_name: 'riego_basico', mode: 'async', params: { volume_ml: vol } };
+      await fetchJSON(api + '/execute', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ robot_id: currentRobot.id, task })});
+      await refreshTasks();
+    }
+
+    async function refreshTasks(){
+      const data = await fetchJSON(api + '/tasks');
+      const tb = $('#tasks tbody'); tb.innerHTML = '';
+      (data.tasks||[]).forEach(t => {
+        if(currentRobot && t.robot_id !== currentRobot.id) return;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${t.robot_id}</td>`+
+          `<td>${t.action||'custom'}</td>`+
+          `<td>${t.status||''}</td>`+
+          `<td>${t.started_at||''}</td>`+
+          `<td>${t.ended_at||''}</td>`+
+          `<td><code>${t.execution_id||''}</code></td>`;
+        tb.appendChild(tr);
+      });
+    }
+
+    async function syncFromCatalog(){
+      try{
+        const res = await fetchJSON(api + '/robots/catalog');
+        const robots = res.robots || [];
+        for(const r of robots){
+          try{ await fetchJSON(api + '/robots', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id:r.id, name:r.name||r.id, base_url:r.base_url, kind:r.kind||'hardware', api_key:r.api_key||null })}); }catch(e){}
+        }
+      }catch(e){}
+      await refreshRobots();
+    }
+
+    try{
+      const ws = new WebSocket((location.protocol==='https:'?'wss':'ws') + '://' + location.host + '/ws');
+      ws.onmessage = ev => {
+        const d = JSON.parse(ev.data);
+        if(d.type==='robots_status'){
+          const rb = (d.robots||[]).find(r=> currentRobot && r.id===currentRobot.id) || (d.robots||[])[0] || null;
+          if(rb){ setRobotUI(rb); }
+        }else if(d.type==='tasks_update' || d.type==='task_added'){
+          refreshTasks();
+        }
+      };
+    }catch{}
+
+    refreshRobots();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

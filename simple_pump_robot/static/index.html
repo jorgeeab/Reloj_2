@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Reloj Labs — Bomba</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b1023; --panel:#121837; --panel2:#0e1430; --text:#e8eefc; --muted:#9db3ff; --border:#2b3568; --accent:#5ad1d8;
+    }
+    .theme-blue{ --accent:#4ea1ff; --panel:#151a2e; --panel2:#1b2140; --border:#273059; --muted:#98a2c9; }
+    .theme-teal{ --accent:#29d3b0; --panel:#12212a; --panel2:#0f1a22; --border:#214247; --muted:#8ecbc3; }
+    .theme-purple{ --accent:#9a7cff; --panel:#1a1631; --panel2:#141028; --border:#2e2458; --muted:#c6b8ff; }
+    body{ background:linear-gradient(180deg,#091029,#0a0f25); color:var(--text); }
+    .topbar{ display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border); background:#0a1130; position:sticky; top:0; z-index:10; }
+    .brand{ display:flex; align-items:center; gap:8px; }
+    .brand .dot{ width:10px; height:10px; background:var(--accent); border-radius:50%; box-shadow:0 0 10px var(--accent); }
+    .pill{ background:var(--panel2); border:1px solid var(--border); color:var(--text); border-radius:999px; padding:6px 10px; font-size:12px; }
+    .pill.warn{ border-color:#e07; color:#ffd6d6; }
+    .wrap{ max-width:1100px; margin:18px auto; padding:0 12px; }
+    .tabs{ display:flex; gap:6px; border-bottom:1px dashed var(--border); margin-bottom:10px; }
+    .tabs button{ background:var(--panel2); color:var(--text); border:1px solid var(--border); border-bottom:none; border-radius:8px 8px 0 0; padding:6px 10px; }
+    .card{ background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--border); border-radius:12px; color:var(--text); }
+    .card-header{ border-bottom:1px solid var(--border); background:transparent; color:var(--muted); }
+    .table{ color:var(--text); }
+    .table thead{ color:#cfe4ff; }
+    .form-control, .form-select, .btn{ border-radius:8px; }
+    .badge-online{ background:#198754; }
+    .grid{ display:grid; gap:12px; }
+    .two{ grid-template-columns: 1.4fr 1fr; }
+    .tabview{ display:none; }
+    .tabview.active{ display:block; }
+    .overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.35); display:none; align-items:center; justify-content:center; }
+    .overlay .panel{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px; min-width:280px; box-shadow:0 8px 40px rgba(0,0,0,0.5); }
+    .telemetry{ display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+    .telemetry div{ background:var(--panel2); border:1px dashed var(--border); border-radius:8px; padding:8px; }
+    .telemetry label{ display:block; font-size:12px; color:var(--muted); margin-bottom:2px }
+    .telemetry span{ font-weight:600 }
+    .gauges{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; align-items:center }
+    .gauge .bar{ background:#0b1330; border:1px solid var(--border); border-radius:8px; height:10px; overflow:hidden }
+    .gauge .bar div{ height:100%; width:0%; background:linear-gradient(90deg,#6bc3ff,#7af7eb); transition: width .2s }
+    .tank{ position:relative; display:flex; align-items:center; gap:8px }
+    .tank .box{ width:28px; height:56px; border:1px solid var(--border); border-radius:6px; background:#0b1330; position:relative; overflow:hidden }
+    .tank .lvl{ position:absolute; bottom:0; left:0; right:0; height:0%; background:linear-gradient(180deg,#5ad1d8,#3a89ff) }
+    .tank .pct{ font-weight:600 }
+    .execbar{ display:flex; align-items:center; gap:8px; margin-top:6px }
+    .execbar .bar{ flex:1; height:10px; background:#0b1330; border:1px solid var(--border); border-radius:999px; overflow:hidden }
+    .execbar .bar > div{ height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition: width .2s }
+    .toast{ position:fixed; right:16px; bottom:16px; background:#0e1a40; border:1px solid var(--border); padding:10px 12px; border-radius:10px; color:var(--text); box-shadow:0 10px 30px rgba(0,0,0,.25); display:none }
+    .svg-gauges{ display:grid; grid-template-columns:repeat(2,120px); gap:14px; margin-top:10px }
+    .svg-gauge svg{ display:block }
+    .svg-gauge .bg{ fill:none; stroke:#24305e; stroke-width:10 }
+    .svg-gauge .fg{ fill:none; stroke:var(--accent); stroke-width:10; stroke-linecap:round; stroke-dasharray:301.59 999; stroke-dashoffset:301.59; transition:stroke-dashoffset .2s }
+    .svg-gauge .txt{ font-size:14px; fill:var(--text) }
+    .svg-gauge .lbl{ font-size:12px; fill:var(--muted) }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="dot"></div>
+      <h1 class="h5 m-0">Reloj Labs <span class="text-muted" style="font-weight:400">— Bomba</span></h1>
+    </div>
+    <span id="pill_robot" class="pill">Robot: —</span>
+    <span id="pill_serial" class="pill">Serial: —</span>
+    <span id="pill_rx" class="pill">RX: —</span>
+    <button id="btn_settings" class="pill">Settings</button>
+    <select id="themeSel" class="pill">
+      <option value="theme-blue">Azul</option>
+      <option value="theme-teal">Turquesa</option>
+      <option value="theme-purple">Morado</option>
+    </select>
+    <span id="badge" class="pill" style="margin-left:auto;">Offline</span>
+    <a href="/docs" target="_blank" class="pill">Gestión</a>
+  </header>
+
+  <main class="wrap">
+    <nav class="tabs">
+      <button data-tab="op" id="tab_op">Operación</button>
+      <button data-tab="set" id="tab_set">Settings</button>
+    </nav>
+
+    <section class="grid two tabview active" data-tab="op" id="view_op">
+      <div class="card">
+        <div class="card-header">Acciones rápidas</div>
+        <div class="card-body">
+          <div class="row g-2 align-items-end flex-wrap">
+            <div class="col-auto">
+              <label class="form-label mb-1">Volumen (ml)</label>
+              <input id="vol" type="number" class="form-control" value="50" min="0" step="1" style="width:140px" />
+            </div>
+            <div class="col-auto">
+              <label class="form-label mb-1">Duración (s)</label>
+              <input id="dur" type="number" class="form-control" placeholder="opcional" min="0" step="1" style="width:140px" />
+            </div>
+            <div class="col-auto"><button id="btnGo" class="btn btn-primary">Regar</button></div>
+            <div class="col-auto"><button id="btnStop" class="btn btn-outline-danger">Detener</button></div>
+            <div class="col text-muted small" id="execInfo"></div>
+            <div class="col-12 execbar"><div class="bar"><div id="exec_bar"></div></div><span class="small" id="exec_pct">0%</span></div>
+          </div>
+        </div>
+        <div class="card-header">Tarea personalizada</div>
+        <div class="card-body">
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col-auto"><label class="col-form-label">Protocolo</label></div>
+            <div class="col">
+              <select id="ct_protocol" class="form-select form-select-sm"></select>
+            </div>
+            <div class="col-auto"><button class="btn btn-outline-success btn-sm" id="btnExecCustom">Ejecutar</button></div>
+          </div>
+          <div id="ct_fields"></div>
+        </div>
+
+        <div class="card-header">Telemetría</div>
+        <div class="card-body">
+          <div class="telemetry mb-2">
+            <div><label>ml_per_sec</label><span id="t_mlps">0.00</span></div>
+            <div><label>pump_running</label><span id="t_run">false</span></div>
+            <div><label>Puerto</label><span id="t_port">—</span></div>
+          </div>
+          <div class="gauges">
+            <div class="gauge"><label class="form-label mb-1">Energía Bomba</label><div class="bar"><div id="g_bomba"></div></div></div>
+            <div class="tank"><div class="box"><div id="tank_lvl" class="lvl"></div></div><div class="pct" id="tank_pct">0%</div></div>
+          </div>
+          <div class="svg-gauges mt-2">
+            <div class="svg-gauge">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="48" class="bg" />
+                <circle id="sg_flow_fg" cx="60" cy="60" r="48" class="fg" transform="rotate(-90 60 60)" />
+                <text id="sg_flow_txt" x="60" y="64" text-anchor="middle" class="txt">0.0</text>
+                <text x="60" y="100" text-anchor="middle" class="lbl">ml/s</text>
+              </svg>
+            </div>
+            <div class="svg-gauge">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="48" class="bg" />
+                <circle id="sg_prog_fg" cx="60" cy="60" r="48" class="fg" transform="rotate(-90 60 60)" />
+                <text id="sg_prog_txt" x="60" y="64" text-anchor="middle" class="txt">0%</text>
+                <text x="60" y="100" text-anchor="middle" class="lbl">progreso</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Estado</span>
+          <span id="kv_ts" class="text-muted small"></span>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0"><tbody id="kv"></tbody></table>
+        </div>
+        <div class="card-header">Tareas</div>
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0" id="tasks">
+            <thead><tr><th>ExecID</th><th>Estado</th><th>Prog</th><th>Inicio</th><th>Fin</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="tabview" data-tab="set" id="view_set">
+      <div class="card">
+        <div class="card-header">Conexión y Calibración</div>
+        <div class="card-body">
+          <div class="row g-2 align-items-end flex-wrap">
+            <div class="col-auto">
+              <label class="form-label mb-1">Puerto</label>
+              <select id="sel_port" class="form-select" style="min-width:160px"></select>
+            </div>
+            <div class="col-auto">
+              <label class="form-label mb-1">Baudios</label>
+              <input id="sel_baud" type="number" class="form-control" value="115200" step="1200" style="width:140px" />
+            </div>
+            <div class="col-auto"><button id="btn_open" class="btn btn-outline-light">Conectar</button></div>
+            <div class="col-auto"><button id="btn_close" class="btn btn-outline-warning">Desconectar</button></div>
+            <div class="col text-muted small" id="serialInfo"></div>
+          </div>
+          <hr/>
+          <div class="row g-2 align-items-end flex-wrap">
+            <div class="col-auto">
+              <label class="form-label mb-1">Caudal (ml/s)</label>
+              <input id="mlps" type="number" class="form-control" step="0.1" style="width:140px" />
+            </div>
+            <div class="col-auto"><button id="btn_apply_cal" class="btn btn-outline-success">Aplicar</button></div>
+            <div class="col text-muted small">Reinicia ejecución para aplicar cambios</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="overlay" id="ovl">
+    <div class="panel">
+      <div class="d-flex align-items-center gap-2"><div class="spinner-border spinner-border-sm" role="status"></div><div id="ovl_text">Ejecución en curso…</div></div>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const $ = (s)=>document.querySelector(s);
+    const api = location.origin.replace(/\/$/, '');
+    let currentExec = null; let lastSse = 0; let protocols=[]; let flowMax = 50.0;
+    let lastProgress = 0;
+
+    function setBadge(on){ const b=$('#badge'); b.textContent = on? 'Online':'Offline'; b.className='pill ' + (on? 'badge-online':''); }
+    function fmt(n){ return (n===undefined||n===null)?'-':(typeof n==='number'?Number(n).toFixed(2):String(n)); }
+    function nowIso(){ try{ return new Date().toISOString(); }catch{ return '' } }
+    function showOverlay(show, text){ const o=$('#ovl'); if(!o) return; o.style.display = show? 'flex':'none'; if(text) $('#ovl_text').textContent = text; }
+    function showToast(msg){ const t=$('#toast'); if(!t) return; t.textContent=String(msg||''); t.style.display='block'; clearTimeout(showToast._tmr); showToast._tmr=setTimeout(()=>{ t.style.display='none' }, 1800); }
+
+    // Tabs
+    function activateTab(id){ document.querySelectorAll('.tabview').forEach(x=>x.classList.remove('active')); const el=document.querySelector(`.tabview[data-tab="${id}"]`); if(el) el.classList.add('active'); }
+    $('#tab_op').addEventListener('click', ()=> activateTab('op'));
+    $('#tab_set').addEventListener('click', ()=> activateTab('set'));
+    $('#btn_settings').addEventListener('click', ()=> activateTab('set'));
+
+    // Themes
+    function applyTheme(th){ const b=document.body; b.classList.remove('theme-blue','theme-teal','theme-purple'); if(th) b.classList.add(th); try{ localStorage.setItem('pump_theme', th||''); }catch{} }
+    (function(){ try{ const t=localStorage.getItem('pump_theme')||'theme-blue'; applyTheme(t); const sel=document.getElementById('themeSel'); if(sel) sel.value=t; }catch{} })();
+    document.getElementById('themeSel').addEventListener('change', ev => applyTheme(ev.target.value));
+
+    async function fetchJSON(url, opts){ const r = await fetch(url, opts); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+
+    // Protocols
+    async function loadProtocols(){ try{ const res = await fetchJSON(api + '/api/protocols'); protocols = res.protocols||[]; const sel=$('#ct_protocol'); sel.innerHTML=''; protocols.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.label||p.id; sel.appendChild(o); }); renderProtocolFields(); }catch{ protocols=[]; $('#ct_protocol').innerHTML=''; $('#ct_fields').innerHTML='<div class="text-muted">Sin protocolos</div>'; } }
+    function renderProtocolFields(){ const pid=$('#ct_protocol').value; const p=(protocols||[]).find(x=>x.id===pid); const box=$('#ct_fields'); if(!p){ box.innerHTML=''; return;} const rows=[]; (p.params||[]).forEach(prm=>{ const id='ctp_'+prm.name; const step=(prm.step!=null?` step="${prm.step}"`:''), min=(prm.min!=null?` min="${prm.min}"`:''), max=(prm.max!=null?` max="${prm.max}"`:''); const val=(prm.default!=null?` value="${prm.default}"`:''); rows.push(`<div class="col-6"><label class="form-label mb-1">${prm.name}${prm.unit? ' ('+prm.unit+')':''}</label><input id="${id}" type="number" class="form-control form-control-sm"${step}${min}${max}${val}></div>`); }); box.innerHTML = `<div class="row g-2">${rows.join('')}</div>`; }
+    $('#ct_protocol').addEventListener('change', renderProtocolFields);
+
+    // Actions
+    async function startWater(){ try{ const vol=Number($('#vol').value||0); const durRaw=$('#dur').value; const dur= durRaw? Number(durRaw): null; const body={ protocol_name:'riego_basico', mode:'async', params:{ volume_ml: vol } }; if(dur!=null) body.duration_seconds=dur; const res = await fetchJSON(api + '/api/tasks/execute', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); currentExec = res.execution_id||null; updateExecInfo(res.status||'running', res.progress); showOverlay(true, 'Ejecución en curso…'); await refreshTasks(); showToast('Tarea iniciada'); }catch(e){ showToast('No se pudo iniciar'); } }
+    async function stopWater(){ try{ const eid = currentExec || (window._lastExecId||null); if(!eid) return; await fetchJSON(api + '/api/execution/' + eid + '/stop', { method:'POST' }); await refreshTasks(); showOverlay(false); updateExecInfo('stopped', null); showToast('Tarea detenida'); }catch{} }
+    $('#btnGo').addEventListener('click', startWater);
+    $('#btnStop').addEventListener('click', stopWater);
+
+    async function execCustom(){ const pid=$('#ct_protocol').value; const p=(protocols||[]).find(x=>x.id===pid); if(!p) return alert('Sin protocolo'); const task={ name:(p.label||pid)+' (custom)', protocol_name:pid, mode:'async', params:{} }; (p.params||[]).forEach(prm=>{ const el=document.getElementById('ctp_'+prm.name); if(!el) return; const raw=el.value; if(raw==='') return; const num=Number(raw); if(prm.name==='duration_seconds'){ task.duration_seconds = num; } else { task.params[prm.name]=num; } }); const res= await fetchJSON(api + '/api/tasks/execute', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(task) }); currentExec = res.execution_id||null; updateExecInfo(res.status||'running', res.progress); showOverlay(true, 'Ejecución en curso…'); await refreshTasks(); }
+    $('#btnExecCustom').addEventListener('click', ()=> execCustom().catch(()=>{}));
+
+    // Status & SSE
+    function updateExecInfo(status, prog){ const el=$('#execInfo'); const pct = (prog!=null)? Math.max(0,Math.min(100,Math.round(100*Number(prog)))) : 0; el.textContent = `estado: ${status||'-'} ${pct}%`.trim(); $('#exec_pct').textContent = pct + '%'; const bar=$('#exec_bar'); if(bar) bar.style.width = pct + '%'; }
+    function setGauge(id, value, max, fmtTxt){ const R=48, C=2*Math.PI*R; const fg=document.getElementById('sg_'+id+'_fg'); const txt=document.getElementById('sg_'+id+'_txt'); const v=Math.max(0, Math.min(max, Number(value||0))); const frac = max>0? (v/max): 0; if(fg){ fg.style.strokeDashoffset = String(C * (1-frac)); } if(txt){ txt.textContent = typeof fmtTxt==='function'? fmtTxt(v, frac): (id==='prog'? (Math.round(frac*100)+'%') : v.toFixed(1)); } }
+    function onStatus(payload){ try{ const st=payload||{}; setBadge(true); lastSse=Date.now(); document.getElementById('pill_robot').textContent = 'Robot: pump'; const serial= st.serial || {}; document.getElementById('pill_serial').textContent = 'Serial: ' + (serial.opened? (serial.port||'') + ' @'+(serial.baud||''): 'cerrado'); const rows = []; rows.push(`<tr><td class=\"fw-semibold\">pump_running</td><td>${fmt(st.pump_running)}</td></tr>`); rows.push(`<tr><td class=\"fw-semibold\">ml_per_sec</td><td>${fmt(st.ml_per_sec)}</td></tr>`); const sensors=st.sensors||{}; Object.keys(sensors).forEach(k=> rows.push(`<tr><td>${k}</td><td>${fmt(sensors[k])}</td></tr>`)); document.getElementById('kv').innerHTML = rows.join(''); document.getElementById('kv_ts').textContent = st.ts || nowIso(); if('execution_id' in st) window._lastExecId = st.execution_id; if('exec_status' in st || 'progress' in st){ updateExecInfo(st.exec_status||'-', st.progress); if(st.exec_status==='completed' || st.exec_status==='stopped' || st.exec_status==='error'){ showOverlay(false); } else if(st.exec_status==='running'){ showOverlay(true,'Ejecución en curso…'); } lastProgress = (st.progress!=null)? Number(st.progress) : lastProgress; } document.getElementById('t_mlps').textContent = fmt(st.ml_per_sec); document.getElementById('t_run').textContent = String(!!st.pump_running); document.getElementById('t_port').textContent = serial.opened? (serial.port||'-') : 'cerrado'; document.getElementById('g_bomba').style.width = st.pump_running? '100%' : '0%'; const pct = Math.max(0, Math.min(100, Math.round(100*(lastProgress||0)))); document.getElementById('tank_lvl').style.height = pct + '%'; document.getElementById('tank_pct').textContent = pct + '%'; setGauge('flow', st.ml_per_sec, flowMax); setGauge('prog', lastProgress||0, 1, (v,f)=> Math.round(100*f)+'%'); }catch{} }
+    function sse(){ try{ const es = new EventSource(api + '/api/status/stream'); es.onmessage = ev => { try{ const d=JSON.parse(ev.data); onStatus(d); }catch{} }; es.onerror = _ => { setBadge(false); }; }catch{ setBadge(false); } }
+    setInterval(()=>{ const age = Date.now()-lastSse; $('#pill_rx').textContent = 'RX: ' + (age<2000? 'OK':'SIN DATOS'); $('#pill_rx').className = 'pill' + (age<2000? '':' warn'); }, 1000);
+
+    // Tasks table
+    async function refreshTasks(){ try{ const data=await fetchJSON(api + '/api/executions'); const tb=$('#tasks tbody'); tb.innerHTML=''; (data.executions||[]).slice().reverse().forEach(t=>{ const tr=document.createElement('tr'); const prog = t.progress!=null? Math.round(100*Number(t.progress))+'%':''; const stopBtn = (t.status==='running')? `<button class=\"btn btn-sm btn-outline-danger\" data-eid=\"${t.execution_id}\">Detener</button>`:''; tr.innerHTML = `<td><code>${t.execution_id||''}</code></td><td>${t.status||''}</td><td>${prog}</td><td>${t.started_at||''}</td><td>${t.ended_at||''}</td><td>${stopBtn}</td>`; tb.appendChild(tr); }); tb.querySelectorAll('button[data-eid]').forEach(b=> b.addEventListener('click', async (ev)=>{ const id=ev.target.getAttribute('data-eid'); try{ await fetchJSON(api + '/api/execution/' + id + '/stop', { method:'POST' }); }catch{} refreshTasks(); })); }catch{} }
+
+    // Settings actions
+    async function loadSerial(){ try{ const res=await fetchJSON(api + '/api/serial/ports'); const sel=$('#sel_port'); sel.innerHTML=''; (res.ports||[]).forEach(p=>{ const o=document.createElement('option'); o.value=p.device; o.textContent = p.device + (p.description? (' - '+p.description):''); sel.appendChild(o); }); }catch{} }
+    async function applyCal(){ try{ const ml=Number($('#mlps').value||0); await fetchJSON(api + '/api/calibration/apply', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ml_per_sec: ml }) }); }catch{ alert('No se pudo aplicar'); } }
+    async function serialOpen(){ try{ const port=$('#sel_port').value; const baud=Number($('#sel_baud').value||115200); const res=await fetchJSON(api + '/api/serial/open', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ port, baud }) }); $('#serialInfo').textContent = JSON.stringify(res.serial||{}, null, 0); }catch{ alert('No se pudo abrir serial'); } }
+    async function serialClose(){ try{ const res=await fetchJSON(api + '/api/serial/close', { method:'POST' }); $('#serialInfo').textContent = JSON.stringify(res.serial||{}, null, 0); }catch{} }
+    $('#btn_apply_cal').addEventListener('click', applyCal);
+    $('#btn_open').addEventListener('click', serialOpen);
+    $('#btn_close').addEventListener('click', serialClose);
+
+    // Init
+    (async ()=>{ try{ const calib= await fetchJSON(api + '/api/calibration'); const v = (calib && calib.ml_per_sec!=null)? Number(calib.ml_per_sec): 10.0; document.getElementById('mlps').value = v; flowMax = Math.max(1.0, v*1.5); }catch{ flowMax = 50.0 } loadSerial(); await loadProtocols(); sse(); refreshTasks(); } )();
+  </script>
+</body>
+</html>
