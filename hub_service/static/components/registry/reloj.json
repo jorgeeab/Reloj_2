@@ -13,26 +13,26 @@
         "metric_label": "Volumen entregado",
         "target_label": "Objetivo",
         "unit": "ml",
-        "path": "volumen_ml|flow.volume_ml",
-        "target_path": "volumen_objetivo_ml|setpoints.volumen_ml",
+        "path": "volumen_ml|flow.volume_ml|metrics.volume_ml",
+        "target_path": "volumen_objetivo_ml|setpoints.volumen_ml|objetivo_volumen_ml",
         "decimals": 1,
         "min": 0,
-        "max": 200,
+        "max": 2000,
         "step": 1,
-        "default": 20
+        "default": 150
       },
       "flow": {
         "label": "Caudal objetivo",
         "metric_label": "Flujo actual",
         "unit": "ml/s",
         "path": "caudal_est_mls|flow_est|sensors.ml_per_sec|metrics.flow_ml_s",
-        "target_path": "caudalBombaMLs|flow.target",
+        "target_path": "caudalBombaMLs|flow.target|caudal_objetivo_mls",
         "decimals": 1,
         "min": 0,
-        "max": 30,
-        "visual_max": 30,
+        "max": 40,
+        "visual_max": 40,
         "step": 0.5,
-        "default": 3.5
+        "default": 5
       },
       "command": {
         "type": "flow_control",
@@ -55,7 +55,7 @@
       "min": 0,
       "max": 400,
       "step": 1,
-      "command": { "type": "setpoint", "field": "x_mm", "override_ms": 2000, "hold_interval_ms": 150, "hold_delay_ms": 350 }
+      "command": { "type": "setpoint", "field": "x_mm", "modo": 3, "override_ms": 2000, "hold_interval_ms": 150, "hold_delay_ms": 350 }
     },
     {
       "id": "angle_control",
@@ -67,7 +67,7 @@
       "min": 0,
       "max": 300,
       "step": 1,
-      "command": { "type": "setpoint", "field": "a_deg", "override_ms": 2000, "hold_interval_ms": 150, "hold_delay_ms": 350 }
+      "command": { "type": "setpoint", "field": "a_deg", "modo": 3, "override_ms": 2000, "hold_interval_ms": 150, "hold_delay_ms": 350 }
     },
     {
       "id": "z_control",
@@ -79,7 +79,7 @@
       "min": 0,
       "max": 200,
       "step": 1,
-      "command": { "type": "setpoint", "field": "z_mm", "override_ms": 2000, "hold_interval_ms": 150, "hold_delay_ms": 350 }
+      "command": { "type": "setpoint", "field": "z_mm", "modo": 3, "override_ms": 2000, "hold_interval_ms": 150, "hold_delay_ms": 350 }
     }
   ]
 }

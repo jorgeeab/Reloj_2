@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 import httpx
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from pathlib import Path
@@ -191,6 +191,7 @@ async def poll_robots_loop():
                             "base_url": rb.base_url,
                             "kind": rb.kind,
                             "status": store.last_robot_status.get(rb.id, {"ok": False}),
+                            "runtime": _robot_runtime_flag(rb.id),
                         }
                         for rb in store.robots.values()
                     ]
@@ -250,6 +251,14 @@ def _stop_sse_task(robot_id: str) -> None:
         t.cancel()
 
 
+def _proc_alive(proc: Optional[subprocess.Popen]) -> bool:
+    return proc is not None and proc.poll() is None
+
+
+def _robot_runtime_flag(robot_id: str) -> bool:
+    return bool(_local_robot_id and robot_id == _local_robot_id and _proc_alive(_local_robot_proc))
+
+
 async def _sse_loop(rb: Robot):
     url = rb.base_url.rstrip("/") + "/api/status/stream"
     headers = {"X-API-Key": rb.api_key} if rb.api_key else None
@@ -280,6 +289,7 @@ async def _sse_loop(rb: Robot):
                                                 "base_url": rb.base_url,
                                                 "kind": rb.kind,
                                                 "status": store.last_robot_status.get(rb.id, {"ok": False}),
+                                                "runtime": _robot_runtime_flag(rb.id),
                                             }
                                         ]
                                     })
@@ -328,10 +338,10 @@ async def websocket_feed(ws: WebSocket):
 def list_robots():
     out = []
     for rb in store.robots.values():
-        out.append({
-            **rb.__dict__,
-            "status": store.last_robot_status.get(rb.id, {"ok": False})
-        })
+        payload = {**rb.__dict__}
+        payload["status"] = store.last_robot_status.get(rb.id, {"ok": False})
+        payload["runtime"] = _robot_runtime_flag(rb.id)
+        out.append(payload)
     return {"robots": out}
 
 
@@ -351,6 +361,28 @@ def del_robot(robot_id: str):
     store.save()
     _stop_sse_task(robot_id)
     return {"status": "ok" if ok else "not_found"}
+
+
+@app.post("/robots/{robot_id}/control")
+async def robot_control(robot_id: str, payload: Optional[Dict[str, Any]] = Body(default=None)):
+    rb = store.robots.get(robot_id)
+    if not rb:
+        raise HTTPException(status_code=404, detail="robot not found")
+    base = rb.base_url.rstrip("/")
+    headers = {"X-API-Key": rb.api_key} if rb.api_key else None
+    data = payload or {}
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            res = await client.post(base + "/api/control", json=data, headers=headers)
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail=f"control proxy error: {exc}") from exc
+    try:
+        reply = res.json()
+    except Exception:
+        reply = {"raw": res.text}
+    if res.status_code >= 300:
+        raise HTTPException(status_code=res.status_code, detail={"robot_response": reply})
+    return {"status": "forwarded", "robot_id": rb.id, "robot_response": reply}
 
 
 @app.get("/plants")
@@ -833,7 +865,7 @@ def start_local_robot(data: StartRobotIn):
             "status": "already_running",
             "pid": _local_robot_proc.pid,
             "base_url": rb.base_url if rb else None,
-            "robot": rb.__dict__ if rb else None,
+            "robot": ({**rb.__dict__, "runtime": _robot_runtime_flag(rb.id)} if rb else None),
         }
 
     port = int((data.port or 5005))
@@ -876,7 +908,14 @@ def start_local_robot(data: StartRobotIn):
         _start_sse_task(rb)
     except Exception:
         pass
-    return {"status": "started", "pid": _local_robot_proc.pid if _local_robot_proc else None, "base_url": base_url, "robot": rb.__dict__}
+    robot_payload = {**rb.__dict__}
+    robot_payload["runtime"] = _robot_runtime_flag(rb.id)
+    return {
+        "status": "started",
+        "pid": _local_robot_proc.pid if _local_robot_proc else None,
+        "base_url": base_url,
+        "robot": robot_payload,
+    }
 
 
 @app.post("/robots/stop")

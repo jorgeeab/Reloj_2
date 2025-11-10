@@ -1,7 +1,10 @@
 Flask
+fastapi
+httpx
 numpy
 pybullet
 pyserial
+uvicorn
 opencv-python
 gym
 PyYAML

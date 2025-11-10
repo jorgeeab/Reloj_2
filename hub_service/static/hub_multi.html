@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="/hub/components/widgets.css" rel="stylesheet">
+  <link href="/hub/components/widgets.css?v=10" rel="stylesheet">
   <style>
     :root {
       --background: #f8fafc;
@@ -429,9 +429,9 @@
     }
 
     .comp-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
     }
 
     /* Mobile optimizations */
@@ -613,6 +613,25 @@
     .status-block[data-section="movement"] .status-title{ color:#0d6efd; }
     .status-block[data-section="flow"] .status-title{ color:#198754; }
     .status-empty{ font-size:0.8rem; color:#6c757d; text-align:center; padding:8px 0; }
+
+    /* Nuevo panel de control */
+    .control-panel .control-input-group{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .control-panel .control-input-group input{ width:110px; text-align:center; }
+    .control-panel .input-unit{ font-size:.75rem; color:#6c757d; }
+    .telemetry-list{ display:flex; flex-direction:column; gap:10px; }
+    .telemetry-item{ display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; border:1px solid #e9ecef; border-radius:10px; padding:10px 14px; }
+    .telemetry-item .label{ font-size:.74rem; letter-spacing:.05em; text-transform:uppercase; color:#6c757d; }
+    .telemetry-item .value{ font-weight:600; font-size:1.05rem; color:#212529; }
+    .axis-panel{ display:flex; flex-wrap:wrap; gap:12px; margin-top:1.25rem; }
+    .axis-card{ flex:1 1 180px; border:1px solid #e9ecef; border-radius:12px; padding:12px; background:#fff; min-width:160px; }
+    .axis-card .axis-label{ font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; color:#6c757d; margin-bottom:6px; }
+    .axis-readings{ display:flex; flex-wrap:wrap; gap:8px; font-size:.78rem; color:#6c757d; margin-bottom:8px; }
+    .axis-readings strong{ color:#212529; margin-left:4px; font-weight:600; }
+    .axis-target-group{ margin-bottom:8px; }
+    .axis-target-group input{ text-align:center; }
+    .axis-card .axis-controls{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+    .axis-card .axis-controls .btn{ flex:1 1 60px; }
+    /* (sin estilos de depuración) */
   </style>
 </head>
 <body class="bg-light">
@@ -628,10 +647,12 @@
             <span id="robot_count">0</span> activos
           </div>
         </div>
-        <button class="btn btn-outline-primary btn-sm" id="refreshAllBtn">
-          <i class="bi bi-arrow-clockwise me-1"></i>
-          Actualizar
-        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-primary btn-sm" id="refreshAllBtn">
+            <i class="bi bi-arrow-clockwise me-1"></i>
+            Actualizar
+          </button>
+        </div>
       </div>
     </div>
   </nav>
@@ -640,8 +661,23 @@
     <div class="row g-3">
       <div class="col-12 col-lg-8">
         <div id="robots_grid" class="d-flex flex-column gap-3"></div>
-
-        <div class="card shadow-sm mt-3">
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="card shadow-sm mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Plantas</span>
+            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="loadPlants()">
+              <i class="bi bi-arrow-repeat"></i>
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0" id="plants_table">
+              <thead class="table-light"><tr><th>Era</th><th>ID</th><th>Nombre</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card shadow-sm">
           <div class="card-header">Tareas recientes</div>
           <div class="card-body p-0">
             <table class="table table-sm mb-0" id="tasks">
@@ -651,115 +687,8 @@
           </div>
         </div>
       </div>
-
-      <div class="col-lg-4">
-        <div class="card shadow-sm mb-3">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Robots disponibles (archivo)</span>
-            <button class="btn btn-sm btn-outline-secondary" onclick="syncFromCatalog()"><i class="bi bi-arrow-repeat"></i></button>
-          </div>
-          <div class="card-body p-0">
-            <table class="table table-sm mb-0" id="catalog">
-              <thead class="table-light"><tr><th>ID</th><th>URL</th></tr></thead>
-              <tbody></tbody>
-            </table>
-            <div class="small text-muted px-3 py-2">Edita <code>hub_service/data/robots_catalog.json</code> para cambiar esta lista.</div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header d-flex align-items-center">
-            <i class="bi bi-gear-fill me-2 text-primary"></i>
-            Configuración de robots
-          </div>
-          <div class="card-body p-0">
-            <!-- Reloj -->
-            <div class="p-3 border-bottom">
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="d-flex align-items-center">
-                  <i class="bi bi-clock me-2 text-primary"></i>
-                  <h6 class="mb-0">Robot Reloj</h6>
-                </div>
-                <button id="btn_reloj" class="btn btn-sm" onclick="toggleReloj()">
-                  <i class="bi bi-power me-1"></i>
-                  <span id="lbl_reloj">Iniciar</span>
-                </button>
-              </div>
-              <div class="row g-2">
-                <div class="col-md-6">
-                  <label class="form-label small">ID</label>
-                  <input id="in_id" class="form-control form-control-sm" placeholder="reloj-local" />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label small">Nombre</label>
-                  <input id="in_name" class="form-control form-control-sm" placeholder="Reloj Local" />
-                </div>
-                <div class="col-md-8">
-                  <label class="form-label small">URL</label>
-                  <input id="in_url" class="form-control form-control-sm" placeholder="http://localhost:5005" />
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label small">Puerto</label>
-                  <input id="in_port" class="form-control form-control-sm" placeholder="5005" value="5005" />
-                </div>
-              </div>
-            </div>
-            
-            <!-- Bomba -->
-            <div class="p-3">
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="d-flex align-items-center">
-                  <i class="bi bi-water me-2 text-primary"></i>
-                  <h6 class="mb-0">Robot Bomba</h6>
-                </div>
-                <button id="btn_pump" class="btn btn-sm" onclick="togglePump()">
-                  <i class="bi bi-power me-1"></i>
-                  <span id="lbl_pump">Iniciar</span>
-                </button>
-              </div>
-              <div class="row g-2">
-                <div class="col-md-6">
-                  <label class="form-label small">ID</label>
-                  <input id="in_pump_id" class="form-control form-control-sm" placeholder="pump-local" />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label small">Nombre</label>
-                  <input id="in_pump_name" class="form-control form-control-sm" placeholder="Bomba Local" />
-                </div>
-                <div class="col-md-8">
-                  <label class="form-label small">URL</label>
-                  <input id="in_pump_url" class="form-control form-control-sm" placeholder="http://localhost:5010" />
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label small">Puerto</label>
-                  <input id="in_pump_port" class="form-control form-control-sm" placeholder="5010" value="5010" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card shadow-sm mt-3">
-          <div class="card-header">Agregar robot (manual)</div>
-          <div class="card-body">
-            <div class="row g-2 align-items-end">
-              <div class="col-4">
-                <select id="add_kind" class="form-select">
-                  <option value="reloj">reloj</option>
-                  <option value="pump">pump</option>
-                </select>
-              </div>
-              <div class="col-4"><input id="add_id" class="form-control" placeholder="id" /></div>
-              <div class="col-4"><input id="add_name" class="form-control" placeholder="nombre" /></div>
-              <div class="col-8"><input id="add_url" class="form-control" placeholder="http://ip:puerto" /></div>
-              <div class="col-4"><input id="add_key" class="form-control" placeholder="api key (opcional)" /></div>
-              <div class="col-12"><button class="btn btn-primary" onclick="addRobotManual()"><i class="bi bi-save"></i> Guardar</button></div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
-  </div>
+  </main>
 
   <script>
     const api = location.origin.replace(/\/$/, '');
@@ -769,16 +698,20 @@
     const robotCountEl = document.getElementById('robot_count');
     const refreshAllBtn = document.getElementById('refreshAllBtn');
     const themeSel = document.getElementById('themeSel');
+    const plantsTable = document.getElementById('plants_table');
     const robotsState = new Map();
     const DEBUG_UI = (()=>{ try{return localStorage.getItem('hub_debug_ui')==='1';}catch{return false;} })();
-    const COMPONENTS_VERSION = '8';
-    let Widgets = null;
     const protocolsCache = new Map();
     const progressByRobot = new Map();
+    const registryCache = new Map();
+    const COMPONENTS_VERSION = '10';
+    let Widgets = null;
     let robotsCache = [];
     let plantsCache = [];
+    let plantsVersion = 0;
     const collapsedKeyPrefix = 'hub_robot_card_collapsed:';
     const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
     function postJSON(path, body){
       return fetch(api + path, {
         method: 'POST',
@@ -789,19 +722,40 @@
 
     async function ensureWidgetsLoaded(){
       if(Widgets) return;
-      const moduleUrl = `/hub/components/widgets.js?v=${COMPONENTS_VERSION}`;
-      Widgets = await import(moduleUrl);
+      const url = `/hub/components/widgets.js?v=${COMPONENTS_VERSION}`;
+      Widgets = await import(url);
     }
 
     async function loadRegistryFor(kind){
+      const normalized = (kind || 'default').toLowerCase();
+      const cacheKey = `${normalized}::${COMPONENTS_VERSION}`;
+      if(registryCache.has(cacheKey)){
+        return registryCache.get(cacheKey);
+      }
       const base = '/hub/components/registry/';
       const version = `?v=${COMPONENTS_VERSION}`;
       const urls = [
-        base + (kind||'default') + '.json' + version,
-        base + 'default.json' + version
+        `${base}${normalized}.json${version}`,
+        `${base}default.json${version}`
       ];
-      for(const u of urls){ try{ const r=await fetch(u); if(r.ok) return r.json(); }catch{} }
-      return { widgets: [] };
+      const loader = (async ()=>{
+        for(const url of urls){
+          try{
+            const res = await fetch(url);
+            if(res.ok){
+              return await res.json();
+            }
+          }catch(err){}
+        }
+        return { widgets: [] };
+      })();
+      registryCache.set(cacheKey, loader);
+      return loader;
+    }
+
+    function registrySignature(reg){
+      if(!reg || !Array.isArray(reg.widgets)) return '';
+      return reg.widgets.map(w => `${w.id||''}:${w.type||''}`).join('|');
     }
 
     async function controlRobot(robotId, payload){
@@ -817,54 +771,31 @@
       }
     }
 
-    function registrySignature(reg){
-      if(!reg || !Array.isArray(reg.widgets)) return '';
-      try{
-        return reg.widgets.map(w => `${w.id||''}:${w.type||''}`).join('|');
-      }catch{
-        return '';
-      }
-    }
-
     async function buildComponentsIfNeeded(state){
       if(!state || !state.compGrid) return;
       await ensureWidgetsLoaded();
-      const reg = await loadRegistryFor(state.kind||'default');
+      const reg = await loadRegistryFor(state.kind || 'default');
       const widgets = Array.isArray(reg.widgets) ? reg.widgets : [];
       const prevSig = registrySignature(state.registry);
       const nextSig = registrySignature(reg);
       const needsRebuild = !state.compInstances || state.compInstances.length !== widgets.length || prevSig !== nextSig;
       if(!needsRebuild) return;
-
-      function createControlWidget(inst) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'control-widget';
-        
-        const label = document.createElement('div');
-        label.className = 'control-label';
-        label.textContent = inst.el.querySelector('label')?.textContent || '';
-        wrapper.appendChild(label);
-
-        const control = document.createElement('div');
-        control.className = 'control-input';
-        
-        // Asegurar que el elemento del widget se expanda
-        inst.el.style.width = '100%';
-        if (inst.el.firstElementChild) {
-          inst.el.firstElementChild.style.width = '100%';
-        }
-        
-        control.appendChild(inst.el);
-        wrapper.appendChild(control);
-        
-        return wrapper;
-      }
       if(state.compInstances && state.compInstances.length){
-        state.compInstances.forEach(ci=>{ try{ ci.inst.destroy && ci.inst.destroy(); }catch(e){} });
+        state.compInstances.forEach(ci=>{ try{ ci.inst.destroy && ci.inst.destroy(); }catch(err){} });
       }
+      state.registry = reg;
+      state.compInstances = [];
       state.compGrid.innerHTML = '';
-      state.registry = reg; state.compInstances = [];
-      (reg.widgets||[]).forEach(w=>{
+      if(!widgets.length){
+        state.compGrid.classList.add('d-none');
+        if(state.statusEmpty){
+          state.statusEmpty.classList.remove('d-none');
+          state.statusEmpty.textContent = 'Sin widgets configurados.';
+        }
+        return;
+      }
+      state.compGrid.classList.remove('d-none');
+      widgets.forEach(w=>{
         try{
           const cfg = { ...w };
           cfg.robotId = state.id;
@@ -894,25 +825,15 @@
               const flowField = cmd.flow_field || cmd.flowField || null;
               const extraPayload = cmd.payload ? clonePayload(cmd.payload) : null;
               const modoValue = cmd.modo != null ? Number(cmd.modo) : null;
-              const resolveNumber = (obj, key, fallback)=>{
-                if(!obj) return 0;
-                if(key && obj[key] != null) return Number(obj[key]);
-                if(fallback && obj[fallback] != null) return Number(obj[fallback]);
-                if(key === 'volume' && obj.volume != null) return Number(obj.volume);
-                if(key === 'flow' && obj.flow != null) return Number(obj.flow);
-                return 0;
-              };
               const assemblePayload = (values)=>{
                 const out = {};
-                if(volumeField){
-                  const v = resolveNumber(values, 'volume', volumeField);
+                if(volumeField != null){
                   out.setpoints = out.setpoints || {};
-                  out.setpoints[volumeField] = v;
+                  out.setpoints[volumeField] = Number(values.volume);
                 }
-                if(flowField){
-                  const v = resolveNumber(values, 'flow', flowField);
+                if(flowField != null){
                   out.flow = out.flow || {};
-                  out.flow[flowField] = v;
+                  out.flow[flowField] = Number(values.flow);
                 }
                 if(extraPayload){
                   mergePayload(out, clonePayload(extraPayload));
@@ -922,88 +843,67 @@
                 }
                 return out;
               };
-              cfg.onExecute = async (values = {})=>{
+              cfg.onExecute = async (values={})=>{
                 await controlRobot(state.id, assemblePayload(values));
               };
-              const stopCfg = cmd.stop || {};
-              cfg.onStop = async (values = {})=>{
+              cfg.onStop = async ()=>{
                 const payload = {};
-                if(stopCfg.volume !== undefined && volumeField){
-                  payload.setpoints = payload.setpoints || {};
-                  payload.setpoints[volumeField] = Number(stopCfg.volume);
-                }else if(stopCfg.setpoints){
-                  payload.setpoints = payload.setpoints || {};
-                  mergePayload(payload.setpoints, clonePayload(stopCfg.setpoints));
-                }else if(volumeField){
-                  payload.setpoints = payload.setpoints || {};
-                  payload.setpoints[volumeField] = 0;
+                if(volumeField != null){
+                  payload.setpoints = { [volumeField]: 0 };
                 }
-                if(stopCfg.flow !== undefined && flowField){
-                  payload.flow = payload.flow || {};
-                  payload.flow[flowField] = Number(stopCfg.flow);
-                }else if(stopCfg.flow_payload || stopCfg.flowPayload){
-                  payload.flow = payload.flow || {};
-                  mergePayload(payload.flow, clonePayload(stopCfg.flow_payload || stopCfg.flowPayload));
-                }else if(flowField){
-                  payload.flow = payload.flow || {};
-                  payload.flow[flowField] = 0;
-                }
-                if(stopCfg.payload){
-                  mergePayload(payload, clonePayload(stopCfg.payload));
-                }
-                if(modoValue != null && stopCfg.keep_modo !== true){
-                  payload.modo = modoValue;
+                if(flowField != null){
+                  payload.flow = { [flowField]: 0 };
                 }
                 await controlRobot(state.id, payload);
               };
-              if(cmd.reset_payload || cmd.resetPayload){
-                const resetPayload = clonePayload(cmd.reset_payload || cmd.resetPayload);
+              if(cmd.reset_payload){
                 cfg.onReset = async ()=>{
-                  await controlRobot(state.id, clonePayload(resetPayload));
+                  await controlRobot(state.id, clonePayload(cmd.reset_payload));
                 };
               }
             }else if(cmd.type === 'control'){
-              cfg.onCommand = async (value)=>{
+              cfg.onCommand = async ()=>{
                 let payload = {};
                 if(cmd.payload){
-                  if(typeof cmd.payload === 'function'){
-                    payload = cmd.payload(value, { state });
-                  }else{
-                    try{
-                      payload = JSON.parse(JSON.stringify(cmd.payload));
-                    }catch{
-                      payload = { ...cmd.payload };
-                    }
-                  }
+                  payload = typeof cmd.payload === 'function'
+                    ? cmd.payload({ state })
+                    : clonePayload(cmd.payload);
                 }
                 if(field != null){
                   payload[field] = Number(value);
                 }
                 await controlRobot(state.id, payload);
               };
-            }else if(typeof cmd === 'function'){
-              const original = cmd;
-              cfg.onCommand = (value, meta)=> original(value, { meta, state });
             }
-          }else if(typeof cfg.onCommand === 'function'){
-            const original = cfg.onCommand;
-            cfg.onCommand = (value, meta)=> original(value, { meta, state });
           }
           const inst = Widgets.WidgetFactory.create(cfg);
-          const widgetWrapper = createControlWidget(inst);
-          state.compGrid.appendChild(widgetWrapper);
-          state.compInstances.push({def:cfg, inst});
-        }catch(e){}
+          state.compGrid.appendChild(inst.el);
+          state.compInstances.push({ def: cfg, inst });
+        }catch(err){
+          console.warn('widget create failed', err);
+        }
       });
+      const snapshot = state.lastData
+        || (state.robotData && state.robotData.status && state.robotData.status.data)
+        || null;
+      if(snapshot){
+        updateComponents(state, snapshot);
+        if(state.statusEmpty){
+          state.statusEmpty.classList.add('d-none');
+        }
+      }else if(state.statusEmpty){
+        state.statusEmpty.textContent = 'Sin datos en tiempo real.';
+        state.statusEmpty.classList.remove('d-none');
+      }
     }
 
     function updateComponents(state, st){
       if(!state || !state.compInstances) return;
-      const rawOnline = !!(state.robotData && state.robotData.status && state.robotData.status.ok);
-      const online = (state.online != null) ? state.online : rawOnline;
-      const data = st || state.lastData || null;
-      const payload = { data, online, error: !online && !data };
-      state.compInstances.forEach(ci=>{ try{ ci.inst.update(payload); }catch(e){} });
+      const online = !!(state.online);
+      const payload = { data: st, online, error: !online && !st };
+      state.compInstances.forEach(ci=>{
+        try{ ci.inst.update(payload); }catch(err){}
+      });
     }
 
     function _openBase(res){
@@ -1102,15 +1002,56 @@
       }
     }
 
+    function updateStartStopControl(state){
+      if(!state || !state.startBtn) return;
+      const kind = state.kind;
+      const eligible = kind === 'reloj' || kind === 'pump';
+      state.startBtn.classList.toggle('d-none', !eligible);
+      if(!eligible) return;
+      const running = !!state.running;
+      const labelEl = state.startBtn.querySelector('span');
+      state.startBtn.className = 'btn btn-sm ' + (running ? 'btn-outline-danger' : 'btn-outline-success');
+      if(labelEl) labelEl.textContent = running ? 'Detener' : 'Iniciar';
+      state.startBtn.disabled = !!state._startStopBusy;
+      if(!state.startBtn._bound){
+        state.startBtn.addEventListener('click', ()=> handleStartStop(state));
+        state.startBtn._bound = true;
+      }
+    }
+
+    async function handleStartStop(state){
+      if(!state || !state.startBtn) return;
+      const kind = state.kind;
+      if(kind !== 'reloj' && kind !== 'pump'){
+        alert('Este robot no admite control de inicio/detención desde el hub.');
+        return;
+      }
+      state._startStopBusy = true;
+      updateStartStopControl(state);
+      try{
+        if(kind === 'reloj') await toggleReloj();
+        else await togglePump();
+      }finally{
+        state._startStopBusy = false;
+        updateStartStopControl(state);
+      }
+    }
+
     function createRobotCard(rb){
       const card = document.createElement('div');
       card.className = 'card shadow-sm robot-card';
       card.dataset.robotId = rb.id;
       card.innerHTML = `
         <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
-          <div>
-            <div class="h5 mb-0">Robot: <span data-role="name">&mdash;</span>
-              <span class="badge bg-secondary ms-2" data-role="status">Offline</span>
+          <div class="w-100">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <div class="h5 mb-0">Robot: <span data-role="name">&mdash;</span>
+                <span class="badge bg-secondary ms-2" data-role="status">Offline</span>
+              </div>
+              <button class="btn btn-sm btn-outline-primary d-none" type="button" data-role="start-stop">
+                <i class="bi bi-power"></i>
+                <span>Iniciar</span>
+              </button>
             </div>
             <div class="muted">URL: <span data-role="url">&mdash;</span></div>
           </div>
@@ -1130,17 +1071,9 @@
                 </div>
                 <div class="d-flex align-items-end gap-2 flex-wrap">
                   <button class="btn btn-success btn-sm qa-move" data-action="move"><i class="bi bi-arrows-move"></i> Mover</button>
-                  <div style="width:160px">
-                    <label class="form-label mb-1 w-100">Volumen (ml)</label>
-                    <div class="input-group input-group-sm flex-nowrap">
-                      <button type="button" class="btn btn-outline-secondary d-flex align-items-center justify-content-center" style="width: 32px" onclick="decrementVolume()">
-                        <i class="bi bi-dash-lg"></i>
-                      </button>
-                      <input type="number" class="form-control qa-vol text-center px-0" value="50" min="0" step="1">
-                      <button type="button" class="btn btn-outline-secondary d-flex align-items-center justify-content-center" style="width: 32px" onclick="incrementVolume()">
-                        <i class="bi bi-plus-lg"></i>
-                      </button>
-                    </div>
+                  <div>
+                    <label class="form-label mb-1">Volumen (ml)</label>
+                    <input type="number" class="form-control form-control-sm qa-vol" value="50" min="0" step="1" style="width:120px">
                   </div>
                   <button class="btn btn-primary btn-sm qa-water" data-action="water"><i class="bi bi-droplet"></i> Regar</button>
                 </div>
@@ -1163,56 +1096,13 @@
               </div>
             </div>
 
-            <div class="card border-0">
-              <div class="card-header bg-transparent py-2">Estado en vivo</div>
-              <div class="card-body p-0">
-                <div class="status-empty" data-role="status-empty">Sin datos disponibles.</div>
-                <div class="status-content">
-                  <!-- Sección de flujo -->
-                  <div class="control-widget flow">
-                    <div class="section-title">Control de flujo</div>
-                    <!-- Volumen objetivo -->
-                    <div class="d-flex align-items-center mb-3">
-                      <div class="control-label">
-                        <i class="bi bi-droplet"></i>
-                        Volumen objetivo
-                      </div>
-                      <div class="input-group">
-                        <input type="number" class="form-control" value="0.0" min="0" step="0.1">
-                        <div class="input-unit">ml</div>
-                      </div>
-                    </div>
-                    <!-- Flujo requerido -->
-                    <div class="d-flex align-items-center mb-3">
-                      <div class="control-label">
-                        <i class="bi bi-water"></i>
-                        Flujo requerido
-                      </div>
-                      <div class="value-display">
-                        0.0<span class="value-unit">ml/s</span>
-                      </div>
-                    </div>
-                    <!-- Flujo restante -->
-                    <div class="d-flex align-items-center">
-                      <div class="control-label">
-                        <i class="bi bi-hourglass-split"></i>
-                        Flujo restante
-                      </div>
-                      <div class="value-display">
-                        0.0<span class="value-unit">ml/s</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Sección de telemetría -->
-                  <div class="control-widget telemetry">
-                    <div class="section-title">Telemetría</div>
-                    <div class="comp-grid d-flex flex-column gap-3" data-role="comp-grid"></div>
-                  </div>
-                </div>
+            <div class="card border-0 bg-light">
+              <div class="card-header bg-transparent py-2">Control directo y telemetría</div>
+              <div class="card-body">
+                <div class="text-muted small d-none" data-role="status-empty">Sin datos disponibles.</div>
+                <div class="comp-grid" data-role="comp-grid"></div>
               </div>
             </div>
-          </div>
           </div>
         </div>`;
 
@@ -1223,6 +1113,7 @@
         nameEl: card.querySelector('[data-role="name"]'),
         urlEl: card.querySelector('[data-role="url"]'),
         statusBadge: card.querySelector('[data-role="status"]'),
+        startBtn: card.querySelector('[data-role="start-stop"]'),
         openHub: null,
         openNative: card.querySelector('[data-action="open-native"]'),
         collapseBtn: card.querySelector('[data-action="collapse"]'),
@@ -1235,7 +1126,6 @@
         protocolSelect: card.querySelector('.ct-protocol'),
         fieldsBox: card.querySelector('.ct-fields'),
         executeBtn: card.querySelector('[data-action="execute"]'),
-        statusGrid: null,
         statusEmpty: card.querySelector('[data-role="status-empty"]'),
         compGrid: card.querySelector('[data-role="comp-grid"]'),
         registry: null,
@@ -1244,16 +1134,20 @@
         lastDataTs: null,
         runtime: rb.runtime === true,
         selectedPlant: null,
-        kind: '',
-        kindRaw: '',
+        plantOptionsVersion: null,
+        kind: (rb.kind || '').toLowerCase(),
+        kindRaw: rb.kind || '',
         protocolsLoaded: false,
         loadingProtocols: false,
         robotData: null,
         lastOnlineTs: null,
         rawStatusOk: false,
+        running: false,
         online: false,
         lastStatusTs: null
       };
+
+      buildComponentsIfNeeded(state);
 
       if(state.plantSelect){
         state.plantSelect.addEventListener('change', () => {
@@ -1283,21 +1177,28 @@
       return state;
     }
 
-    function populatePlantSelect(state){
+    function populatePlantSelect(state, force = false){
       if(!state || !state.plantSelect) return;
       const sel = state.plantSelect;
-      const prev = state.selectedPlant || sel.value;
-      sel.innerHTML = '';
       if(state.kind !== 'reloj'){
-        sel.innerHTML = '<option value="">No aplica</option>';
-        state.selectedPlant = '';
+        if(force || state.plantOptionsVersion !== 'non-reloj'){
+          sel.innerHTML = '<option value="">No aplica</option>';
+          state.selectedPlant = '';
+          state.plantOptionsVersion = 'non-reloj';
+        }
         return;
       }
+      if(!force && state.plantOptionsVersion === plantsVersion){
+        return;
+      }
+      sel.innerHTML = '';
       if(!plantsCache.length){
         sel.innerHTML = '<option value="">(sin plantas)</option>';
         state.selectedPlant = '';
+        state.plantOptionsVersion = plantsVersion;
         return;
       }
+      const prev = state.selectedPlant || sel.value;
       plantsCache.forEach(p => {
         const opt = document.createElement('option');
         opt.value = `${p.era}|${p.id_planta}`;
@@ -1306,10 +1207,11 @@
       });
       if(prev && Array.from(sel.options).some(o => o.value === prev)){
         sel.value = prev;
-      } else {
+      } else if(sel.options.length){
         sel.selectedIndex = 0;
       }
       state.selectedPlant = sel.value;
+      state.plantOptionsVersion = plantsVersion;
     }
 
     function parsePlantValue(value){
@@ -1504,29 +1406,36 @@
       if(!st && state.robotData && state.robotData.status && state.robotData.status.raw){
         try{ st = JSON.parse(state.robotData.status.raw); }
         catch{} }
-      // Histeresis de UI: si no hay datos nuevos pero tenemos últimos válidos hace <5s, mantenerlos visibles.
       const nowTs = Date.now();
-      const fresh = (state.lastDataTs && (nowTs - state.lastDataTs) < 5000);
-      if(!st || typeof st !== 'object'){
-        if(state.lastData && fresh){ st = state.lastData; }
+      const fresh = state.lastDataTs && (nowTs - state.lastDataTs) < 5000;
+      if((!st || typeof st !== 'object') && state.lastData && fresh){
+        st = state.lastData;
       }
-      if(DEBUG_UI){ console.debug('[telemetry]', state.id, st); }
       if(!st || typeof st !== 'object'){
-        if(state.statusEmpty) state.statusEmpty.classList.remove('d-none');
+        if(state.statusEmpty && Array.isArray(state.compInstances) && state.compInstances.length){
+          state.statusEmpty.textContent = 'Sin datos en tiempo real.';
+          state.statusEmpty.classList.remove('d-none');
+        }
         updateComponents(state, null);
         return;
       }
-      // Cachear último paquete válido y mostrar grid
-      state.lastData = st; state.lastDataTs = Date.now();
-      if(state.statusEmpty) state.statusEmpty.classList.add('d-none');
-
+      state.lastData = st;
+      state.lastDataTs = nowTs;
+      if(state.statusEmpty && Array.isArray(state.compInstances) && state.compInstances.length){
+        state.statusEmpty.classList.add('d-none');
+      }
       updateComponents(state, st);
     }
 
     function updateRobotCard(state, rb){
       state.robotData = rb;
+      const prevKind = state.kind;
       state.kindRaw = rb.kind || '';
       state.kind = state.kindRaw.toLowerCase();
+      const kindChanged = state.kind !== prevKind;
+      if(kindChanged || !state.compInstances || !state.compInstances.length){
+        buildComponentsIfNeeded(state);
+      }
       state.runtime = rb.runtime === true;
       if(state.nameEl) state.nameEl.textContent = rb.name || rb.id || '—';
       if(state.urlEl) state.urlEl.textContent = rb.base_url || '—';
@@ -1536,7 +1445,9 @@
         state.lastOnlineTs = nowTs;
       }
       const graceOnline = state.lastOnlineTs != null && (nowTs - state.lastOnlineTs) < 3000;
-      const stOk = rawStatusOk || graceOnline || state.runtime;
+      const running = state.runtime;
+      const stOk = running && (rawStatusOk || graceOnline);
+      state.running = running;
       state.online = stOk;
       state.rawStatusOk = rawStatusOk;
       state.lastStatusTs = nowTs;
@@ -1544,6 +1455,7 @@
         state.statusBadge.className = 'badge ' + (stOk ? 'bg-success' : 'bg-secondary') + ' ms-2';
         state.statusBadge.textContent = stOk ? 'Online' : 'Offline';
       }
+      updateStartStopControl(state);
       if(state.openNative){
         const base = rb.base_url ? String(rb.base_url).replace(/\/$/, '') + '/' : '';
         if(base){
@@ -1562,8 +1474,7 @@
       if(state.moveBtn){
         state.moveBtn.style.display = state.kind === 'reloj' ? 'inline-flex' : 'none';
       }
-      populatePlantSelect(state);
-      buildComponentsIfNeeded(state);
+      populatePlantSelect(state, kindChanged);
       renderTelemetry(state);
       if(!state.protocolsLoaded){
         loadRobotProtocols(state);
@@ -1624,40 +1535,43 @@
         console.warn('No se pudo cargar la lista de robots', err);
         data = { robots: [] };
       }
-      robotsCache = data.robots || [];
+      const defaults = [
+        { id: 'reloj-local', name: 'Reloj Local', base_url: 'http://localhost:5005', kind: 'reloj' },
+        { id: 'pump-local', name: 'Bomba Local', base_url: 'http://localhost:5010', kind: 'pump' }
+      ];
+      const incoming = data.robots || [];
+      const merged = [...incoming];
+      const seen = new Set(incoming.map(r => r.id));
+      defaults.forEach(def=>{
+        if(!seen.has(def.id)){
+          merged.push({
+            ...def,
+            status: { ok: false },
+            runtime: false
+          });
+        }
+      });
+      robotsCache = merged;
       renderRobotsList(robotsCache);
-      updateStartStopButtons();
       if(light) return;
-      await Promise.all([refreshTasks(), refreshCatalog()]);
+      await refreshTasks();
       await loadPlants();
     }
 
-    function updateStartStopButtons(){
-      const reloj = robotsCache.find(r => (r.kind || '').toLowerCase() === 'reloj');
-      const pump = robotsCache.find(r => (r.kind || '').toLowerCase() === 'pump');
-      const relojOn = !!(reloj && reloj.runtime === true);
-      const pumpOn = !!(pump && pump.runtime === true);
-      const btnR = $('#btn_reloj');
-      const lblR = $('#lbl_reloj');
-      if(btnR && lblR){
-        btnR.className = relojOn ? 'btn btn-warning w-100' : 'btn btn-outline-secondary w-100';
-        lblR.textContent = relojOn ? 'Detener Reloj' : 'Iniciar Reloj';
-      }
-      const btnP = $('#btn_pump');
-      const lblP = $('#lbl_pump');
-      if(btnP && lblP){
-        btnP.className = pumpOn ? 'btn btn-warning w-100' : 'btn btn-outline-secondary w-100';
-        lblP.textContent = pumpOn ? 'Detener Bomba' : 'Iniciar Bomba';
-      }
+    function isRobotRunning(kind){
+      if(!kind) return false;
+      const normalized = String(kind).toLowerCase();
+      const rb = robotsCache.find(r => (r.kind || '').toLowerCase() === normalized);
+      if(!rb) return false;
+      return rb.runtime === true;
     }
 
     async function ensureRobotState(kind, shouldBeOnline, timeoutMs = 8000){
       const deadline = Date.now() + timeoutMs;
       while(Date.now() < deadline){
         await refreshRobots({ light: true });
-        const rb = robotsCache.find(r => (r.kind || '').toLowerCase() === kind);
-        const online = !!(rb && rb.runtime === true);
-        if(online === shouldBeOnline) return true;
+        const running = isRobotRunning(kind);
+        if(running === shouldBeOnline) return true;
         await sleep(400);
       }
       return false;
@@ -1728,28 +1642,61 @@
     }
 
     async function loadPlants(){
+      let updated = false;
       try{
         const data = await fetchJSON('/plants');
         plantsCache = data.plants || [];
+        plantsVersion++;
+        updated = true;
       }catch(err){
-        plantsCache = [];
+        console.warn('No se pudo cargar la lista de plantas', err);
       }
-      robotsState.forEach(state => populatePlantSelect(state));
+      robotsState.forEach(state => populatePlantSelect(state, updated));
+      renderPlantsTable();
     }
 
     function handleRobotStatusUpdate(list){
       if(!Array.isArray(list) || !list.length) return;
       const index = new Map(robotsCache.map((r, i) => [r.id, i]));
+      let needFullRender = false;
       list.forEach(rb => {
+        if(!rb || !rb.id) return;
+        let merged = null;
         if(index.has(rb.id)){
           const idx = index.get(rb.id);
-          robotsCache[idx] = Object.assign({}, robotsCache[idx], rb);
+          merged = robotsCache[idx] = Object.assign({}, robotsCache[idx], rb);
         } else {
           robotsCache.push(rb);
+          index.set(rb.id, robotsCache.length - 1);
+          needFullRender = true;
+          return;
+        }
+        const state = robotsState.get(rb.id);
+        if(state){
+          updateRobotCard(state, merged);
+        } else {
+          needFullRender = true;
         }
       });
-      renderRobotsList(robotsCache);
-      updateStartStopButtons();
+      if(needFullRender){
+        renderRobotsList(robotsCache);
+      }
+    }
+
+    function renderPlantsTable(){
+      if(!plantsTable) return;
+      const tbody = plantsTable.querySelector('tbody');
+      if(!tbody) return;
+      if(!plantsCache.length){
+        tbody.innerHTML = '<tr><td colspan="3" class="text-muted text-center">Sin plantas registradas.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      plantsCache.forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${p.era || ''}</td><td>${p.id_planta ?? ''}</td><td>${p.nombre || ''}</td>`;
+        tbody.appendChild(tr);
+      });
     }
 
     function setupWebSocket(){
@@ -1841,11 +1788,8 @@
     }
 
     async function toggleReloj(){
-      const running = robotsCache.some(r => (r.kind || '').toLowerCase() === 'reloj' && r.status && r.status.ok);
-      const btn = $('#btn_reloj');
-      const lbl = $('#lbl_reloj');
-      if(btn) btn.disabled = true;
-      if(lbl) lbl.textContent = running ? 'Deteniendo...' : 'Iniciando...';
+      const running = isRobotRunning('reloj');
+      const btn = null;
       let confirmed = false;
       try{
         if(running){
@@ -1865,8 +1809,6 @@
         console.error('toggleReloj error', err);
         alert('Error al intentar cambiar el estado del robot Reloj.');
       }finally{
-        if(btn) btn.disabled = false;
-        updateStartStopButtons();
       }
     }
 
@@ -1893,11 +1835,7 @@
     }
 
     async function togglePump(){
-      const running = robotsCache.some(r => (r.kind || '').toLowerCase() === 'pump' && r.status && r.status.ok);
-      const btn = $('#btn_pump');
-      const lbl = $('#lbl_pump');
-      if(btn) btn.disabled = true;
-      if(lbl) lbl.textContent = running ? 'Deteniendo...' : 'Iniciando...';
+      const running = isRobotRunning('pump');
       let confirmed = false;
       try{
         if(running){
@@ -1916,9 +1854,6 @@
       }catch(err){
         console.error('togglePump error', err);
         alert('Error al intentar cambiar el estado de la bomba.');
-      }finally{
-        if(btn) btn.disabled = false;
-        updateStartStopButtons();
       }
     }
 
@@ -1964,24 +1899,6 @@
         await refreshRobots();
       }catch(err){
         alert('No se pudo guardar el robot.');
-      }
-    }
-
-    function incrementVolume() {
-      const input = document.querySelector('.qa-vol');
-      if (input) {
-        const currentValue = parseInt(input.value) || 0;
-        input.value = currentValue + 1;
-      }
-    }
-
-    function decrementVolume() {
-      const input = document.querySelector('.qa-vol');
-      if (input) {
-        const currentValue = parseInt(input.value) || 0;
-        if (currentValue > 0) {
-          input.value = currentValue - 1;
-        }
       }
     }
 

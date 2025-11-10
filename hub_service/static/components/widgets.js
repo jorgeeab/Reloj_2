@@ -110,14 +110,19 @@ function createSlider(item){
   const max = Number(item.max ?? 100);
   const stepRaw = Number(item.step ?? 1);
   const step = Number.isFinite(stepRaw) && stepRaw > 0 ? stepRaw : 1;
-  let holdDelay = Number(item.holdDelay ?? item.command?.hold_delay_ms ?? 350);
+  const cmdCfg = item.command || {};
+  let holdDelay = Number(item.holdDelay ?? cmdCfg.hold_delay_ms ?? cmdCfg.holdDelay ?? 350);
   if(!Number.isFinite(holdDelay) || holdDelay < 0) holdDelay = 350;
-  let holdInterval = Number(item.holdInterval ?? item.command?.hold_interval_ms ?? 120);
+  let holdInterval = Number(item.holdInterval ?? cmdCfg.hold_interval_ms ?? cmdCfg.holdInterval ?? 120);
   if(!Number.isFinite(holdInterval) || holdInterval < 50) holdInterval = 120;
-  let overrideMs = Number(item.overrideMs ?? item.command?.override_ms ?? 1500);
+  let overrideMs = Number(item.overrideMs ?? cmdCfg.override_ms ?? cmdCfg.overrideMs ?? 1500);
   if(!Number.isFinite(overrideMs) || overrideMs < 0) overrideMs = 1500;
-  let sendDelay = Number(item.sendDelay ?? item.command?.debounce_ms ?? 120);
+  let sendDelay = Number(item.sendDelay ?? cmdCfg.debounce_ms ?? cmdCfg.debounceMs ?? 120);
   if(!Number.isFinite(sendDelay) || sendDelay < 0) sendDelay = 120;
+  const telemetryToleranceRaw = Number(item.telemetryTolerance ?? cmdCfg.telemetry_tolerance ?? cmdCfg.telemetryTolerance ?? step);
+  const telemetryTolerance = Number.isFinite(telemetryToleranceRaw) && telemetryToleranceRaw >= 0 ? telemetryToleranceRaw : step;
+  let telemetryTimeout = Number(item.commandEchoMs ?? cmdCfg.echo_timeout_ms ?? cmdCfg.echoTimeout ?? 12000);
+  if(!Number.isFinite(telemetryTimeout) || telemetryTimeout < 0) telemetryTimeout = 12000;
   input.min = String(min);
   input.max = String(max);
   input.step = String(step);
@@ -144,6 +149,8 @@ function createSlider(item){
   let overrideUntil = 0;
   let pendingValue = null;
   let sendTimer = null;
+  let awaitingTelemetryUntil = 0;
+  let lastCommandValue = null;
 
   const updateDisplay = (value)=>{
     val.textContent = format(value);
@@ -157,6 +164,8 @@ function createSlider(item){
       const target = pendingValue;
       pendingValue = null;
       sendTimer = null;
+      lastCommandValue = target;
+      awaitingTelemetryUntil = Date.now() + telemetryTimeout;
       try{
         await item.onCommand(target, { value: target });
       }catch(err){
@@ -248,16 +257,27 @@ function createSlider(item){
       }
       const now = Date.now();
       const inOverride = overrideUntil > now && manualValue != null;
-      if(numeric != null && !inOverride){
+      let allowTelemetryControl = numeric != null;
+      if(numeric != null){
+        const awaiting = awaitingTelemetryUntil > now;
+        const matchesCommand = lastCommandValue != null && Math.abs(numeric - lastCommandValue) <= telemetryTolerance;
+        if(matchesCommand){
+          awaitingTelemetryUntil = 0;
+        }
+        if(awaiting && !matchesCommand){
+          allowTelemetryControl = false;
+        }
+      }
+      if(allowTelemetryControl && !inOverride){
         manualValue = numeric;
         input.value = String(numeric);
         updateDisplay(numeric);
-      }else if(inOverride && manualValue != null){
-        updateDisplay(manualValue);
-      }else if(numeric != null){
-        updateDisplay(numeric);
       }else if(manualValue != null){
+        input.value = String(manualValue);
         updateDisplay(manualValue);
+      }else if(allowTelemetryControl){
+        input.value = String(numeric);
+        updateDisplay(numeric);
       }else{
         updateDisplay(null);
       }
