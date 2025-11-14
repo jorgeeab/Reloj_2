@@ -37,6 +37,27 @@
     .telemetry div{ background:var(--panel2); border:1px dashed var(--border); border-radius:8px; padding:8px; }
     .telemetry label{ display:block; font-size:12px; color:var(--muted); margin-bottom:2px }
     .telemetry span{ font-weight:600 }
+    .flow-widget{border:1px solid var(--border); border-radius:12px; padding:12px; background:rgba(0,0,0,0.18); margin-bottom:16px;}
+    .fw-header{display:flex; flex-direction:column; gap:12px; margin-bottom:12px;}
+    @media(min-width:768px){ .fw-header{flex-direction:row; justify-content:space-between; align-items:flex-start;} }
+    .fw-stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;}
+    .fw-stat{background:rgba(0,0,0,0.15); border:1px solid var(--border); border-radius:10px; padding:8px 10px;}
+    .fw-stat label{display:block; font-size:12px; color:var(--muted);}
+    .fw-stat span{font-weight:600; font-size:14px;}
+    .fw-step-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-bottom:12px;}
+    .fw-stepper{border:1px solid var(--border); border-radius:10px; padding:10px; background:rgba(0,0,0,0.12);}
+    .stepper-head{display:flex; justify-content:space-between; align-items:center; font-weight:600; margin-bottom:8px;}
+    .stepper-head .unit{font-size:12px; color:var(--muted);}
+    .stepper-body{display:flex; gap:6px; flex-wrap:wrap; align-items:center;}
+    .stepper-body button{background:#0f1530; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer; transition:background .15s;}
+    .stepper-body button:hover{background:#1b2244;}
+    .stepper-body input{width:90px; text-align:center;}
+    .fw-actions{display:flex; gap:10px; flex-wrap:wrap;}
+    .fw-actions button{padding:8px 16px; border-radius:10px; border:1px solid var(--border); background:#101736; color:var(--text); cursor:pointer;}
+    .fw-actions button.warn{background:#2a1220; border-color:#4e2236;}
+    .fw-actions button.ghost{background:transparent; color:var(--muted);}
+    .fw-actions button:disabled{opacity:.4; cursor:not-allowed;}
+
     .gauges{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; align-items:center }
     .gauge .bar{ background:#0b1330; border:1px solid var(--border); border-radius:8px; height:10px; overflow:hidden }
     .gauge .bar div{ height:100%; width:0%; background:linear-gradient(90deg,#6bc3ff,#7af7eb); transition: width .2s }
@@ -83,40 +104,75 @@
 
     <section class="grid two tabview active" data-tab="op" id="view_op">
       <div class="card">
-        <div class="card-header">Acciones rápidas</div>
+        <div class="card-header">Operación + Telemetría</div>
         <div class="card-body">
-          <div class="row g-2 align-items-end flex-wrap">
-            <div class="col-auto">
-              <label class="form-label mb-1">Volumen (ml)</label>
-              <input id="vol" type="number" class="form-control" value="50" min="0" step="1" style="width:140px" />
+          <div class="flow-widget" id="flow_widget">
+            <div class="fw-header">
+              <div>
+                <h3 style="margin:0">Control de Flujo</h3>
+                <p class="muted small" style="margin:2px 0 0 0">Replica el control del Hub para la bomba.</p>
+              </div>
+              <div class="fw-stats">
+                <div class="fw-stat">
+                  <label>Flujo actual</label>
+                  <span id="fw_flow_actual">0.0 ml/s</span>
+                </div>
+                <div class="fw-stat">
+                  <label>Objetivo de flujo</label>
+                  <span id="fw_flow_target">0.0 ml/s</span>
+                </div>
+                <div class="fw-stat">
+                  <label>Volumen entregado</label>
+                  <span id="fw_volume_actual">0 ml</span>
+                </div>
+                <div class="fw-stat">
+                  <label>Objetivo de volumen</label>
+                  <span id="fw_volume_target">0 ml</span>
+                </div>
+                <div class="fw-stat">
+                  <label>Restante</label>
+                  <span id="fw_volume_remaining">0 ml</span>
+                </div>
+              </div>
             </div>
-            <div class="col-auto">
-              <label class="form-label mb-1">Duración (s)</label>
-              <input id="dur" type="number" class="form-control" placeholder="opcional" min="0" step="1" style="width:140px" />
+            <div class="fw-step-grid">
+              <div class="fw-stepper">
+                <div class="stepper-head">
+                  <label>Volumen objetivo</label>
+                  <span class="unit">ml</span>
+                </div>
+                <div class="stepper-body">
+                  <button type="button" data-fw-step="-100" data-target="volume">−100</button>
+                  <button type="button" data-fw-step="-10" data-target="volume">−10</button>
+                  <input type="number" id="fw_volume" value="150" min="0" max="2000" step="1">
+                  <button type="button" data-fw-step="10" data-target="volume">+10</button>
+                  <button type="button" data-fw-step="100" data-target="volume">+100</button>
+                </div>
+              </div>
+              <div class="fw-stepper">
+                <div class="stepper-head">
+                  <label>Caudal objetivo</label>
+                  <span class="unit">ml/s</span>
+                </div>
+                <div class="stepper-body">
+                  <button type="button" data-fw-step="-5" data-target="flow">−5</button>
+                  <button type="button" data-fw-step="-1" data-target="flow">−1</button>
+                  <input type="number" id="fw_flow" value="5" min="0" max="40" step="0.5">
+                  <button type="button" data-fw-step="1" data-target="flow">+1</button>
+                  <button type="button" data-fw-step="5" data-target="flow">+5</button>
+                </div>
+              </div>
             </div>
-            <div class="col-auto"><button id="btnGo" class="btn btn-primary">Regar</button></div>
-            <div class="col-auto"><button id="btnStop" class="btn btn-outline-danger">Detener</button></div>
-            <div class="col text-muted small" id="execInfo"></div>
-            <div class="col-12 execbar"><div class="bar"><div id="exec_bar"></div></div><span class="small" id="exec_pct">0%</span></div>
+            <div class="fw-actions">
+              <button type="button" id="fw_start">Ejecutar</button>
+              <button type="button" id="fw_stop" class="warn">Detener</button>
+              <button type="button" id="fw_reset" class="ghost">Reiniciar volumen</button>
+            </div>
           </div>
-        </div>
-        <div class="card-header">Tarea personalizada</div>
-        <div class="card-body">
-          <div class="row g-2 align-items-center mb-2">
-            <div class="col-auto"><label class="col-form-label">Protocolo</label></div>
-            <div class="col">
-              <select id="ct_protocol" class="form-select form-select-sm"></select>
-            </div>
-            <div class="col-auto"><button class="btn btn-outline-success btn-sm" id="btnExecCustom">Ejecutar</button></div>
-          </div>
-          <div id="ct_fields"></div>
-        </div>
 
-        <div class="card-header">Telemetría</div>
-        <div class="card-body">
-          <div class="telemetry mb-2">
+          <div class="telemetry mb-3">
             <div><label>ml_per_sec</label><span id="t_mlps">0.00</span></div>
-            <div><label>pump_running</label><span id="t_run">false</span></div>
+            <div><label>Bomba encendida</label><span id="t_run">false</span></div>
             <div><label>Puerto</label><span id="t_port">—</span></div>
           </div>
           <div class="gauges">
@@ -141,7 +197,23 @@
               </svg>
             </div>
           </div>
+          <div class="row g-2 align-items-center mt-3">
+            <div class="col text-muted small" id="execInfo"></div>
+            <div class="col-12 execbar"><div class="bar"><div id="exec_bar"></div></div><span class="small" id="exec_pct">0%</span></div>
+          </div>
         </div>
+        <div class="card-header">Tarea personalizada</div>
+        <div class="card-body">
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col-auto"><label class="col-form-label">Protocolo</label></div>
+            <div class="col">
+              <select id="ct_protocol" class="form-select form-select-sm"></select>
+            </div>
+            <div class="col-auto"><button class="btn btn-outline-success btn-sm" id="btnExecCustom">Ejecutar</button></div>
+          </div>
+          <div id="ct_fields"></div>
+        </div>
+
       </div>
 
       <div class="card">
@@ -230,20 +302,198 @@
     function renderProtocolFields(){ const pid=$('#ct_protocol').value; const p=(protocols||[]).find(x=>x.id===pid); const box=$('#ct_fields'); if(!p){ box.innerHTML=''; return;} const rows=[]; (p.params||[]).forEach(prm=>{ const id='ctp_'+prm.name; const step=(prm.step!=null?` step="${prm.step}"`:''), min=(prm.min!=null?` min="${prm.min}"`:''), max=(prm.max!=null?` max="${prm.max}"`:''); const val=(prm.default!=null?` value="${prm.default}"`:''); rows.push(`<div class="col-6"><label class="form-label mb-1">${prm.name}${prm.unit? ' ('+prm.unit+')':''}</label><input id="${id}" type="number" class="form-control form-control-sm"${step}${min}${max}${val}></div>`); }); box.innerHTML = `<div class="row g-2">${rows.join('')}</div>`; }
     $('#ct_protocol').addEventListener('change', renderProtocolFields);
 
-    // Actions
-    async function startWater(){ try{ const vol=Number($('#vol').value||0); const durRaw=$('#dur').value; const dur= durRaw? Number(durRaw): null; const body={ protocol_name:'riego_basico', mode:'async', params:{ volume_ml: vol } }; if(dur!=null) body.duration_seconds=dur; const res = await fetchJSON(api + '/api/tasks/execute', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); currentExec = res.execution_id||null; updateExecInfo(res.status||'running', res.progress); showOverlay(true, 'Ejecución en curso…'); await refreshTasks(); showToast('Tarea iniciada'); }catch(e){ showToast('No se pudo iniciar'); } }
-    async function stopWater(){ try{ const eid = currentExec || (window._lastExecId||null); if(!eid) return; await fetchJSON(api + '/api/execution/' + eid + '/stop', { method:'POST' }); await refreshTasks(); showOverlay(false); updateExecInfo('stopped', null); showToast('Tarea detenida'); }catch{} }
-    $('#btnGo').addEventListener('click', startWater);
-    $('#btnStop').addEventListener('click', stopWater);
+    // Flow widget & acciones
+    function initFlowWidget(){
+      const widget = document.getElementById('flow_widget');
+      const volumeInput = document.getElementById('fw_volume');
+      const flowInput = document.getElementById('fw_flow');
+      const startBtn = document.getElementById('fw_start');
+      const stopBtn = document.getElementById('fw_stop');
+      const resetBtn = document.getElementById('fw_reset');
+      if(!widget || !volumeInput || !flowInput || !startBtn || !stopBtn) return null;
+
+      const stats = {
+        flowActual: document.getElementById('fw_flow_actual'),
+        flowTarget: document.getElementById('fw_flow_target'),
+        volumeActual: document.getElementById('fw_volume_actual'),
+        volumeTarget: document.getElementById('fw_volume_target'),
+        volumeRemaining: document.getElementById('fw_volume_remaining')
+      };
+
+      const bounds = {
+        volume: { min: Number(volumeInput.min||0), max: Number(volumeInput.max||2000), precision: 0 },
+        flow: { min: Number(flowInput.min||0), max: Number(flowInput.max||40), precision: 1 }
+      };
+
+      const state = {
+        targetVolume: Number(volumeInput.value||150),
+        targetFlow: Number(flowInput.value||5),
+        execId: null,
+        online: true,
+        busy: false
+      };
+
+      const clampValue = (val, cfg)=>{
+        if(!Number.isFinite(val)) return cfg.min;
+        return Math.min(cfg.max, Math.max(cfg.min, Number(val)));
+      };
+
+      const setInputValue = (input, value, cfg)=>{
+        const v = clampValue(value, cfg);
+        input.value = v.toFixed(cfg.precision);
+        return v;
+      };
+
+      const getValues = ()=>({
+        volume: clampValue(Number(volumeInput.value), bounds.volume),
+        flow: clampValue(Number(flowInput.value), bounds.flow)
+      });
+
+      const updateTargetsFromInputs = ()=>{
+        state.targetVolume = setInputValue(volumeInput, volumeInput.value, bounds.volume);
+        state.targetFlow = setInputValue(flowInput, flowInput.value, bounds.flow);
+      };
+
+      widget.querySelectorAll('[data-fw-step]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const target = (btn.dataset.target === 'flow') ? 'flow' : 'volume';
+          const input = target === 'flow' ? flowInput : volumeInput;
+          const cfg = bounds[target];
+          const step = Number(btn.dataset.fwStep||0);
+          setInputValue(input, Number(input.value||0)+step, cfg);
+          updateTargetsFromInputs();
+        });
+      });
+
+      [volumeInput, flowInput].forEach(input=>{
+        input.addEventListener('change', ()=>{
+          const target = (input===flowInput)? 'flow':'volume';
+          setInputValue(input, input.value, bounds[target]);
+          updateTargetsFromInputs();
+        });
+      });
+
+      const sendCalibration = async (flow)=>{
+        try{
+          await fetchJSON(api + '/api/calibration/apply', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ ml_per_sec: flow })
+          });
+        }catch(err){ console.warn('calibration apply failed', err); }
+      };
+
+      const refreshDisabled = ()=>{
+        const disabled = !state.online || state.busy;
+        startBtn.disabled = disabled;
+        stopBtn.disabled = disabled;
+        if(resetBtn) resetBtn.disabled = disabled;
+      };
+
+      startBtn.addEventListener('click', async ()=>{
+        updateTargetsFromInputs();
+        const values = getValues();
+        state.targetVolume = values.volume;
+        state.targetFlow = values.flow;
+        state.busy = true; refreshDisabled();
+        try{
+          await sendCalibration(values.flow);
+          flowMax = Math.max(flowMax, values.flow * 1.5);
+          const body = { protocol_name:'riego_basico', mode:'async', params:{ volume_ml: values.volume } };
+          const res = await fetchJSON(api + '/api/tasks/execute', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(body)
+          });
+          currentExec = res.execution_id || null;
+          state.execId = currentExec;
+          updateExecInfo(res.status||'running', res.progress);
+          showOverlay(true, 'Ejecución en curso…');
+          await refreshTasks();
+          showToast('Tarea iniciada');
+        }catch(err){
+          console.error(err);
+          showToast('No se pudo iniciar');
+        }finally{
+          state.busy = false; refreshDisabled();
+        }
+      });
+
+      stopBtn.addEventListener('click', async ()=>{
+        const eid = currentExec || state.execId || window._lastExecId || null;
+        if(!eid) return;
+        state.busy = true; refreshDisabled();
+        try{
+          await fetchJSON(api + '/api/execution/' + eid + '/stop', { method:'POST' });
+          await refreshTasks();
+          showOverlay(false);
+          updateExecInfo('stopped', null);
+          showToast('Tarea detenida');
+          currentExec = null;
+          state.execId = null;
+        }catch(err){
+          console.error(err);
+          showToast('No se pudo detener');
+        }finally{
+          state.busy = false; refreshDisabled();
+        }
+      });
+
+      if(resetBtn){
+        resetBtn.addEventListener('click', ()=>{
+          lastProgress = 0;
+          currentExec = null;
+          state.execId = null;
+          updateExecInfo('-', 0);
+          showOverlay(false);
+          showToast('Volumen reiniciado (UI)');
+        });
+      }
+
+      const fmtMetric = (value, unit, precision)=>{
+        if(value === null || value === undefined || Number.isNaN(value)) return '—';
+        return `${Number(value).toFixed(precision)} ${unit}`.trim();
+      };
+
+      return {
+        setOnline(flag){
+          state.online = !!flag;
+          refreshDisabled();
+        },
+        updateTelemetry({ flowActual, progress, running, execId }){
+          if(execId && !state.execId){ state.execId = execId; }
+          if(typeof flowActual === 'number' && stats.flowActual){
+            stats.flowActual.textContent = fmtMetric(flowActual, 'ml/s', bounds.flow.precision);
+          }
+          if(stats.flowTarget){ stats.flowTarget.textContent = fmtMetric(state.targetFlow, 'ml/s', bounds.flow.precision); }
+          const delivered = (progress != null && state.targetVolume != null)
+            ? Math.max(0, Number(progress)) * state.targetVolume
+            : (running ? null : 0);
+          if(stats.volumeActual){ stats.volumeActual.textContent = fmtMetric(delivered, 'ml', bounds.volume.precision); }
+          if(stats.volumeTarget){ stats.volumeTarget.textContent = fmtMetric(state.targetVolume, 'ml', bounds.volume.precision); }
+          if(stats.volumeRemaining){
+            const remaining = (state.targetVolume != null && delivered != null)
+              ? Math.max(0, state.targetVolume - delivered)
+              : null;
+            stats.volumeRemaining.textContent = fmtMetric(remaining, 'ml', bounds.volume.precision);
+          }
+          if(document.activeElement !== volumeInput){ setInputValue(volumeInput, state.targetVolume, bounds.volume); }
+          if(document.activeElement !== flowInput){ setInputValue(flowInput, state.targetFlow, bounds.flow); }
+        }
+      };
+    }
+
+    const FlowWidgetCtrl = initFlowWidget();
 
     async function execCustom(){ const pid=$('#ct_protocol').value; const p=(protocols||[]).find(x=>x.id===pid); if(!p) return alert('Sin protocolo'); const task={ name:(p.label||pid)+' (custom)', protocol_name:pid, mode:'async', params:{} }; (p.params||[]).forEach(prm=>{ const el=document.getElementById('ctp_'+prm.name); if(!el) return; const raw=el.value; if(raw==='') return; const num=Number(raw); if(prm.name==='duration_seconds'){ task.duration_seconds = num; } else { task.params[prm.name]=num; } }); const res= await fetchJSON(api + '/api/tasks/execute', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(task) }); currentExec = res.execution_id||null; updateExecInfo(res.status||'running', res.progress); showOverlay(true, 'Ejecución en curso…'); await refreshTasks(); }
     $('#btnExecCustom').addEventListener('click', ()=> execCustom().catch(()=>{}));
 
-    // Status & SSE
+// Status & SSE
     function updateExecInfo(status, prog){ const el=$('#execInfo'); const pct = (prog!=null)? Math.max(0,Math.min(100,Math.round(100*Number(prog)))) : 0; el.textContent = `estado: ${status||'-'} ${pct}%`.trim(); $('#exec_pct').textContent = pct + '%'; const bar=$('#exec_bar'); if(bar) bar.style.width = pct + '%'; }
     function setGauge(id, value, max, fmtTxt){ const R=48, C=2*Math.PI*R; const fg=document.getElementById('sg_'+id+'_fg'); const txt=document.getElementById('sg_'+id+'_txt'); const v=Math.max(0, Math.min(max, Number(value||0))); const frac = max>0? (v/max): 0; if(fg){ fg.style.strokeDashoffset = String(C * (1-frac)); } if(txt){ txt.textContent = typeof fmtTxt==='function'? fmtTxt(v, frac): (id==='prog'? (Math.round(frac*100)+'%') : v.toFixed(1)); } }
-    function onStatus(payload){ try{ const st=payload||{}; setBadge(true); lastSse=Date.now(); document.getElementById('pill_robot').textContent = 'Robot: pump'; const serial= st.serial || {}; document.getElementById('pill_serial').textContent = 'Serial: ' + (serial.opened? (serial.port||'') + ' @'+(serial.baud||''): 'cerrado'); const rows = []; rows.push(`<tr><td class=\"fw-semibold\">pump_running</td><td>${fmt(st.pump_running)}</td></tr>`); rows.push(`<tr><td class=\"fw-semibold\">ml_per_sec</td><td>${fmt(st.ml_per_sec)}</td></tr>`); const sensors=st.sensors||{}; Object.keys(sensors).forEach(k=> rows.push(`<tr><td>${k}</td><td>${fmt(sensors[k])}</td></tr>`)); document.getElementById('kv').innerHTML = rows.join(''); document.getElementById('kv_ts').textContent = st.ts || nowIso(); if('execution_id' in st) window._lastExecId = st.execution_id; if('exec_status' in st || 'progress' in st){ updateExecInfo(st.exec_status||'-', st.progress); if(st.exec_status==='completed' || st.exec_status==='stopped' || st.exec_status==='error'){ showOverlay(false); } else if(st.exec_status==='running'){ showOverlay(true,'Ejecución en curso…'); } lastProgress = (st.progress!=null)? Number(st.progress) : lastProgress; } document.getElementById('t_mlps').textContent = fmt(st.ml_per_sec); document.getElementById('t_run').textContent = String(!!st.pump_running); document.getElementById('t_port').textContent = serial.opened? (serial.port||'-') : 'cerrado'; document.getElementById('g_bomba').style.width = st.pump_running? '100%' : '0%'; const pct = Math.max(0, Math.min(100, Math.round(100*(lastProgress||0)))); document.getElementById('tank_lvl').style.height = pct + '%'; document.getElementById('tank_pct').textContent = pct + '%'; setGauge('flow', st.ml_per_sec, flowMax); setGauge('prog', lastProgress||0, 1, (v,f)=> Math.round(100*f)+'%'); }catch{} }
-    function sse(){ try{ const es = new EventSource(api + '/api/status/stream'); es.onmessage = ev => { try{ const d=JSON.parse(ev.data); onStatus(d); }catch{} }; es.onerror = _ => { setBadge(false); }; }catch{ setBadge(false); } }
+    function onStatus(payload){ try{ const st=payload||{}; setBadge(true); FlowWidgetCtrl && FlowWidgetCtrl.setOnline(true); lastSse=Date.now(); document.getElementById('pill_robot').textContent = 'Robot: pump'; const serial= st.serial || {}; document.getElementById('pill_serial').textContent = 'Serial: ' + (serial.opened? (serial.port||'') + ' @'+(serial.baud||''): 'cerrado'); const rows = []; rows.push(`<tr><td class="fw-semibold">pump_running</td><td>${fmt(st.pump_running)}</td></tr>`); rows.push(`<tr><td class="fw-semibold">ml_per_sec</td><td>${fmt(st.ml_per_sec)}</td></tr>`); const sensors=st.sensors||{}; Object.keys(sensors).forEach(k=> rows.push(`<tr><td>${k}</td><td>${fmt(sensors[k])}</td></tr>`)); document.getElementById('kv').innerHTML = rows.join(''); document.getElementById('kv_ts').textContent = st.ts || nowIso(); if('execution_id' in st) window._lastExecId = st.execution_id; if('exec_status' in st || 'progress' in st){ updateExecInfo(st.exec_status||'-', st.progress); if(st.exec_status==='completed' || st.exec_status==='stopped' || st.exec_status==='error'){ showOverlay(false); } else if(st.exec_status==='running'){ showOverlay(true,'Ejecuci�n en curso�'); } lastProgress = (st.progress!=null)? Number(st.progress) : lastProgress; } document.getElementById('t_mlps').textContent = fmt(st.ml_per_sec); document.getElementById('t_run').textContent = String(!!st.pump_running); document.getElementById('t_port').textContent = serial.opened? (serial.port||'-') : 'cerrado'; document.getElementById('g_bomba').style.width = st.pump_running? '100%' : '0%'; const pct = Math.max(0, Math.min(100, Math.round(100*(lastProgress||0)))); document.getElementById('tank_lvl').style.height = pct + '%'; document.getElementById('tank_pct').textContent = pct + '%'; setGauge('flow', st.ml_per_sec, flowMax); setGauge('prog', lastProgress||0, 1, (v,f)=> Math.round(100*f)+'%'); FlowWidgetCtrl && FlowWidgetCtrl.updateTelemetry({ flowActual: st.ml_per_sec, progress: st.progress, running: !!st.pump_running, execId: st.execution_id||null }); }catch{} }
+
+function sse(){ try{ const es = new EventSource(api + '/api/status/stream'); es.onmessage = ev => { try{ const d=JSON.parse(ev.data); onStatus(d); }catch{} }; es.onerror = _ => { setBadge(false); FlowWidgetCtrl && FlowWidgetCtrl.setOnline(false); }; }catch{ setBadge(false); FlowWidgetCtrl && FlowWidgetCtrl.setOnline(false); } }
     setInterval(()=>{ const age = Date.now()-lastSse; $('#pill_rx').textContent = 'RX: ' + (age<2000? 'OK':'SIN DATOS'); $('#pill_rx').className = 'pill' + (age<2000? '':' warn'); }, 1000);
 
     // Tasks table

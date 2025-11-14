@@ -1,0 +1,45 @@
+{
+  "widgets": [
+    {
+      "id": "direct_flow",
+      "type": "flow-control",
+      "title": "Control directo de bomba",
+      "start_label": "Ejecutar",
+      "stop_label": "Detener",
+      "reset_label": "Reiniciar volumen",
+      "show_remaining": true,
+      "volume": {
+        "label": "Volumen objetivo",
+        "metric_label": "Volumen entregado",
+        "target_label": "Objetivo",
+        "unit": "ml",
+        "path": "volumen_ml|flow.volume_ml|metrics.volume_ml",
+        "target_path": "volumen_objetivo_ml|setpoints.volumen_ml|objetivo_volumen_ml",
+        "decimals": 1,
+        "min": 0,
+        "max": 2000,
+        "step": 1,
+        "default": 150
+      },
+      "flow": {
+        "label": "Caudal objetivo",
+        "metric_label": "Flujo actual",
+        "unit": "ml/s",
+        "path": "caudal_est_mls|flow_est|sensors.ml_per_sec|metrics.flow_ml_s",
+        "target_path": "caudalBombaMLs|flow.target|caudal_objetivo_mls",
+        "decimals": 1,
+        "min": 0,
+        "max": 40,
+        "visual_max": 40,
+        "step": 0.5,
+        "default": 5
+      },
+      "command": {
+        "type": "flow_control",
+        "volume_field": "volumen_ml",
+        "flow_field": "caudal_bomba_mls",
+        "reset_payload": { "reset_volumen": 1 }
+      }
+    }
+  ]
+}

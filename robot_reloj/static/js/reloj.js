@@ -16,9 +16,203 @@
   async function jpost(url, body){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); if(!r.ok) throw new Error(`${r.status} ${url}`); return r.json(); }
   async function jdel(url){ const r=await fetch(url,{method:'DELETE'}); if(!r.ok) throw new Error(`${r.status} ${url}`); return r.json(); }
 
+  const WS_BASE = (location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host;
+  const connectionFlags = { control: false, telemetry: false };
+  let isSerialOpen = false;
+  let rxAgeMs = 999999;
+  let FlowWidgetCtrl = null;
+  const pillRx = document.getElementById('pill-rx');
+  const overlayEl = document.getElementById('op_overlay');
+  const overlayMsg = document.getElementById('overlay_msg');
+  const overlayReconnect = document.getElementById('btn_overlay_reconnect');
+
+  function refreshOverlay(){
+    if(!overlayEl) return;
+    const issues = [];
+    if(!connectionFlags.telemetry) issues.push("Sin telemetría");
+    if(!connectionFlags.control) issues.push("Sin canal de control");
+    if(!isSerialOpen && !connectionFlags.telemetry){
+      issues.push("Esperando datos del robot");
+    }
+    if(issues.length){
+      if(overlayMsg){ overlayMsg.textContent = issues.join(" · "); }
+      overlayEl.hidden = false;
+      if(overlayReconnect){
+        const showBtn = !connectionFlags.control || !connectionFlags.telemetry;
+        overlayReconnect.style.display = showBtn ? 'inline-flex' : 'none';
+      }
+    }else{
+      overlayEl.hidden = true;
+      if(overlayReconnect){ overlayReconnect.style.display = 'none'; }
+    }
+  }
+
+  if(overlayReconnect){
+    overlayReconnect.addEventListener('click', ()=>{
+      if(typeof window !== 'undefined'){
+        const ctrl = window.ControlChannel;
+        if(ctrl && typeof ctrl.restart === 'function'){
+          ctrl.restart();
+        }
+        const telem = window.TelemetryChannel;
+        if(telem && typeof telem.restart === 'function'){
+          telem.restart();
+        }
+      }
+    });
+  }
+
+  refreshOverlay();
+
+  function updateRxPillLabel(customText){
+    if(!pillRx) return;
+    if(!connectionFlags.telemetry){
+      pillRx.textContent = "RX: SIN DATOS";
+      pillRx.classList.add('warn');
+      return;
+    }
+    const label = customText || (Number.isFinite(rxAgeMs) ? `RX ${Math.round(rxAgeMs)} ms` : "RX OK");
+    pillRx.textContent = label;
+    pillRx.classList.toggle('warn', Number.isFinite(rxAgeMs) && rxAgeMs > 4000);
+  }
+
+  function setConnectionState(kind, value){
+    if(connectionFlags[kind] === value) return;
+    connectionFlags[kind] = value;
+    const label = `[ws/${kind}] ${value ? 'connected' : 'disconnected'}`;
+    console[value ? 'info' : 'warn'](label);
+    if(kind === 'telemetry'){
+      updateRxPillLabel();
+    }
+    refreshOverlay();
+  }
+
+  function createControlChannel(){
+    let socket = null;
+    let reconnectTimer = null;
+    const sendQueue = [];
+    const awaiting = [];
+    let lastPayload = null;
+
+    const enqueue = (entry)=>{
+      sendQueue.push(entry);
+      flush();
+    };
+
+    const flush = ()=>{
+      if(!socket || socket.readyState !== WebSocket.OPEN) return;
+      while(sendQueue.length){
+        const entry = sendQueue.shift();
+        try{
+          socket.send(JSON.stringify(entry.body));
+          lastPayload = entry.body;
+          entry.timeout = setTimeout(()=>{
+            const idx = awaiting.indexOf(entry);
+            if(idx !== -1){
+              awaiting.splice(idx,1);
+              entry.reject(new Error("control timeout"));
+            }
+          }, 4000);
+          awaiting.push(entry);
+        }catch(err){
+          entry.reject(err);
+        }
+      }
+    };
+
+    const handleClose = ()=>{
+      setConnectionState('control', false);
+      awaiting.splice(0).forEach(entry=>{
+        clearTimeout(entry.timeout);
+        entry.reject(new Error("control socket cerrado"));
+      });
+      scheduleReconnect();
+    };
+
+    const handleMessage = (event)=>{
+      let data = null;
+      try{
+        data = JSON.parse(event.data || "{}");
+      }catch{
+        return;
+      }
+      if(data.type === "control_ready"){
+        setConnectionState('control', true);
+        flush();
+        return;
+      }
+      if(data.type === "control_ack"){
+        const entry = awaiting.shift();
+        if(!entry) return;
+        clearTimeout(entry.timeout);
+        if(data.status === "ok"){
+          entry.resolve(data.body || {});
+        }else{
+          entry.reject(new Error(data.error || "control_error"));
+        }
+        flush();
+        return;
+      }
+    };
+
+    const connect = ()=>{
+      if(socket){
+        try{ socket.close(); }catch{}
+      }
+      setConnectionState('control', false);
+      console.info('[ws/control] connecting...');
+      socket = new WebSocket(`${WS_BASE}/ws/control`);
+      socket.addEventListener('open', ()=>{
+        setConnectionState('control', true);
+        flush();
+      });
+      socket.addEventListener('message', handleMessage);
+      socket.addEventListener('close', handleClose);
+      socket.addEventListener('error', (err)=>{
+        console.error('[ws/control] error', err);
+        socket && socket.close();
+      });
+    };
+
+    const scheduleReconnect = ()=>{
+      if(reconnectTimer) return;
+      reconnectTimer = setTimeout(()=>{
+        reconnectTimer = null;
+        connect();
+      }, 1200);
+    };
+
+    connect();
+
+    return {
+      send(body){
+        if(!body || typeof body !== 'object'){
+          return Promise.resolve({});
+        }
+        return new Promise((resolve, reject)=> enqueue({ body, resolve, reject }));
+      },
+      restart(){ connect(); },
+      getLastPayload(){ return lastPayload; }
+    };
+  }
+
+  const ControlChannel = createControlChannel();
+  if(typeof window !== 'undefined'){
+    window.ControlChannel = ControlChannel;
+  }
+  updateRxPillLabel();
+
   // ------------- Serial (toggle único) -------------
   async function refreshPorts(){
     const info = await jget("/api/serial/ports");
+    const hwRow = document.getElementById('serial_hw_row');
+    if(hwRow){
+      hwRow.hidden = !!info.is_virtual;
+    }
+    const virtualMsg = document.getElementById('serial_virtual_msg');
+    if(virtualMsg){
+      virtualMsg.style.display = info.is_virtual ? 'inline-flex' : 'none';
+    }
     const sel = $("#sel_port");
     if(sel){
       sel.innerHTML="";
@@ -45,13 +239,21 @@
       }
     }
     const ports = (info.ports||[]).join(', ');
+    const showHwAlert = !info.is_virtual && !info.open;
+    const hwAlert = document.getElementById('serial_hw_alert');
+    if(hwAlert){
+      hwAlert.style.display = showHwAlert ? 'inline-flex' : 'none';
+    }
     const statusEl = $("#serial_status");
     if(statusEl){
       if(info.is_virtual){
-        statusEl.textContent = "Modo virtual activo - Serial simulado";
+        statusEl.textContent = "Modo virtual activo — serial simulado";
+        statusEl.classList.remove('warn-text');
       }else{
-        const status = info.open ? `Conectado a ${info.current}` : "Desconectado";
-        statusEl.textContent = `${status} · Puertos: ${ports}`;
+        const status = info.open ? `Conectado a ${info.current || '(puerto actual)'}` : "Robot físico sin conexión";
+        const portsLabel = ports || "sin puertos detectados";
+        statusEl.textContent = `${status} · Puertos: ${portsLabel}`;
+        statusEl.classList.toggle('warn-text', showHwAlert);
       }
     }
     const btn = $("#btn_toggle_serial");
@@ -60,9 +262,11 @@
         btn.textContent = "Virtual";
         btn.disabled = true;
         btn.classList.remove('warn');
+        btn.title = "Modo virtual activo, no se requiere COM";
       }else{
         btn.disabled = false;
         btn.textContent = info.open ? "Desconectar" : "Conectar";
+        btn.removeAttribute('title');
         if(info.open) btn.classList.add('warn'); else btn.classList.remove('warn');
       }
     }
@@ -75,6 +279,10 @@
   if(_btnToggleSerial) _btnToggleSerial.onclick = async ()=>{
     try{
       const info = await jget("/api/serial/ports");
+      if(info.is_virtual){
+        toast("Modo virtual activo, no se requiere puerto serial.");
+        return;
+      }
       if(info.open){ await jpost("/api/serial/close",{}); toast("Desconectado"); }
       else {
         const port=$("#sel_port").value||info.current||"";
@@ -146,23 +354,10 @@
       await jpost('/api/robots/select', { id });
       const label = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : id;
       toast(`Robot activo: ${label}`);
-      // Abrir/cerrar GUI PyBullet automáticamente según perfil
-      try{
-        if(id === 'virtual') await jpost('/api/visual/gui/start',{});
-        else await jpost('/api/visual/gui/stop',{});
-      }catch{}
-
-      // Mostrar/ocultar tanque solo si hay objetivo definido
-      try{
-        const goal = Number((window._statusCache && _statusCache.volumen_objetivo_ml!=null)? _statusCache.volumen_objetivo_ml : (s && s.volumen_objetivo_ml!=null ? s.volumen_objetivo_ml : 0));
-        const box = document.getElementById('tank_box'); if(box){ box.style.display = (goal>0 ? 'flex' : 'none'); }
-      }catch{}
-
       // Sin vaciado físico: no hay barra de “vaciado”.
       await refreshRobots();
       try{ await refreshPorts(); }catch{}
-      try{ await refreshPbGui(); }catch{}
-      pollStatus();
+      TelemetryChannel.restart();
     }catch(e){
       toast('No se pudo cambiar el robot');
       await refreshRobots();
@@ -194,20 +389,6 @@
       activate(first);
     }
   })();
-
-  // ------------- PyBullet GUI controls -------------
-  const pbGuiStatus = document.getElementById('pb_gui_status');
-  const btnPbStart = document.getElementById('btn_pb_gui_start');
-  const btnPbStop  = document.getElementById('btn_pb_gui_stop');
-  async function refreshPbGui(){
-    try{
-      const s = await jget('/api/visual/gui/status');
-      if(pbGuiStatus) pbGuiStatus.textContent = s.running? 'ejecutándose':'detenida';
-    }catch{ if(pbGuiStatus) pbGuiStatus.textContent = 'error'; }
-  }
-  if(btnPbStart){ btnPbStart.onclick = async ()=>{ try{ await jpost('/api/visual/gui/start',{}); toast('GUI iniciada'); }catch{ toast('No se pudo iniciar GUI'); } await refreshPbGui(); }; }
-  if(btnPbStop){  btnPbStop.onclick  = async ()=>{ try{ await jpost('/api/visual/gui/stop',{});  toast('GUI detenida'); }catch{ toast('No se pudo detener GUI'); } await refreshPbGui(); }; }
-  refreshPbGui();
 
   // Selector de tema (tabs cambian de color)
   const themeSel = document.getElementById('themeSel');
@@ -280,18 +461,13 @@
       pidX:{ kp:Number(document.getElementById('def_kpX').value||0), ki:Number(document.getElementById('def_kiX').value||0), kd:Number(document.getElementById('def_kdX').value||0) },
       pidA:{ kp:Number(document.getElementById('def_kpA').value||0), ki:Number(document.getElementById('def_kiA').value||0), kd:Number(document.getElementById('def_kdA').value||0) }
     } };
-    try{ await jpost('/api/control', payload); toast('PID aplicados'); }catch{ toast('Error aplicando PID'); }
+    try{ await ControlChannel.send(payload); toast('PID aplicados'); }catch{ toast('Error aplicando PID'); }
   }; }
 
-  const btnApplyPolicy=document.getElementById('btn_apply_policy'); if(btnApplyPolicy){ btnApplyPolicy.onclick = async ()=>{
-    try{
-      const pol = (document.getElementById('sel_policy')||{}).value||'stop_only';
-      const sch = !!((document.getElementById('chk_scheduler')||{}).checked);
-      await jpost('/api/command_policy', {policy: pol});
-      await jpost('/api/scheduler', {enabled: sch});
-      toast('Políticas aplicadas');
-    }catch{ toast('Error políticas'); }
-  }; }
+  const btnApplyPolicy=document.getElementById('btn_apply_policy'); if(btnApplyPolicy){
+    btnApplyPolicy.onclick = ()=> toast('Políticas gestionadas automáticamente por el hub');
+    btnApplyPolicy.disabled = true;
+  }
 
   // ------------- Real-time Chart -------------
   const canvas = document.getElementById('chart');
@@ -424,491 +600,464 @@
     svg.addEventListener('touchend', onUp);
   })();
 
-  // ------------- Pollers (/status + /debug/serial) -------------
-  let lastRxText = "";        // para watchdog RX
-  let lastRxSeenTs = 0;
-  let rxOK = false;
-  let statusFetching = false;  // evita solapamiento de peticiones
-  let isSerialOpen = false;    // estado serial para overlays
-  let rxAgeMs = 999999;        // edad de RX para heurística de conexión
-  let lastSerialOpenTs = 0;    // última vez visto abierto
-
+  // ------------- Telemetría vía WebSocket -------------
+  let lastSerialOpenTs = 0;
   window._statusCache = null;
-  async function pollStatus(){
-    if(statusFetching) return; statusFetching = true;
+
+  function applyStatusSnapshot(s){
+    if(!s) return;
+    window._statusCache = s;
+    if(typeof s.rx_age_ms === 'number'){ rxAgeMs = Number(s.rx_age_ms); }
+    updateRxPillLabel();
+    $("#t_x").textContent = fmt(s.x_mm||0);
+    $("#t_a").textContent = fmt(s.a_deg||0);
+    const zmm = Number(s.z_mm||0);
+    const flowActual = Number((s.caudal_est_mls!=null?s.caudal_est_mls:s.flow_est)||0);
+    const tz=document.getElementById('t_z'); if(tz){ tz.textContent = fmt(zmm||0); }
+    const rewardEl = document.getElementById('t_reward');
+    if(rewardEl && s.reward !== undefined) { rewardEl.textContent = Number(s.reward).toFixed(3); }
+    const rdz=document.getElementById('rd_z_mm'); if(rdz){ rdz.textContent = fmt(zmm||0); }
+    const rdX=document.getElementById('rd_x_mm'); if(rdX){ rdX.textContent = fmt(s.x_mm||0); }
+    const rdA=document.getElementById('rd_a_deg'); if(rdA){ rdA.textContent = fmt(s.a_deg||0); }
+    updateSVG(s.x_mm, s.a_deg);
+    $("#t_vol").textContent = fmt(s.volumen_ml||0);
+    $("#t_flow").textContent = fmt(flowActual);
+    const rdV=document.getElementById('rd_vol_ml'); if(rdV){ rdV.textContent = fmt(s.volumen_ml||0); }
+    $("#t_limx").textContent = s.lim_x||0; $("#t_lima").textContent = s.lim_a||0;
+    $("#t_homx").textContent = s.homing_x||0; $("#t_homa").textContent = s.homing_a||0;
+    const portLabel = document.getElementById('t_port'); if(portLabel){ portLabel.textContent = s.serial_port || "—"; }
+    const serialPill = $("#pill-serial"); if(serialPill){ serialPill.textContent = `Serial: ${s.serial_port||'—'} @ ${s.baudrate||''}`; }
+    if(robotPill){
+      const label = s.robot_label || s.robot_id || '—';
+      robotPill.textContent = `Robot: ${label}`;
+      robotPill.classList.toggle('warn', !!s.is_virtual);
+    }
+    if(robotSel && s.robot_id && robotSel.value !== s.robot_id){
+      robotSel.value = s.robot_id;
+    }
+    isSerialOpen = !!s.serial_open;
+    if(isSerialOpen){ lastSerialOpenTs = Date.now(); }
+    refreshOverlay();
+    const modoEl = document.getElementById('t_modo_tx'); if(modoEl){ modoEl.textContent = String(s.modo!=null?s.modo:"—"); }
+
+    const setText=(id,val)=>{ const el=document.getElementById(id); if(el){ el.textContent=String(val); } };
+    setText('k_steps_mm', (s.pasosPorMM!=null?fmt(s.pasosPorMM,2):'—'));
+    setText('k_steps_deg', (s.pasosPorGrado!=null?fmt(s.pasosPorGrado,2):'—'));
+    setText('k_usar_flujo', (s.usarSensorFlujo? 'sí':'no'));
+    setText('k_caudal_bomba', (s.caudalBombaMLs!=null?fmt(s.caudalBombaMLs,1):'—'));
+    setText('k_kpX', (s.kpX!=null?fmt(s.kpX,2):'—'));
+    setText('k_kiX', (s.kiX!=null?fmt(s.kiX,2):'—'));
+    setText('k_kdX', (s.kdX!=null?fmt(s.kdX,2):'—'));
+    setText('k_kpA', (s.kpA!=null?fmt(s.kpA,2):'—'));
+    setText('k_kiA', (s.kiA!=null?fmt(s.kiA,2):'—'));
+    setText('k_kdA', (s.kdA!=null?fmt(s.kdA,2):'—'));
+
+    const ex = clamp((Math.abs((s.energies&&s.energies.x)||0)/255)*100,0,100);
+    const ea = clamp((Math.abs((s.energies&&s.energies.a)||0)/255)*100,0,100);
+    const eb = clamp((Math.abs((s.energies&&s.energies.bomba)||0)/255)*100,0,100);
+    $("#g_ex").style.width = ex+"%";
+    $("#g_ea").style.width = ea+"%";
+    $("#g_eb").style.width = eb+"%";
+    const rdEX=document.getElementById('rd_en_x'); if(rdEX){ rdEX.textContent = String((s.energies&&s.energies.x)||0); }
+    const rdEA=document.getElementById('rd_en_a'); if(rdEA){ rdEA.textContent = String((s.energies&&s.energies.a)||0); }
+    const pumpEnergy = (s.energies&&s.energies.bomba)||0;
+    const rdEB=document.getElementById('rd_en_b'); if(rdEB){ rdEB.textContent = String(pumpEnergy); }
+    const pumpSlider = document.getElementById('en_b');
+    if(pumpSlider){
+      pumpSlider.value = String(pumpEnergy);
+      const out = document.getElementById('en_b_o'); if(out){ out.textContent = String(pumpEnergy); }
+    }
+
     try{
-      const s = await jget("/api/status");
-      window._statusCache = s;
-      if(!s) return;
-      
-      // Debug: mostrar datos recibidos
-      console.log("[DEBUG] pollStatus recibió:", s);
-      console.log("[DEBUG] x_mm:", s.x_mm, "a_deg:", s.a_deg);
-      $("#t_x").textContent = fmt(s.x_mm||0);
-      $("#t_a").textContent = fmt(s.a_deg||0);
-      const zmm = Number(s.z_mm||0);
-      const tz=document.getElementById('t_z'); if(tz){ tz.textContent = fmt(zmm||0); }
-      
-      // Actualizar reward en telemetría
-      const rewardEl = document.getElementById('t_reward');
-      if(rewardEl && s.reward !== undefined) {
-        rewardEl.textContent = Number(s.reward).toFixed(3);
-      }
-      const rdz=document.getElementById('rd_z_mm'); if(rdz){ rdz.textContent = fmt(zmm||0); }
-      const rdX=document.getElementById('rd_x_mm'); if(rdX){ rdX.textContent = fmt(s.x_mm||0); }
-      const rdA=document.getElementById('rd_a_deg'); if(rdA){ rdA.textContent = fmt(s.a_deg||0); }
-      updateSVG(s.x_mm, s.a_deg);
-      $("#t_vol").textContent = fmt(s.volumen_ml||0);
-      $("#t_flow").textContent = fmt((s.caudal_est_mls!=null?s.caudal_est_mls:s.flow_est)||0);
-      const rdV=document.getElementById('rd_vol_ml'); if(rdV){ rdV.textContent = fmt(s.volumen_ml||0); }
-      $("#t_limx").textContent = s.lim_x||0; $("#t_lima").textContent = s.lim_a||0;
-      $("#t_homx").textContent = s.homing_x||0; $("#t_homa").textContent = s.homing_a||0;
-      $("#t_port").textContent = s.serial_port || "—";
-      $("#pill-serial").textContent = `Serial: ${s.serial_port} @ ${s.baudrate||''}`;
-      if(robotPill){
-        const label = s.robot_label || s.robot_id || '—';
-        robotPill.textContent = `Robot: ${label}`;
-        robotPill.classList.toggle('warn', !!s.is_virtual);
-      }
-      if(robotSel && s.robot_id && robotSel.value !== s.robot_id){
-        robotSel.value = s.robot_id;
-      }
-      isSerialOpen = !!s.serial_open;
-      if(isSerialOpen){ lastSerialOpenTs = Date.now(); }
-      // Modo en telemetría (desde RX/status)
-      const modoEl = document.getElementById('t_modo_tx'); if(modoEl){ modoEl.textContent = String(s.modo!=null?s.modo:"—"); }
-
-      // KPIs (calibración/flujo y PID)
-      const setText=(id,val)=>{ const el=document.getElementById(id); if(el){ el.textContent=String(val); } };
-      setText('k_steps_mm', (s.pasosPorMM!=null?fmt(s.pasosPorMM,2):'—'));
-      setText('k_steps_deg', (s.pasosPorGrado!=null?fmt(s.pasosPorGrado,2):'—'));
-      setText('k_usar_flujo', (s.usarSensorFlujo? 'sí':'no'));
-      setText('k_caudal_bomba', (s.caudalBombaMLs!=null?fmt(s.caudalBombaMLs,1):'—'));
-      setText('k_kpX', (s.kpX!=null?fmt(s.kpX,2):'—'));
-      setText('k_kiX', (s.kiX!=null?fmt(s.kiX,2):'—'));
-      setText('k_kdX', (s.kdX!=null?fmt(s.kdX,2):'—'));
-      setText('k_kpA', (s.kpA!=null?fmt(s.kpA,2):'—'));
-      setText('k_kiA', (s.kiA!=null?fmt(s.kiA,2):'—'));
-      setText('k_kdA', (s.kdA!=null?fmt(s.kdA,2):'—'));
-
-      const ex = clamp((Math.abs((s.energies&&s.energies.x)||0)/255)*100,0,100);
-      const ea = clamp((Math.abs((s.energies&&s.energies.a)||0)/255)*100,0,100);
-      const eb = clamp((Math.abs((s.energies&&s.energies.bomba)||0)/255)*100,0,100);
-      $("#g_ex").style.width = ex+"%";
-      $("#g_ea").style.width = ea+"%";
-      $("#g_eb").style.width = eb+"%";
-      const rdEX=document.getElementById('rd_en_x'); if(rdEX){ rdEX.textContent = String((s.energies&&s.energies.x)||0); }
-      const rdEA=document.getElementById('rd_en_a'); if(rdEA){ rdEA.textContent = String((s.energies&&s.energies.a)||0); }
-      const rdEB=document.getElementById('rd_en_b'); if(rdEB){ rdEB.textContent = String((s.energies&&s.energies.bomba)||0); }
-
-      // Progreso de volumen (si hay objetivo)
-      try{
-        const goal = Number((s.volumen_objetivo_ml!=null)?s.volumen_objetivo_ml:0);
-        const cur = Number(s.volumen_ml||0);
-        const bar = document.getElementById('g_vol_goal');
-        if(bar){
-          if(goal>0){
-            const pct = clamp((cur/goal)*100,0,100);
-            bar.style.width = pct+"%";
-            // ETA si se puede estimar
-            let eta='';
-            const flow = Number((s.caudal_est_mls!=null?s.caudal_est_mls:s.flow_est)||0);
-            if(flow>0 && cur<goal){
-              const secs = Math.max(0, (goal-cur)/flow);
-              const mm = Math.floor(secs/60), ss = Math.round(secs%60);
-              eta = ` • ETA ${mm}m ${ss}s`;
-            }
-            bar.parentElement.title = `${cur.toFixed(1)} / ${goal.toFixed(1)} ml${eta}`;
-          }else{
-            bar.style.width = "0%"; bar.parentElement.title = "";
+      const goal = Number((s.volumen_objetivo_ml!=null)?s.volumen_objetivo_ml:0);
+      const cur = Number(s.volumen_ml||0);
+      const bar = document.getElementById('g_vol_goal');
+      if(bar){
+        if(goal>0){
+          const pct = clamp((cur/goal)*100,0,100);
+          bar.style.width = pct+"%";
+          let eta='';
+          const flow = flowActual;
+          if(flow>0 && cur<goal){
+            const secs = Math.max(0, (goal-cur)/flow);
+            const mm = Math.floor(secs/60), ss = Math.round(secs%60);
+            eta = ` • ETA ${mm}m ${ss}s`;
           }
+          bar.dataset.goal = `${fmt(cur,1)} / ${fmt(goal,1)}${eta}`;
+          bar.parentElement.dataset.visible = "1";
+        }else{
+          bar.style.width = "0%";
+          if(bar.parentElement) bar.parentElement.dataset.visible = "0";
         }
-      }catch{}
-
-      // Gauges SVG: porcentaje respecto a sus máximos
-      const cLen = 2*Math.PI*48; // circunferencia del radio 48
-      const setGauge = (id, value, maxVal, textId)=>{
-        const fg = document.getElementById(id);
-        const tx = document.getElementById(textId);
-        if(!fg || !tx) return;
-        const p = clamp(maxVal>0? (value/maxVal):0, 0, 1);
-        fg.style.strokeDasharray = cLen+" "+999;
-        fg.style.strokeDashoffset = String(cLen*(1-p));
-        tx.textContent = fmt(value);
-      };
-      setGauge('sg_x_fg', Number(s.x_mm||0), 400, 'sg_x_txt');
-      setGauge('sg_a_fg', Number(s.a_deg||0), 360, 'sg_a_txt');
-      setGauge('sg_vol_fg', Number(s.volumen_ml||0), Math.max(Number(s.volumen_objetivo_ml||0), 1), 'sg_vol_txt');
-      const zMaxGauge = Math.max((history.reduce((m,p)=>Math.max(m,p.z||0),0)) || 1, 1);
-      const sgz=document.getElementById('sg_z_fg'); if(sgz){ setGauge('sg_z_fg', zmm, zMaxGauge, 'sg_z_txt'); }
-      setGauge('sg_flow_fg', Number((s.caudal_est_mls!=null?s.caudal_est_mls:s.flow_est)||0), Math.max( (history.reduce((m,p)=>Math.max(m,p.flow||0),0)) || 1, 1), 'sg_flow_txt');
-
-      // Tank nivel (relativo a objetivo, o al inicio de vaciado, o al máximo reciente)
-      try{
-        const tank = document.getElementById('tank_level');
-        const tankPct = document.getElementById('tank_pct');
-        if(tank && tankPct){
-          const vol = Number(s.volumen_ml||0);
-          const goal = Number((s.volumen_objetivo_ml!=null)?s.volumen_objetivo_ml:0);
-          let ref = 0;
-          if(goal>0){ ref = goal; }
-          else if(window._drainStartVol){ ref = window._drainStartVol; }
-          else{
-            try{ ref = (history.reduce((m,p)=>Math.max(m,p.vol||0),0)) || 0; }catch{ ref = 0; }
-          }
-          ref = Math.max(ref, 1);
-          const p = clamp(vol/ref, 0, 1);
-          const H = 66, Y0 = 7; // según SVG en reloj.html
-          const h = Math.round(H * p);
-          const y = Y0 + (H - h);
-          tank.setAttribute('y', String(y));
-          tank.setAttribute('height', String(h));
-          tankPct.textContent = `${Math.round(p*100)}%`;
-          // Color por umbral
-          try{
-            const fill = p>0.5? '#29d3b0' : (p>0.2? '#ffb84d' : '#ff6a6a');
-            tank.style.fill = fill;
-          }catch{}
-        }
-      }catch{}
-
-      // Actualizar mini panel Control
-      const setT=(id,val)=>{ const el=document.getElementById(id); if(el){ el.textContent = fmt(val); } };
-      setT('gx', s.x_mm||0); setT('ga', s.a_deg||0); setT('gvol', s.volumen_ml||0); setT('gflow', (s.caudal_est_mls!=null?s.caudal_est_mls:s.flow_est)||0);
-
-      // Arena: rotar pista según ángulo y desplazar carro en la pista
-      const ang = Math.max(0, Math.min(360, Number(s.a_deg||0)));
-      const track = document.getElementById('arena_track'); if(track){ track.setAttribute('transform', `rotate(${ang} 160 160)`); }
-      const ac = document.getElementById('arena_carro'); if(ac){ const x = 70 + Math.max(0, Math.min(400, Number(s.x_mm||0))) * (180/400); ac.setAttribute('x', String(x)); }
-      const aa = document.getElementById('arena_aguja'); if(aa){ const rad=(ang-90)*Math.PI/180; const cx=160, cy=160, r=120; aa.setAttribute('x2', String(cx+Math.cos(rad)*r)); aa.setAttribute('y2', String(cy+Math.sin(rad)*r)); }
-
-      // Gráfico
-      if(!freeze){
-        const now=Date.now()/1000;
-        history.push({t:now, x:s.x_mm, a:s.a_deg, vol:s.volumen_ml, flow:(s.caudal_est_mls!=null?s.caudal_est_mls:s.flow_est), z:zmm});
-        while(history.length && (now-history[0].t)>MAX_SEC) history.shift();
-        drawChart();
       }
-      refreshOverlay();
-    }catch(e){ /* silencio */ }
-    finally{ statusFetching = false; }
-  }
-
-  async function pollDebug(){
-    try{
-      const d = await jget("/debug/serial");
-      const txt = JSON.stringify(d,null,2);
-      $("#dbg_serial").textContent = txt;
-      // también TX
-      const tx = await jget("/debug/serial_tx");
-      $("#dbg_serial").textContent += "\n--- TX ---\n"+JSON.stringify(tx,null,2);
-      // edades para UI
-      const rxAge = d.age_ms||0; const txAge = tx.age_ms||0;
-      const rxEl = document.getElementById('rx_age_ms'); if(rxEl) rxEl.textContent = String(rxAge);
-      const txEl = document.getElementById('tx_age_ms'); if(txEl) txEl.textContent = String(txAge);
-      // mostrar modo (TX) si es posible
-      try{
-        let payload = tx && tx.last_tx;
-        if(typeof payload === 'string'){
-          let obj;
-          try{ obj = JSON.parse(payload); }
-          catch{ obj = JSON.parse(JSON.parse(payload)); }
-          if(obj && typeof obj.modo !== 'undefined'){
-            const el = document.getElementById('t_modo_tx'); if(el) el.textContent = String(obj.modo);
-          }
-        }else if(payload && typeof payload === 'object' && typeof payload.modo !== 'undefined'){
-          const el = document.getElementById('t_modo_tx'); if(el) el.textContent = String(payload.modo);
-        }
-      }catch{}
-      // color según antigüedad
-      const age = d.age_ms||0; rxAgeMs = age;
-      $("#pill-rx").className = age<1500? "pill ok": age<5000?"pill warn":"pill err";
-      $("#pill-rx").textContent = age<1500? "RX OK": age<5000? "RX LENTO":"RX SIN DATOS";
-      refreshOverlay();
     }catch{}
+
+    try{
+      const tank = document.getElementById('tank_water');
+      const tankHighlight = document.getElementById('tank_highlight');
+      const tankPct = document.getElementById('tank_pct');
+      if(tank && tankPct){
+        const goal = Number.isFinite(s.volumen_objetivo_ml) ? Number(s.volumen_objetivo_ml) : 0;
+        const cur = Number.isFinite(s.volumen_ml) ? Number(s.volumen_ml) : 0;
+        const manualInput = document.getElementById('fw_volume') || document.getElementById('sp_vol');
+        let fallback = manualInput ? Number(manualInput.value) : NaN;
+        if(!Number.isFinite(fallback) || fallback <= 0){
+          fallback = 100;
+        }
+        let ref = goal > 0 ? goal : fallback;
+        if(!Number.isFinite(ref) || ref <= 0){
+          ref = 100;
+        }
+        const safeCur = Math.max(0, cur);
+        const p = clamp(safeCur / ref, 0, 1);
+        const H = 140, Y0 = 25;
+        const h = Math.round(H * p);
+        const y = Y0 + (H - h);
+        const updateRect = (el)=>{
+          if(!el) return;
+          el.setAttribute('y', String(y));
+          el.setAttribute('height', String(h));
+        };
+        updateRect(tank);
+        updateRect(tankHighlight);
+        tankPct.textContent = `${Math.round(p*100)}%`;
+        const fill = p>0.5? '#29d3b0' : (p>0.2? '#ffb84d' : '#ff6a6a');
+        tank.style.filter = `drop-shadow(0 0 6px ${fill}88)`;
+      }
+    }catch{}
+
+    const setT=(id,val)=>{ const el=document.getElementById(id); if(el){ el.textContent = fmt(val); } };
+    setT('gx', s.x_mm||0); setT('ga', s.a_deg||0); setT('gvol', s.volumen_ml||0); setT('gflow', flowActual);
+    if(FlowWidgetCtrl){
+      FlowWidgetCtrl.updateTelemetry({
+        flowActual,
+        flowTarget: (s.caudalBombaMLs!=null)?Number(s.caudalBombaMLs):null,
+        volumeActual: Number(s.volumen_ml||0),
+        volumeTarget: (s.volumen_objetivo_ml!=null)?Number(s.volumen_objetivo_ml):null
+      });
+    }
+
+    const ang = Math.max(0, Math.min(360, Number(s.a_deg||0)));
+    const track = document.getElementById('arena_track'); if(track){ track.setAttribute('transform', `rotate(${ang} 160 160)`); }
+    const ac = document.getElementById('arena_carro'); if(ac){ const x = 70 + Math.max(0, Math.min(400, Number(s.x_mm||0))) * (180/400); ac.setAttribute('x', String(x)); }
+    const aa = document.getElementById('arena_aguja'); if(aa){ const rad=(ang-90)*Math.PI/180; const cx=160, cy=160, r=120; aa.setAttribute('x2', String(cx+Math.cos(rad)*r)); aa.setAttribute('y2', String(cy+Math.sin(rad)*r)); }
+
+    if(!freeze){
+      const now=Date.now()/1000;
+      history.push({t:now, x:s.x_mm, a:s.a_deg, vol:s.volumen_ml, flow:(s.caudal_est_mls!=null?s.caudal_est_mls:s.flow_est), z:zmm});
+      while(history.length && (now-history[0].t)>MAX_SEC) history.shift();
+      drawChart();
+    }
+    refreshOverlay();
   }
-  // Desactivar polling periódico de debug para no saturar el server
-  // pollDebug solo bajo demanda (botón) o ante error
-  pollStatus();
-  setInterval(pollStatus, 150);
+
+  function createTelemetryChannel(onSnapshot){
+    let socket = null;
+    let reconnectTimer = null;
+    const connect = ()=>{
+      if(socket){
+        try{ socket.close(); }catch{}
+      }
+      console.info('[ws/telemetry] connecting...');
+      socket = new WebSocket(`${WS_BASE}/ws/telemetry`);
+      socket.addEventListener('open', ()=> setConnectionState('telemetry', true));
+      socket.addEventListener('message', (event)=>{
+        let data = null;
+        try{ data = JSON.parse(event.data || "{}"); }catch{ return; }
+        if(data.type === "telemetry"){
+          const status = data.status || {};
+          if(onSnapshot) onSnapshot(status);
+        }
+      });
+      socket.addEventListener('close', ()=>{
+        setConnectionState('telemetry', false);
+        scheduleReconnect();
+      });
+      socket.addEventListener('error', (err)=>{
+        console.error('[ws/telemetry] error', err);
+        socket && socket.close();
+      });
+    };
+    const scheduleReconnect = ()=>{
+      if(reconnectTimer) return;
+      reconnectTimer = setTimeout(()=>{ reconnectTimer=null; connect(); }, 1500);
+    };
+    connect();
+    return { restart: ()=> connect() };
+  }
+
+  const TelemetryChannel = createTelemetryChannel(applyStatusSnapshot);
+  if(typeof window !== 'undefined'){
+    window.TelemetryChannel = TelemetryChannel;
+  }
+
+  function pollDebug(){
+    const status = window._statusCache;
+    const dbg = document.getElementById('dbg_serial');
+    if(dbg){
+      dbg.textContent = status ? JSON.stringify(status, null, 2) : 'Sin telemetría disponible.';
+    }
+    const rxEl = document.getElementById('rx_age_ms'); if(rxEl) rxEl.textContent = String(Math.round(rxAgeMs||0));
+    const txEl = document.getElementById('tx_age_ms'); if(txEl) txEl.textContent = connectionFlags.control ? 'WS' : '—';
+    updateRxPillLabel();
+  }
 
   // Botones depuración
   const bRef = document.getElementById('btn_refresh_dbg'); if(bRef){ bRef.onclick = ()=>{ pollDebug(); toast('Refrescado'); }; }
   const bCopy = document.getElementById('btn_copy_tx'); if(bCopy){ bCopy.onclick = async ()=>{
     try{
-      const tx = await jget('/debug/serial_tx');
-      const s = typeof tx.last_tx==='string'? tx.last_tx: JSON.stringify(tx.last_tx);
-      await navigator.clipboard.writeText(s||''); toast('TX copiado');
+      const payload = ControlChannel.getLastPayload();
+      if(!payload){ toast('Sin TX reciente'); return; }
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      toast('TX copiado');
     }catch{ toast('No se pudo copiar'); }
   }; }
   const bClr = document.getElementById('btn_clear_dbg'); if(bClr){ bClr.onclick = ()=>{ const el=document.getElementById('dbg_serial'); if(el) el.textContent=''; }; }
 
-  // Cámara (simple)
-  const camImg = document.getElementById('cam_img');
-  const btnCamStart = document.getElementById('btn_cam_start'); if(btnCamStart){ btnCamStart.onclick = async ()=>{
-    try{ await jpost('/api/camera/start',{}); toast('Cámara iniciada'); if(camImg){ camImg.src = '/static/camera_placeholder.jpg?'+Date.now(); } }
-    catch{ toast('No se pudo iniciar cámara'); }
-  }; }
-  const btnCamShot = document.getElementById('btn_cam_snapshot'); if(btnCamShot){ btnCamShot.onclick = async ()=>{
-    try{ await jpost('/api/camera/snapshot',{}); toast('Snapshot guardado'); }
-    catch{ toast('Error snapshot'); }
-  }; }
-  // PyBullet visualizer
-  const pbPanel = document.getElementById('pybullet_panel');
-  const pbImg = document.getElementById('pybullet_view');
-  const pbStatus = document.getElementById('pybullet_status');
-  if(pbImg){
-    const pbPlaceholder = pbImg.getAttribute('data-placeholder') || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+  // ------------- PyBullet frame polling -------------
+  (function initPyBulletFeed(){
+    const img = document.getElementById('pybullet_view');
+    const status = document.getElementById('pybullet_status');
+    if(!img || !window.fetch) return;
     let lastUrl = null;
-    let fetchingFrame = false;
-    async function updatePybulletFrame(){
-      if(fetchingFrame){ return; }
-      fetchingFrame = true;
-      try{
-        const resp = await fetch(`/api/visual/frame?ts=${Date.now()}`, { cache: 'no-store' });
-        if(!resp.ok){ throw new Error(`status ${resp.status}`); }
-        const blob = await resp.blob();
-        const url = URL.createObjectURL(blob);
-        if(lastUrl){ URL.revokeObjectURL(lastUrl); }
-        lastUrl = url;
-        pbImg.src = url;
-        pbImg.style.opacity = '1';
-        if(pbStatus){ pbStatus.textContent = `Actualizado ${new Date().toLocaleTimeString()}`; pbStatus.classList.remove('warn'); }
-        if(pbPanel){ pbPanel.classList.remove('warn'); }
-      }catch(e){
-        if(pbStatus){ pbStatus.textContent = 'Visualizador no disponible'; pbStatus.classList.add('warn'); }
-        pbImg.src = pbPlaceholder;
-        pbImg.style.opacity = '0.2';
-        if(pbPanel){ pbPanel.classList.add('warn'); }
-      }finally{
-        fetchingFrame = false;
-      }
-    }
-    updatePybulletFrame();
-    setInterval(updatePybulletFrame, 250);
-    window.addEventListener('beforeunload', ()=>{ if(lastUrl){ URL.revokeObjectURL(lastUrl); } });
-  }
-
-  // ------------- Guard de ejecuciones (desactivar controles) -------------
-  const execBanner = document.getElementById('exec_banner');
-  const execInfo = document.getElementById('exec_info');
-  const opSection = document.querySelector('section.tabview[data-tab="op"]');
-  const opOverlay = document.getElementById('op_overlay');
-  const opOverlayText = opOverlay? opOverlay.querySelector('.overlay-content') : null;
-  const overlayMsg = document.getElementById('overlay_msg');
-  const overlayReconnect = document.getElementById('btn_overlay_reconnect'); if(overlayReconnect){ overlayReconnect.onclick = async ()=>{
-    try{
-      const info = await jget('/api/serial/ports');
-      const port=(document.getElementById('sel_port')||{}).value||info.current||'';
-      const baud=Number((document.getElementById('sel_baud')||{}).value||info.baudrate||115200);
-      await jpost('/api/serial/open',{port, baudrate: baud}); toast('Reconectado'); refreshPorts();
-      const pill=document.getElementById('pill-serial'); if(pill){ pill.classList.add('ok'); setTimeout(()=>pill.classList.remove('ok'), 1200); }
-    }catch{ toast('No se pudo reconectar'); }
-  }; }
-  let activeExecutionId = null;
-  const gameSection = null;
-  const gameOverlay = null;
-  const gameOverlayMsg = null;
-
-  async function pollExecutions(){
-    try{
-      if(!activeExecutionId){ refreshOverlay(); return; }
-      const st = await jget(`/api/execution/${encodeURIComponent(activeExecutionId)}`);
-      const pct = (st && st.progress && typeof st.progress.percentage==='number')? st.progress.percentage : 0;
-      const typ = st && st.type || 'unknown';
-      const tgt = st && st.target_id || '';
-      if(execBanner) execBanner.style.display='block';
-      if(execInfo) execInfo.textContent = `ID: ${activeExecutionId} • ${typ} '${tgt}' • ${pct}%`;
-      const logEl = document.getElementById('exec_log');
-      if(logEl && st && Array.isArray(st.log)){
-        const lines = st.log.slice(-50); // últimas 50 entradas
-        logEl.textContent = lines.join('\n');
-        logEl.scrollTop = logEl.scrollHeight;
-      }
-      // Mostrar reward y logs del runner (consultar con menor cadencia)
-      try{
-        const now = Date.now();
-        if(!window._lastProtoStatusAt || (now - window._lastProtoStatusAt) > 2000){
-          window._lastProtoStatusAt = now;
-          const ps = await jget('/api/protocols/status');
-          if(ps){
-            const rsum = (ps.reward_sum!=null)? Number(ps.reward_sum).toFixed(3) : '—';
-            const rthr = (ps.reward_threshold!=null)? String(ps.reward_threshold) : '—';
-            const rlast= (ps.last_reward!=null)? Number(ps.last_reward).toFixed(3) : '—';
-            const info = document.getElementById('exec_info');
-            if(info){
-              const base = info.textContent||'';
-              info.textContent = base.replace(/\s*\|\s*R:.*/, '') + ` | R:${rsum}/${rthr} (last ${rlast})`;
-            }
-            if(Array.isArray(ps.logs)){
-              const l2 = ps.logs.slice(-80);
-              const logEl2 = document.getElementById('exec_log');
-              if(logEl2){
-                const base = logEl2.textContent? (logEl2.textContent+'\n') : '';
-                logEl2.textContent = base + l2.join('\n');
-                logEl2.scrollTop = logEl2.scrollHeight;
-              }
-            }
-          }
-        }
-      }catch{}
-      // NO tocar elementos durante polling - solo actualizar datos
-      // Cargar historial filtrado para debug rápido (x_mm,a_deg,volumen_ml)
-      try{
-        const cfg = collectSensorConfig();
-        const wanted = Object.keys(cfg).filter(k=>cfg[k]);
-        const qs = wanted.length? `sensors=${encodeURIComponent(wanted.join(','))}&limit=50` : 'limit=50';
-        const hist = await jget(`/api/execution/${encodeURIComponent(activeExecutionId)}/history?${qs}`);
-        const logEl = document.getElementById('dbg_serial');
-        if(logEl){
-          const rows = (hist.samples||[]).map(s=>{
-            const ts = new Date((s.timestamp||0)*1000).toLocaleTimeString();
-            const parts = Object.keys(s).filter(k=>k!=='timestamp').map(k=> `${k}:${s[k]}`);
-            return `${ts}  ${parts.join('  ')}`;
-          });
-          logEl.textContent = rows.join('\n');
-        }
-      }catch{}
-      // limpiar solo si terminó
-      if(st && (st.status==='completed' || st.status==='error' || st.status==='timeout' || st.status==='stopped' || st.status==='done')){
-        activeExecutionId = null;
-        window._controlsDisabled = false; // Reset flag
-        if(execBanner) execBanner.style.display='none';
-        const logEl2=document.getElementById('exec_log'); if(logEl2){ logEl2.textContent=''; }
-        if(opSection){ opSection.style.opacity='1'; }
-        const b=document.getElementById('btn_proto_execute'); if(b){ b.textContent='▶ Ejecutar tarea'; b.classList.remove('warn'); }
-      }
-      // Fin del ciclo de polling
-      refreshOverlay();
-    }catch(e){ /* silencio */ }
-  }
-  let pollExecTimer = setInterval(pollExecutions, 800);
-  pollExecutions();
-
-  function refreshOverlay(){
-    const setDisabledAll = (flag)=>{
-      try{
-        document.querySelectorAll('input,button,select,textarea').forEach(el=>{
-          const id=el.id||'';
-          if(flag){
-            // Mantener activos elementos de telemetría (no interactivos) y debug
-            const isTelemetry = id.startsWith('t_') || id.startsWith('rd_') || id.startsWith('sg_') || 
-                               id.startsWith('k_') || id.startsWith('g_') || id.startsWith('pill-') ||
-                               id==='dbg_serial' || id==='exec_log' || id==='exec_info' || id==='chart' ||
-                               id==='robot_svg' || id==='carro' || id==='aguja' || id==='cam_img' ||
-                               id==='debug_info' || id==='proto_debug' || id==='observations_info' || id==='observations_display' || // Mantener debug activo
-                               id==='proto_sel' || id.startsWith('pp_') || // Mantener controles de protocolo activos
-                               id==='btn_settings' || id==='robotSel' || id==='robotSel2' || // permitir cambiar robot y abrir Settings
-                               id==='btn_pb_gui_start' || id==='btn_pb_gui_stop' || id==='pb_gui_status' ||
-                               el.closest && (el.closest('.telemetry') || el.closest('#proto_debug') || el.closest('#observations_display'));
-            if(!isTelemetry && id!=='btn_kill_exec' && id!=='tl_reload') el.disabled=true;
-          }else{
-            el.disabled=false;
-          }
-        });
-      }catch{}
+    let timer = null;
+    const setState = (msg, ok)=>{
+      if(status) status.textContent = msg;
+      img.style.opacity = ok ? 1 : 0.2;
     };
-    // Prioridad 1: ejecución activa
-    if(activeExecutionId){
-      if(overlayMsg) overlayMsg.textContent = 'Ejecución en curso — Controles deshabilitados. Usa "Detener ejecución".';
-      if(overlayReconnect) overlayReconnect.style.display='none';
-      // Mostrar overlay para indicar ejecución activa
-      if(opOverlay) opOverlay.style.display = 'flex';
-      if(opSection){ opSection.style.opacity='0.7'; } // Ligeramente oscurecido para indicar desactivado
-      // Asegurar que el debug permanezca visible durante la ejecución
-      const debugEl = document.getElementById('proto_debug');
-      const obsEl = document.getElementById('observations_display');
-      if(debugEl) debugEl.style.display = 'block';
-      if(obsEl) obsEl.style.display = 'block';
-      // Deshabilitar controles una sola vez (no en cada polling)
-      if(!window._controlsDisabled){
-        setDisabledAll(true);
-        window._controlsDisabled = true;
-      }
-      return;
-    }
-    // Prioridad 2: conexión (RX reciente o serial_open true)
-    const connected = isSerialOpen || (rxAgeMs < 5000);
-    if(connected){
-      if(opOverlay) opOverlay.style.display = 'none';
-      if(opSection){ opSection.style.opacity='1'; }
-      setDisabledAll(false);
-      window._controlsDisabled = false; // Reset flag
-      // botón ejecutar habilitado
-      const b=document.getElementById('btn_proto_execute'); if(b){ b.disabled=false; }
-    }else{
-      if(overlayMsg) overlayMsg.textContent = 'Serial desconectado. Abra Settings para conectar.';
-      if(overlayReconnect) overlayReconnect.style.display='inline-block';
-      if(opOverlay) opOverlay.style.display = 'flex';
-      if(opSection){ opSection.style.opacity='0.5'; }
-      setDisabledAll(true);
-      const b=document.getElementById('btn_proto_execute'); if(b){ b.disabled=true; }
-      // Forzar que botones clave permanezcan habilitados aunque el overlay esté activo
+    const fetchFrame = async ()=>{
       try{
-        ['btn_settings','robotSel','robotSel2','btn_pb_gui_start','btn_pb_gui_stop','pb_gui_status']
-          .forEach(k=>{ const el=document.getElementById(k); if(el){ el.disabled=false; } });
-      }catch{}
+        const res = await fetch(`/api/pybullet/frame?ts=${Date.now()}`, { cache: 'no-store' });
+        if(res.status === 404){
+          setState("PyBullet no disponible en este servidor.", false);
+          if(timer){ clearInterval(timer); timer = null; }
+          return;
+        }
+        if(!res.ok){
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        if(lastUrl){ URL.revokeObjectURL(lastUrl); }
+        lastUrl = URL.createObjectURL(blob);
+        img.src = lastUrl;
+        setState("Visualización PyBullet en vivo", true);
+      }catch(err){
+        setState("Esperando frame PyBullet...", false);
+      }
+    };
+    fetchFrame();
+    timer = setInterval(fetchFrame, 1500);
+    window.addEventListener('beforeunload', ()=>{
+      if(lastUrl){ URL.revokeObjectURL(lastUrl); }
+      if(timer){ clearInterval(timer); }
+    });
+  })();
+
+  function initFlowWidget(){
+    const widget = document.getElementById('flow_widget');
+    const volumeInput = document.getElementById('fw_volume');
+    const flowInput = document.getElementById('fw_flow');
+    const startBtn = document.getElementById('fw_start');
+    const stopBtn = document.getElementById('fw_stop');
+    const resetBtn = document.getElementById('fw_reset');
+    if(!widget || !volumeInput || !flowInput || !startBtn || !stopBtn){
+      return null;
     }
+    const stats = {
+      flowActual: document.getElementById('fw_flow_actual'),
+      flowTarget: document.getElementById('fw_flow_target'),
+      volumeActual: document.getElementById('fw_volume_actual'),
+      volumeTarget: document.getElementById('fw_volume_target'),
+      volumeRemaining: document.getElementById('fw_volume_remaining')
+    };
+    const limits = {
+      volume: { min: Number(volumeInput.min||0), max: Number(volumeInput.max||2000), precision: 0 },
+      flow: { min: Number(flowInput.min||0), max: Number(flowInput.max||40), precision: 1 }
+    };
+    const state = {
+      targetVolume: 0,
+      targetFlow: 0,
+      lastVolumeActual: null,
+      lastFlowActual: null,
+      userOverrideVolume: false,
+      userOverrideFlow: false,
+      editingVolume: false,
+      editingFlow: false
+    };
+
+    const clampValue = (value, bounds)=>
+      Math.min(bounds.max, Math.max(bounds.min, Number.isFinite(value)?value:bounds.min));
+
+    const formatNumber = (value, precision)=> Number(value).toFixed(precision);
+
+    const getValue = (input, bounds)=>{
+      const num = Number(input.value);
+      return clampValue(num, bounds);
+    };
+
+    const setValue = (input, value, bounds)=>{
+      const v = clampValue(value, bounds);
+      input.value = formatNumber(v, bounds.precision);
+      return v;
+    };
+
+    const formatMetric = (value, unit, precision)=>{
+      if(value === null || value === undefined || Number.isNaN(value)){
+        return '—';
+      }
+      return `${Number(value).toFixed(precision)} ${unit}`.trim();
+    };
+
+    const refreshStats = ()=>{
+      if(stats.flowActual){
+        stats.flowActual.textContent = formatMetric(state.lastFlowActual, 'ml/s', limits.flow.precision);
+      }
+      if(stats.volumeActual){
+        stats.volumeActual.textContent = formatMetric(state.lastVolumeActual, 'ml', limits.volume.precision);
+      }
+      if(stats.flowTarget){
+        stats.flowTarget.textContent = formatMetric(state.targetFlow, 'ml/s', limits.flow.precision);
+      }
+      if(stats.volumeTarget){
+        stats.volumeTarget.textContent = formatMetric(state.targetVolume, 'ml', limits.volume.precision);
+      }
+      if(stats.volumeRemaining){
+        const remaining = (Number.isFinite(state.targetVolume) && Number.isFinite(state.lastVolumeActual))
+          ? Math.max(0, state.targetVolume - state.lastVolumeActual)
+          : null;
+        stats.volumeRemaining.textContent = formatMetric(remaining, 'ml', limits.volume.precision);
+      }
+    };
+
+    const setStateTarget = (target, value, {fromTelemetry=false}={})=>{
+      const key = target === 'flow' ? 'targetFlow' : 'targetVolume';
+      const bounds = limits[target === 'flow' ? 'flow' : 'volume'];
+      const input = target === 'flow' ? flowInput : volumeInput;
+      const editingKey = target === 'flow' ? 'editingFlow' : 'editingVolume';
+      const overrideKey = target === 'flow' ? 'userOverrideFlow' : 'userOverrideVolume';
+      const val = clampValue(value, bounds);
+      state[key] = val;
+      if(!state[editingKey]){
+        setValue(input, val, bounds);
+      }
+      if(!fromTelemetry){
+        state[overrideKey] = true;
+      }
+      refreshStats();
+    };
+
+    state.targetVolume = getValue(volumeInput, limits.volume);
+    state.targetFlow = getValue(flowInput, limits.flow);
+    refreshStats();
+
+    const adjustValue = (target, delta)=>{
+      const input = target==='flow' ? flowInput : volumeInput;
+      const bounds = limits[target==='flow' ? 'flow' : 'volume'];
+      const next = getValue(input, bounds) + delta;
+      setStateTarget(target, next);
+    };
+
+    widget.querySelectorAll('[data-fw-step]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const target = btn.dataset.target === 'flow' ? 'flow' : 'volume';
+        const step = Number(btn.dataset.fwStep||0);
+        if(!step) return;
+        adjustValue(target, step);
+      });
+    });
+
+    const bindInput = (input, target)=>{
+      input.addEventListener('focus', ()=>{
+        state[target==='flow'?'editingFlow':'editingVolume'] = true;
+      });
+      input.addEventListener('blur', ()=>{
+        state[target==='flow'?'editingFlow':'editingVolume'] = false;
+        setStateTarget(target, getValue(input, limits[target==='flow'?'flow':'volume']));
+      });
+      input.addEventListener('change', ()=>{
+        setStateTarget(target, getValue(input, limits[target==='flow'?'flow':'volume']));
+      });
+      input.addEventListener('input', ()=>{
+        const val = Number(input.value);
+        if(Number.isFinite(val)){
+          setStateTarget(target, val);
+        }
+      });
+    };
+    bindInput(volumeInput, 'volume');
+    bindInput(flowInput, 'flow');
+
+    const adoptTelemetryTarget = (target, value)=>{
+      if(value===null || value===undefined) return;
+      const overrideKey = target==='flow'?'userOverrideFlow':'userOverrideVolume';
+      if(state[overrideKey]) return;
+      setStateTarget(target, value, { fromTelemetry: true });
+    };
+
+    const sendPayload = async (payload, okMsg)=>{
+      if(!connectionFlags.control){
+        toast('Sin conexión con el canal de control');
+        if(ControlChannel && typeof ControlChannel.restart === 'function'){
+          ControlChannel.restart();
+        }
+        return;
+      }
+      try{
+        await ControlChannel.send(payload);
+        toast(okMsg || 'Comando enviado');
+      }catch(err){
+        toast('No se pudo enviar');
+      }
+    };
+
+    startBtn.addEventListener('click', ()=>{
+      const payload = {
+        setpoints: { volumen_ml: getValue(volumeInput, limits.volume) },
+        flow: { caudal_bomba_mls: getValue(flowInput, limits.flow) }
+      };
+      setStateTarget('volume', payload.setpoints.volumen_ml);
+      setStateTarget('flow', payload.flow.caudal_bomba_mls);
+      sendPayload(payload, 'Flujo aplicado');
+    });
+    stopBtn.addEventListener('click', ()=>{
+      const curVol = (window._statusCache && typeof window._statusCache.volumen_ml === 'number')
+        ? Number(window._statusCache.volumen_ml) : null;
+      const payload = { flow: { caudal_bomba_mls: 0 } };
+      if(Number.isFinite(curVol)){
+        payload.setpoints = { volumen_ml: curVol };
+      }
+      sendPayload(payload, 'Bomba detenida');
+    });
+    if(resetBtn){
+      resetBtn.addEventListener('click', ()=>{
+        state.userOverrideVolume = false;
+        state.targetVolume = 0;
+        setValue(volumeInput, 0, limits.volume);
+        refreshStats();
+        sendPayload({ reset_volumen: 1 }, 'Volumen reiniciado');
+      });
+    }
+
+    return {
+      updateTelemetry({ flowActual, flowTarget, volumeActual, volumeTarget }){
+        if(Number.isFinite(flowActual)){
+          state.lastFlowActual = Number(flowActual);
+        }
+        if(Number.isFinite(volumeActual)){
+          state.lastVolumeActual = Number(volumeActual);
+        }
+        if(Number.isFinite(flowTarget)){
+          adoptTelemetryTarget('flow', flowTarget);
+        }
+        if(Number.isFinite(volumeTarget)){
+          adoptTelemetryTarget('volume', volumeTarget);
+        }
+        refreshStats();
+      }
+    };
   }
 
-  const btnKill = document.getElementById('btn_kill_exec');
-  if(btnKill){ btnKill.onclick = async ()=>{ if(!activeExecutionId) return; await jpost(`/api/execution/${encodeURIComponent(activeExecutionId)}/stop`,{}); toast('Parando ejecución...'); }; }
-
-  // Reproductor simple (ejecuta protocolo con params {x_mm,a_deg,volumen_ml})
-  const btnPlPlay = document.getElementById('btn_pl_play'); if(btnPlPlay){ btnPlPlay.onclick = async ()=>{
-    const nameEl=(document.getElementById('pl_prot')||{});
-    const name = (nameEl&&nameEl.value)||'';
-    const x = Number((document.getElementById('pl_x')||{}).value||0);
-    const a = Number((document.getElementById('pl_a')||{}).value||0);
-    const vol = Number((document.getElementById('pl_vol')||{}).value||0);
-    const toEl=document.getElementById('pl_timeout'); const timeoutSeconds = toEl? Number(toEl.value||25): undefined;
-    if(!name){ toast('Nombre de protocolo vacío'); return; }
-    try{
-      // validar existencia
-      try{ await jget(`/api/protocols/${encodeURIComponent(name)}`); if(nameEl){ nameEl.classList.remove('err'); nameEl.classList.add('ok'); } }
-      catch{ if(nameEl){ nameEl.classList.remove('ok'); nameEl.classList.add('err'); } toast('Protocolo inexistente'); return; }
-      const body={ type:'protocol', id:name, params:{ x_mm:x, a_deg:a, volumen_ml:vol } };
-      if(!isNaN(timeoutSeconds)) body.timeout_seconds = timeoutSeconds;
-      const r = await jpost('/api/execute', body);
-      activeExecutionId = r.execution_id || null; if(execInfo) execInfo.textContent = `ID: ${activeExecutionId}`; if(execBanner) execBanner.style.display='block';
-      toast(`Ejecutando protocolo (${r.execution_id||''})`);
-    }catch{ toast('Error ejecutando protocolo'); }
-  }; }
-  const btnPlStop = document.getElementById('btn_pl_stop'); if(btnPlStop){ btnPlStop.onclick = async ()=>{
-    if(!activeExecutionId){ toast('Sin ejecución activa'); return; }
-    try{ await jpost(`/api/execution/${encodeURIComponent(activeExecutionId)}/stop`,{}); toast('Deteniendo'); }catch{ toast('Error deteniendo'); }
-  }; }
-
-  // Plantillas del reproductor
-  const tplSel=document.getElementById('pl_tpl'); if(tplSel){ tplSel.onchange = ()=>{
-    const v = tplSel.value||'';
-    const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.value=String(val); };
-    if(v==='regar_pos'){
-      set('pl_prot','regar_pos'); set('pl_x',100); set('pl_a',30); set('pl_vol',50);
-    }else if(v==='ir_pos'){
-      set('pl_prot','ir_pos'); set('pl_x',100); set('pl_a',30); set('pl_vol',0);
-    }else if(v==='regar_rapido'){
-      set('pl_prot','regar_rapido'); set('pl_x',80); set('pl_a',20); set('pl_vol',30);
-    }
-  }; }
-
-  // Guardar plantilla personalizada en /api/settings (key: player_favorites)
-  const btnSaveTpl=document.getElementById('btn_pl_saveTpl'); if(btnSaveTpl){ btnSaveTpl.onclick = async ()=>{
-    const name = prompt('Nombre de la plantilla:'); if(!name) return;
-    const prot = (document.getElementById('pl_prot')||{}).value||'';
-    const x = Number((document.getElementById('pl_x')||{}).value||0);
-    const a = Number((document.getElementById('pl_a')||{}).value||0);
-    const vol = Number((document.getElementById('pl_vol')||{}).value||0);
-    try{
-      const cur = await jget('/api/settings');
-      const fav = Array.isArray(cur.player_favorites)? cur.player_favorites: [];
-      fav.push({ name, prot, x, a, vol });
-      await jpost('/api/settings', { player_favorites: fav });
-      // añadir al select
-      const sel=document.getElementById('pl_tpl'); if(sel){ const opt=document.createElement('option'); opt.value=prot; opt.textContent=name; sel.appendChild(opt); sel.value=opt.value; sel.onchange&&sel.onchange(); }
-      toast('Plantilla guardada');
-    }catch{ toast('Error guardando plantilla'); }
-  }; }
+  FlowWidgetCtrl = initFlowWidget();
 
   // ------------- Control helpers (POST unificado a /api/control) -------------
   async function sendControl(params){
@@ -957,7 +1106,7 @@
     if(params.reset_x){ body.reset_x=1; }
     if(params.reset_a){ body.reset_a=1; }
     if(params.reset_vol || params.reset_volumen){ body.reset_volumen=1; }
-    await jpost('/api/control', body);
+    await ControlChannel.send(body);
   }
 
   // ------------- Operación -------------
@@ -1019,23 +1168,37 @@
   $("#en_b").oninput = e=> { $("#en_b_o").textContent = e.target.value; };
 
   // Auto-aplicar energías con debounce continuo y forzar modo manual según sliders
+  const ALLOW_MANUAL_PUMP_ENERGY = false;
+
   const applyEnergiesNow = async ()=>{
     const vx = Number($("#en_x") && $("#en_x").value || 0);
     const va = Number($("#en_a") && $("#en_a").value || 0);
     const vb = Number($("#en_b") && $("#en_b").value || 0);
     if(chkX && Math.abs(vx) > 0){ chkX.checked = true; }
     if(chkA && Math.abs(va) > 0){ chkA.checked = true; }
-    await sendControl({
+    const payload = {
       modo: recomputeModoBits(),
       energy_x: vx,
-      energy_a: va,
-      energy_bomba: vb,
-    });
+      energy_a: va
+    };
+    if(ALLOW_MANUAL_PUMP_ENERGY){
+      payload.energy_bomba = vb;
+    }
+    await sendControl(payload);
   };
   const debouncedEnergies = debounce(applyEnergiesNow, 120);
   const enX = document.getElementById('en_x'); if(enX){ enX.oninput = ()=>{ $("#en_x_o").textContent = enX.value; debouncedEnergies(); }; }
   const enA = document.getElementById('en_a'); if(enA){ enA.oninput = ()=>{ $("#en_a_o").textContent = enA.value; debouncedEnergies(); }; }
-  const enB = document.getElementById('en_b'); if(enB){ enB.oninput = ()=>{ $("#en_b_o").textContent = enB.value; debouncedEnergies(); }; }
+  const enB = document.getElementById('en_b'); 
+  if(enB){
+    if(!ALLOW_MANUAL_PUMP_ENERGY){
+      enB.disabled = true;
+      enB.title = "La bomba se controla desde Ejecutar/Detener";
+      enB.addEventListener('input', ()=>{ $("#en_b_o").textContent = enB.value; });
+    }else{
+      enB.oninput = ()=>{ $("#en_b_o").textContent = enB.value; debouncedEnergies(); };
+    }
+  }
 
   $("#btn_stop_all").onclick = async ()=>{
     $("#en_x").value=0; $("#en_a").value=0; $("#en_b").value=0; $("#en_x_o").textContent="0"; $("#en_a_o").textContent="0"; $("#en_b_o").textContent="0";
@@ -1056,702 +1219,19 @@
   // (Controles PID removidos de la UI)
   const btnApplySteps = document.getElementById('btn_apply_steps');
   if(btnApplySteps){ btnApplySteps.onclick = async ()=>{
-    await jpost("/api/control", {calibration:{steps_mm:Number($("#steps_mm").value||0), steps_deg:Number($("#steps_deg").value||0)}});
+    await ControlChannel.send({calibration:{steps_mm:Number($("#steps_mm").value||0), steps_deg:Number($("#steps_deg").value||0)}});
     toast("Calibración aplicada");
   }; }
   const btnApplyFlujo = document.getElementById('btn_apply_flujo');
   if(btnApplyFlujo){ btnApplyFlujo.onclick = async ()=>{
-    await jpost("/api/control", {flow:{
+    await ControlChannel.send({flow:{
       usar_sensor_flujo: $("#chk_sensor_flujo").checked?1:0,
       caudal_bomba_mls: Number($("#caudal").value||0)
     } });
     toast("Ajustes de flujo aplicados");
   }; }
 
-  // ------------- Protocolos -------------
-  // meta + inputs dinámicos
-  let protoMeta = null;
-  let protoPrefs = { current: null, params: {}, sensor_config: {} };
-  async function loadProtoMeta(){
-    try{
-      const r = await jget('/api/protocols');
-      protoMeta = r && r.meta || {};
-      const arr = (r && r.protocols) || [];
-      const sel = document.getElementById('proto_sel'); if(!sel) return;
-      sel.innerHTML='';
-      arr.forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o); });
-      // cargar preferencias guardadas
-      try{
-        const s = await jget('/api/settings');
-        if(s && s.proto_preferences){ protoPrefs = Object.assign({current:null, params:{}, sensor_config:{}}, s.proto_preferences); }
-      }catch{}
-      const initial = (protoPrefs && protoPrefs.current && arr.includes(protoPrefs.current))? protoPrefs.current : (arr[0]||'');
-      if(initial){ sel.value = initial; buildProtoInputs(initial); applyParamsToInputs(initial); await loadProtoCode(initial); applySensorChecksFromPrefs(); applyRewardDefaults(initial); }
-      // Restaurar reward prefs
-      try{
-        const rwd = (protoPrefs && protoPrefs.reward) || {};
-        const setv = (id, v)=>{ const el=document.getElementById(id); if(el && typeof v!=='undefined' && v!==null){ el.value = String(v); }};
-        setv('pp_max_dur', rwd.max_duration_seconds);
-        setv('pp_reward_key', rwd.reward_key);
-        setv('pp_reward_thr', rwd.reward_threshold);
-        setv('pp_reward_expr', rwd.reward_expr);
-        const rc=document.getElementById('pp_reward_cum'); if(rc && typeof rwd.reward_cumulative!=='undefined'){ rc.checked = !!rwd.reward_cumulative; }
-      }catch{}
-    }catch{}
-  }
-
-  function buildProtoInputs(name){
-    const box = document.getElementById('proto_params'); if(!box) return;
-    box.innerHTML = '';
-    const spec = protoMeta && protoMeta[name];
-    const params = spec && spec.params || {};
-    const grid=document.createElement('div'); grid.className='row'; grid.style.flexWrap='wrap'; grid.style.gap='8px';
-    Object.keys(params).forEach(k=>{
-      const p=params[k]||{}; const f=document.createElement('div'); f.className='field';
-      const label=document.createElement('label'); label.textContent=p.label||k; f.appendChild(label);
-      const inp=document.createElement('input'); inp.type=p.type||'number'; if(p.min!=null) inp.min=String(p.min); if(p.max!=null) inp.max=String(p.max); if(p.step!=null) inp.step=String(p.step);
-      inp.value = (p.default!=null? String(p.default): ''); inp.id = `pp_${k}`;
-      inp.oninput = debounce(()=>{ tryLiveUpdate(name); saveProtoPrefsDebounced(); }, 150);
-      f.appendChild(inp); grid.appendChild(f);
-    });
-    box.appendChild(grid);
-  }
-
-  function applyParamsToInputs(name){
-    try{
-      const saved = (protoPrefs && protoPrefs.params && protoPrefs.params[name]) || {};
-      Object.keys(saved).forEach(k=>{ const el=document.getElementById(`pp_${k}`); if(el){ el.value = String(saved[k]); }});
-    }catch{}
-  }
-
-  async function tryLiveUpdate(name){
-    // si hay ejecución activa, enviar vars al vuelo
-    if(activeExecutionId){
-      const params = collectParamsFromUI();
-      try{ await jpost(`/api/protocols/${encodeURIComponent(name)}/vars`, {params}); }catch{}
-    }
-  }
-
-  function collectParamsFromUI(){
-    const params={};
-    const box=document.getElementById('proto_params'); if(!box) return params;
-    Array.from(box.querySelectorAll('input[id^="pp_"]')).forEach(inp=>{
-      const key=inp.id.replace('pp_',''); const v=Number(inp.value);
-      params[key] = isNaN(v)? inp.value : v;
-    });
-    return params;
-  }
-
-  function collectSensorConfig(){
-    const cfg={};
-    const cont=document.getElementById('sensor_checks'); if(!cont) return cfg;
-    Array.from(cont.querySelectorAll('input.sensor_chk')).forEach(ch=>{ cfg[ch.value] = !!ch.checked; });
-    return cfg;
-  }
-
-  function applySensorChecksFromPrefs(){
-    try{
-      const cont=document.getElementById('sensor_checks'); if(!cont) return;
-      const cfg = (protoPrefs && protoPrefs.sensor_config) || {};
-      Array.from(cont.querySelectorAll('input.sensor_chk')).forEach(ch=>{ if(typeof cfg[ch.value] !== 'undefined'){ ch.checked = !!cfg[ch.value]; }});
-    }catch{}
-  }
-
-  const saveProtoPrefsDebounced = debounce(async ()=>{
-    try{
-      const name = (document.getElementById('proto_sel')||{}).value||'';
-      const params = collectParamsFromUI();
-      const sensor_config = collectSensorConfig();
-      const reward = {
-        max_duration_seconds: Number((document.getElementById('pp_max_dur')||{}).value||0) || undefined,
-        reward_key: (document.getElementById('pp_reward_key')||{}).value||undefined,
-        reward_threshold: Number((document.getElementById('pp_reward_thr')||{}).value||0) || undefined,
-        reward_expr: (document.getElementById('pp_reward_expr')||{}).value||undefined,
-        reward_cumulative: !!((document.getElementById('pp_reward_cum')||{}).checked)
-      };
-      const payload = { proto_preferences: { current: name, params: Object.assign({}, protoPrefs.params, { [name]: params }), sensor_config, reward } };
-      await jpost('/api/settings', payload);
-      protoPrefs = payload.proto_preferences;
-    }catch{}
-  }, 250);
-
-  async function loadProtoCode(name){
-    try{
-      const r = await jget(`/api/protocols/${encodeURIComponent(name)}`);
-      const cont = document.getElementById('proto_params'); if(!cont) return;
-      let pre = cont.querySelector('pre'); if(!pre){ pre=document.createElement('pre'); pre.className='log small'; pre.style.maxHeight='180px'; pre.style.overflow='auto'; pre.style.marginTop='8px'; cont.appendChild(pre); }
-      pre.textContent = r && r.code || '';
-    }catch{}
-  }
-
-  function applyRewardDefaults(name){
-    const rk=document.getElementById('pp_reward_key');
-    const rthr=document.getElementById('pp_reward_thr');
-    const rex=document.getElementById('pp_reward_expr');
-    if(!rk||!rthr) return;
-    const spec = (protoMeta && protoMeta[name]) || {};
-    const rwd = (spec && spec.reward && spec.reward.defaults) || {};
-    if(typeof rwd.key !== 'undefined') rk.value = String(rwd.key||'');
-    if(typeof rwd.threshold !== 'undefined') rthr.value = rwd.threshold>0? String(rwd.threshold): '';
-    if(rex && typeof rwd.expr !== 'undefined') rex.value = String(rwd.expr||'');
-    const rc=document.getElementById('pp_reward_cum'); if(rc && typeof rwd.cumulative!=='undefined') rc.checked = !!rwd.cumulative;
-    // opciones sugeridas (simple placeholder en title)
-    const sugg = (spec && spec.reward && spec.reward.suggested_keys) || [];
-    rk.placeholder = sugg.join(', ');
-  }
-
-  const protoSel=document.getElementById('proto_sel'); if(protoSel){ protoSel.onchange = async ()=>{ const v=protoSel.value||''; console.log('[UI] protocolo seleccionado:', v); buildProtoInputs(v); applyParamsToInputs(v); await loadProtoCode(v); applyRewardDefaults(v); saveProtoPrefsDebounced(); }; }
-  // guardar cuando se cambien checks de sensores
-  (function bindSensorChecks(){ const cont=document.getElementById('sensor_checks'); if(!cont) return; Array.from(cont.querySelectorAll('input.sensor_chk')).forEach(ch=>{ ch.onchange = saveProtoPrefsDebounced; }); })();
-  loadProtoMeta();
-
-  // ejecutar/stop desde reproductor dinámico
-  const btnProtoExec=document.getElementById('btn_proto_execute'); if(btnProtoExec){ btnProtoExec.onclick = async ()=>{
-    // Usar la nueva lógica simplificada
-    if (typeof executeProtocolSimple === 'function') {
-      await executeProtocolSimple();
-      return;
-    }
-    // Fallback a la lógica original si no está disponible
-    // Bloqueo si no hay serial
-    if(!isSerialOpen && !(rxAgeMs<5000)) { toast('Serial desconectado. Conecta en Settings.'); return; }
-    if(activeExecutionId){
-      try{ 
-        await jpost(`/api/protocols/stop`,{}); 
-        toast('Deteniendo...'); 
-        activeExecutionId = null; 
-        btnProtoExec.textContent = '▶ Ejecutar'; 
-        btnProtoExec.classList.remove('warn'); 
-        const btnStop = document.getElementById('btn_proto_stop');
-        if(btnStop) btnStop.style.display = 'none';
-        // NO ocultar el debug de protocolos - siempre visible en la pestaña
-        const debugInfo = document.getElementById('debug_info');
-        if(debugInfo) debugInfo.innerHTML = '<div class="muted">Protocolo detenido</div>';
-        const obsInfo = document.getElementById('observations_info');
-        if(obsInfo) obsInfo.innerHTML = '<div class="muted">Esperando observaciones...</div>';
-      }catch{ toast('Error deteniendo'); }
-      return;
-    }
-    const name = (document.getElementById('proto_sel')||{}).value||'ir_posicion';
-    const params = collectParamsFromUI();
-    
-    try{
-      const startedAt = Date.now();
-      console.log('[UI] POST /api/protocols/' + name + '/execute', params);
-      const resp = await fetch(`/api/protocols/${encodeURIComponent(name)}/execute`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)});
-      let r={}; try{ r = await resp.json(); }catch{ r={}; }
-      if(!resp.ok){ console.error('[UI] execute error', r); toast(r.error||'Error ejecutando'); return; }
-      activeExecutionId = r.execution_id || 'protocolo_activo';
-      // No usar execution_id para protocolos directos
-      if (activeExecutionId === 'protocolo_activo') {
-        activeExecutionId = 'protocolo_activo';
-      }
-      const el=document.getElementById('proto_active'); if(el){ el.textContent = name; }
-      toast(`Ejecutando ${name} (protocolo activo)`);
-      
-      // Mostrar debug del protocolo (siempre visible en la pestaña de protocolos)
-      const debugEl = document.getElementById('proto_debug');
-      const debugInfo = document.getElementById('debug_info');
-      if(debugEl) debugEl.style.display = 'block';
-      if(debugInfo) debugInfo.innerHTML = '<div class="muted">Iniciando protocolo...</div>';
-      
-      // Mostrar observaciones en tiempo real
-      const obsEl = document.getElementById('observations_display');
-      const obsInfo = document.getElementById('observations_info');
-      if(obsEl) obsEl.style.display = 'block';
-      if(obsInfo) obsInfo.innerHTML = '<div class="muted">Esperando observaciones...</div>';
-      
-      // Mostrar tiempo de ejecución en vivo - VERSIÓN CORREGIDA
-      const info = document.getElementById('exec_info');
-      let updateCount = 0;
-      window.protoUpdateInterval = setInterval(async ()=>{
-        updateCount++;
-        
-        // CORRECCIÓN 1: Verificar si el protocolo sigue activo
-        if(!activeExecutionId){ 
-          clearInterval(window.protoUpdateInterval); 
-          window.protoUpdateInterval = null;
-          return; 
-        }
-        
-        const secs = Math.floor((Date.now()-startedAt)/1000);
-        if(info){ info.textContent = `ID: ${activeExecutionId} • ${name} • ${secs}s`; }
-        
-        // CORRECCIÓN 2: Usar /api/protocols/status para obtener estado del protocolo
-        try {
-          const protocolStatusResponse = await fetch('/api/protocols/status');
-          const protocolStatus = await protocolStatusResponse.json();
-          
-          // CORRECCIÓN 3: También obtener estado del robot para observaciones
-          // Usar endpoint que fuerza actualización completa de datos
-          const forceUpdateResponse = await fetch('/api/debug/force_update');
-          const forceUpdate = await forceUpdateResponse.json();
-          
-          // DEBUG: Conectar y probar comunicación serial
-          const serialConnectResponse = await fetch('/api/debug/serial_connect');
-          const serialConnect = await serialConnectResponse.json();
-          
-          const serialTestResponse = await fetch('/api/debug/serial_test');
-          const serialTest = await serialTestResponse.json();
-          
-          let robotStatus = {};
-          let rawObs = {};
-          
-          if (forceUpdate.success) {
-            robotStatus = forceUpdate.status;
-            rawObs = {
-              raw_obs: forceUpdate.raw_obs,
-              length: forceUpdate.raw_obs.length,
-              x_mm: forceUpdate.raw_obs[0],
-              a_deg: forceUpdate.raw_obs[1],
-              z_mm: forceUpdate.raw_obs[21]
-            };
-          } else {
-            // Fallback a endpoint normal si falla
-            const robotStatusResponse = await fetch('/api/status/fresh');
-            robotStatus = await robotStatusResponse.json();
-            
-            const rawObsResponse = await fetch('/api/debug/raw_obs');
-            rawObs = await rawObsResponse.json();
-          }
-          
-          // CORRECCIÓN 4: Actualizar debug con datos correctos
-          if(debugInfo){
-            const currentTime = new Date().toLocaleTimeString();
-            const isRunning = protocolStatus.status === 'running' && !protocolStatus.done;
-            const statusIcon = isRunning ? '🔄' : '✅';
-            const statusText = isRunning ? 'Ejecutando...' : 'Completado';
-            
-            let debugText = `[${currentTime}] 🚀 PROTOCOLO: ${name}\n`;
-            debugText += `⏱️  Tiempo: ${secs}s | Estado: ${statusIcon} ${statusText}\n`;
-            
-            if (protocolStatus.last_log) {
-              debugText += `📝 Último log: ${protocolStatus.last_log}\n`;
-            }
-            
-            debugText += `\n📍 Estado del Robot:\n`;
-            debugText += `   X: ${robotStatus.x_mm || 0}mm (target: ${params.x_mm || 0}mm)\n`;
-            debugText += `   A: ${robotStatus.a_deg || 0}° (target: ${params.a_deg || 0}°)\n`;
-            debugText += `   Z: ${robotStatus.z_mm || 0}mm\n`;
-            debugText += `   Volumen: ${robotStatus.volumen_ml || 0}ml\n`;
-            debugText += `   Modo: ${robotStatus.modo || 'N/A'}\n`;
-            debugText += `   Serial: ${robotStatus.serial_open ? 'Conectado' : 'Desconectado'}\n`;
-            
-            if (robotStatus.rx_age_ms !== undefined) {
-              debugText += `   Edad RX: ${robotStatus.rx_age_ms} ms\n`;
-            }
-            
-            // DEBUG: Mostrar datos raw y diagnóstico
-            if (rawObs && rawObs.raw_obs) {
-              debugText += `\n🔍 DEBUG - Datos Raw:\n`;
-              debugText += `   Raw X: ${rawObs.x_mm || 'N/A'}\n`;
-              debugText += `   Raw A: ${rawObs.a_deg || 'N/A'}\n`;
-              debugText += `   Raw Z: ${rawObs.z_mm || 'N/A'}\n`;
-              debugText += `   Array length: ${rawObs.length || 0}\n`;
-              if (rawObs.raw_obs && rawObs.raw_obs.length > 0) {
-                debugText += `   Primeros 5 valores: [${rawObs.raw_obs.slice(0, 5).map(v => v.toFixed(2)).join(', ')}]\n`;
-              }
-            } else {
-              debugText += `\n🔍 DEBUG - Sin datos raw disponibles\n`;
-            }
-            
-            // DEBUG: Mostrar información de diagnóstico
-            if (forceUpdate && forceUpdate.debug_info) {
-              const diag = forceUpdate.debug_info;
-              debugText += `\n🔧 DIAGNÓSTICO DE COMUNICACIÓN:\n`;
-              debugText += `   Serial disponible: ${diag.serial_available ? 'Sí' : 'No'}\n`;
-              debugText += `   Serial abierto: ${diag.serial_open ? 'Sí' : 'No'}\n`;
-              debugText += `   Puerto: ${diag.serial_port || 'N/A'}\n`;
-              debugText += `   Baudrate: ${diag.baudrate || 'N/A'}\n`;
-              debugText += `   Tamaño cola: ${diag.queue_size || 0}\n`;
-              debugText += `   Última RX: ${diag.last_rx_ts ? new Date(diag.last_rx_ts * 1000).toLocaleTimeString() : 'N/A'}\n`;
-              debugText += `   Texto RX: ${diag.last_rx_text || 'N/A'}\n`;
-              debugText += `   Obs array: ${diag.obs_arr ? 'Disponible' : 'No disponible'}\n`;
-              debugText += `   Longitud obs: ${diag.obs_length || 0}\n`;
-            }
-            
-            // DEBUG: Mostrar conexión serial
-            if (serialConnect) {
-              debugText += `\n🔌 CONEXIÓN SERIAL:\n`;
-              debugText += `   Éxito: ${serialConnect.success ? 'Sí' : 'No'}\n`;
-              debugText += `   Mensaje: ${serialConnect.message || 'N/A'}\n`;
-              debugText += `   Puerto: ${serialConnect.port || 'N/A'}\n`;
-              debugText += `   Baudrate: ${serialConnect.baudrate || 'N/A'}\n`;
-              if (serialConnect.error) {
-                debugText += `   Error: ${serialConnect.error}\n`;
-              }
-            }
-            
-            // DEBUG: Mostrar prueba de comunicación serial
-            if (serialTest) {
-              debugText += `\n📡 PRUEBA DE COMUNICACIÓN SERIAL:\n`;
-              debugText += `   Comando enviado: ${serialTest.command_sent || 'N/A'}\n`;
-              debugText += `   Respuesta: ${serialTest.response || 'N/A'}\n`;
-              debugText += `   Longitud respuesta: ${serialTest.response_length || 0}\n`;
-              debugText += `   Timeout alcanzado: ${serialTest.timeout_reached ? 'Sí' : 'No'}\n`;
-              debugText += `   Éxito: ${serialTest.success ? 'Sí' : 'No'}\n`;
-              if (serialTest.error) {
-                debugText += `   Error: ${serialTest.error}\n`;
-              }
-            }
-            
-            debugText += `\n📋 Parámetros: ${JSON.stringify(params, null, 2)}`;
-            debugInfo.innerHTML = `<pre>${debugText}</pre>`;
-          }
-          
-          // CORRECCIÓN 5: Actualizar observaciones en tiempo real
-          const obsInfo = document.getElementById('observations_info');
-          if(obsInfo) {
-            const currentTime = new Date().toLocaleTimeString();
-            let obsText = `[${currentTime}] 📊 OBSERVACIONES: ${name}\n\n`;
-            obsText += `Posición X: ${(robotStatus.x_mm || 0).toFixed(2)} mm\n`;
-            obsText += `Posición A: ${(robotStatus.a_deg || 0).toFixed(2)}°\n`;
-            obsText += `Posición Z: ${(robotStatus.z_mm || 0).toFixed(2)} mm\n`;
-            obsText += `Volumen: ${(robotStatus.volumen_ml || 0).toFixed(2)} ml\n`;
-            obsText += `Modo: ${robotStatus.modo || 'N/A'}\n`;
-            obsText += `Serial: ${robotStatus.serial_open ? 'Conectado' : 'Desconectado'}\n`;
-            
-            if (robotStatus.rx_age_ms !== undefined) {
-              obsText += `Edad RX: ${robotStatus.rx_age_ms} ms\n`;
-            }
-            
-            obsText += `\n🔄 Actualizando cada 1s...`;
-            obsInfo.innerHTML = `<pre>${obsText}</pre>`;
-          }
-          
-          // CORRECCIÓN 6: Verificar si el protocolo terminó
-          if (protocolStatus.done || protocolStatus.status === 'stopped') {
-            console.log('[UI] Protocolo terminado, limpiando intervalo');
-            clearInterval(window.protoUpdateInterval);
-            window.protoUpdateInterval = null;
-            
-            // Actualizar UI para mostrar que terminó
-            if(debugInfo) {
-              const finalTime = new Date().toLocaleTimeString();
-              const finalSecs = Math.floor((Date.now() - startedAt) / 1000);
-              debugInfo.innerHTML = `<pre>[${finalTime}] ✅ PROTOCOLO COMPLETADO: ${name}\n⏱️  Tiempo total: ${finalSecs}s\n📊 Estado final: ${JSON.stringify(protocolStatus, null, 2)}</pre>`;
-            }
-            
-            // Restaurar botones
-            const executeBtn = document.getElementById('btn_proto_execute');
-            const stopBtn = document.getElementById('btn_proto_stop');
-            if(executeBtn) executeBtn.style.display = 'inline-block';
-            if(stopBtn) stopBtn.style.display = 'none';
-            
-            activeExecutionId = null;
-            window.activeExecutionId = null;
-          }
-          
-        } catch(error) {
-          console.error('[UI] Error obteniendo estado:', error);
-          // Actualizar debug con error
-          if(debugInfo) {
-            const currentTime = new Date().toLocaleTimeString();
-            let debugText = `[${currentTime}] 🚀 PROTOCOLO: ${name}\n`;
-            debugText += `⏱️  Tiempo: ${secs}s | Estado: 🔄 Ejecutando...\n`;
-            debugText += `❌ Error obteniendo estado: ${error.message}\n`;
-            debugText += `📋 Parámetros: ${JSON.stringify(params, null, 2)}`;
-            debugInfo.innerHTML = `<pre>${debugText}</pre>`;
-          }
-        }
-      }, 1000); // CORRECCIÓN 7: Cambiar a 1 segundo para evitar spam
-      // Mostrar botón de detener separado
-      const btnStop = document.getElementById('btn_proto_stop');
-      if(btnStop) btnStop.style.display = 'inline-block';
-      
-      // Mostrar debug unificado
-      const debugInfoInit = document.getElementById('debug_info');
-      if(debugInfoInit) {
-        debugInfoInit.innerHTML = '<div class="muted">Iniciando protocolo...</div>';
-      }
-    }catch{ toast('Error ejecutando'); }
-  }; }
-  const btnProtoStop=document.getElementById('btn_proto_stop'); 
-  if(btnProtoStop){ 
-    btnProtoStop.onclick = async ()=>{ 
-      // Usar la nueva lógica simplificada
-      if (typeof stopProtocol === 'function') {
-        await stopProtocol();
-        return;
-      }
-      // Fallback a la lógica original si no está disponible
-      try{ 
-        await jpost(`/api/protocols/stop`,{}); 
-        toast('Protocolo detenido'); 
-        
-        // CORRECCIÓN 8: Limpiar intervalo ANTES de limpiar el estado
-        if(window.protoUpdateInterval) {
-          clearInterval(window.protoUpdateInterval);
-          window.protoUpdateInterval = null;
-        }
-        
-        // Limpiar estado de ejecución
-        activeExecutionId = null; 
-        window.activeExecutionId = null;
-        
-        // Restaurar botón de ejecutar
-        const executeBtn = document.getElementById('btn_proto_execute');
-        if(executeBtn) {
-          executeBtn.style.display = 'inline-block';
-          executeBtn.disabled = false;
-        }
-        
-        // Ocultar botón de detener
-        const stopBtn = document.getElementById('btn_proto_stop');
-        if(stopBtn) stopBtn.style.display = 'none';
-        
-        // Limpiar debug
-        const debugInfo = document.getElementById('debug_info'); 
-        if(debugInfo) debugInfo.innerHTML = '<div class="muted">🛑 Protocolo detenido por el usuario</div>';
-        
-        // Limpiar observaciones
-        const obsInfo = document.getElementById('observations_info');
-        if(obsInfo) obsInfo.innerHTML = '<div class="muted">Esperando observaciones...</div>';
-        
-      }catch{ toast('Error deteniendo protocolo'); } 
-    }; 
-  }
-
-  const bNewProt=document.getElementById('btn_new_prot'); if(bNewProt){ bNewProt.onclick = ()=>{
-    const ed=document.getElementById('prot_editor'); if(ed){ ed.style.display='block'; }
-    const n=document.getElementById('prot_name'); if(n){ n.value='nuevo_protocolo'; }
-    const c=document.getElementById('prot_code'); if(c){ c.value = (
-`#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Protocolo de ejemplo (Gym-like)
-==============================
-
-Ejemplo de protocolo usando la nueva estructura compatible con Gym.
-"""
-
-import numpy as np
-from protocolos import ProtocoloBase
-
-class MiProtocolo(ProtocoloBase):
-    """
-    Protocolo de ejemplo que hereda de ProtocoloBase.
-    
-    Parámetros:
-        x_mm: Posición objetivo en X (mm)
-        a_deg: Ángulo objetivo en A (grados)
-        threshold: Umbral de llegada (mm/grados)
-    """
-    
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.target_x = self.params.get('x_mm', 100.0)
-        self.target_a = self.params.get('a_deg', 45.0)
-        self.threshold = float(self.params.get('threshold', 1.0))
-        self.current_x = 0.0
-        self.current_a = 0.0
-        
-    def reset(self):
-        """Reset del protocolo"""
-        super().reset()
-        self.current_x = 0.0
-        self.current_a = 0.0
-        return self._get_initial_observation()
-    
-    def step(self, action=None):
-        """Un paso del protocolo"""
-        super().step(action)
-        
-        # Obtener observación actual
-        obs = self._get_observation()
-        self.current_x = float(obs[0]) if len(obs) > 0 else 0.0
-        self.current_a = float(obs[1]) if len(obs) > 1 else 0.0
-        
-        # Calcular distancias al objetivo
-        dx = abs(self.current_x - self.target_x)
-        da = abs(self.current_a - self.target_a)
-        
-        # Verificar si llegamos al objetivo
-        if dx <= self.threshold and da <= self.threshold:
-            self.done = True
-            patch = {"codigoModo": 0}  # Parar motores
-            log = f"Objetivo alcanzado: X={self.current_x:.1f}mm, A={self.current_a:.1f}°"
-        else:
-            # Mover hacia el objetivo
-            patch = {
-                "codigoModo": 0,  # Modo automático
-                "setpointX": float(self.target_x),
-                "setpointX_mm": float(self.target_x),
-                "setpointA": float(self.target_a),
-                "setpointA_deg": float(self.target_a)
-            }
-            log = f"Movimiento: X={self.current_x:.1f}→{self.target_x}mm, A={self.current_a:.1f}→{self.target_a}°"
-        
-        # Calcular recompensa
-        reward = self._calculate_reward()
-        
-        # Información adicional
-        info = {
-            "patch": patch,
-            "sleep_ms": 100,
-            "log": log,
-            "distance_x": dx,
-            "distance_a": da
-        }
-        
-        return obs, reward, self.done, info
-    
-    def _calculate_reward(self):
-        """Calcula recompensa basada en la distancia al objetivo"""
-        dx = abs(self.current_x - self.target_x)
-        da = abs(self.current_a - self.target_a)
-        return max(0.0, 100.0 - (dx + da))
-    
-    def _get_observation(self):
-        """Obtener observación actual del entorno"""
-        return np.array([
-            self.current_x,  # x_mm
-            self.current_a,  # a_deg
-            0.0,  # z_mm
-            0.0,  # volumen_ml
-            0.0,  # caudal_est_mls
-            0,    # modo
-        ], dtype=np.float32)
-    
-    def render(self, mode='human'):
-        """Renderizado opcional del protocolo"""
-        if mode == 'human':
-            print(f"MiProtocolo: X={self.current_x:.1f}→{self.target_x}mm, A={self.current_a:.1f}→{self.target_a}°")
-    
-    def close(self):
-        """Limpieza al finalizar"""
-        super().close()
-        print("MiProtocolo: Protocolo finalizado")
-
-
-# Compatibilidad con estructura antigua (opcional)
-def custom_action(obs, ctx):
-    """Wrapper para compatibilidad con estructura antigua"""
-    protocolo = MiProtocolo(**ctx.get('vars', {}))
-    obs_array = np.array(obs, dtype=np.float32)
-    _, reward, done, info = protocolo.step()
-    
-    return {
-        "patch": info.get("patch", {}),
-        "done": done,
-        "sleep_ms": info.get("sleep_ms", 100),
-        "log": info.get("log", ""),
-        "reward": reward
-    }
-`); }
-    const p=document.getElementById('prot_params'); if(p){ p.value = '{\n  "x_mm": 150.0,\n  "a_deg": 90.0,\n  "threshold": 2.0\n}'; }
-  }; }
-
-  $("#btn_load_prot").onclick = async ()=>{
-    const name=($("#prot_name").value||"").trim(); if(!name){toast("Nombre vacío"); return;}
-    try{ const r=await jget(`/api/protocols/${encodeURIComponent(name)}`); $("#prot_code").value=r.code||""; toast("Protocolo cargado"); }
-    catch{ toast("No existe / error al cargar"); }
-  };
-  $("#btn_save_prot").onclick = async ()=>{
-    const name=($("#prot_name").value||"").trim(), code=$("#prot_code").value||"";
-    if(!name||!code){ toast("Completa nombre y código"); return; }
-    await jpost("/api/protocols",{name, code}); toast("Protocolo guardado");
-  };
-  $("#btn_delete_prot").onclick = async ()=>{
-    const name=($("#prot_name").value||"").trim(); if(!name){toast("Nombre vacío"); return;}
-    const r=await fetch(`/api/protocols/${encodeURIComponent(name)}`,{method:'DELETE'});
-    if(r.ok) toast("Protocolo eliminado"); else toast("Error al eliminar");
-  };
-  $("#btn_run_prot").onclick = async ()=>{
-    const name=($("#prot_name").value||"").trim(); if(!name){toast("Nombre vacío"); return;}
-    let params={}; const raw=($("#prot_params").value||"").trim();
-    if(raw){ try{ params=JSON.parse(raw);}catch{ toast("Params JSON inválido"); return; } }
-    const toEl=document.getElementById('prot_timeout'); const timeoutSeconds = toEl? Number(toEl.value||25): undefined;
-    const body={type:"protocol", id:name, params}; if(!isNaN(timeoutSeconds)) body.timeout_seconds = timeoutSeconds;
-    const r=await jpost("/api/execute", body); $("#job_id").value=r.execution_id||""; activeExecutionId=r.execution_id||null; if(execInfo) execInfo.textContent = `ID: ${activeExecutionId}`; if(execBanner) execBanner.style.display='block'; toast(`Ejecutado (exec ${r.execution_id||''})`);
-  };
-  $("#btn_list_jobs").onclick = async ()=>{ const eid=($("#job_id").value||"").trim(); if(!eid){ $("#jobs_out").textContent='{"error":"Execution ID vacío"}'; return;} const r=await jget(`/api/execution/${encodeURIComponent(eid)}`); $("#jobs_out").textContent=JSON.stringify(r,null,2); };
-  $("#btn_stop_job").onclick = async ()=>{ const eid=($("#job_id").value||"").trim(); if(!eid){toast("Execution ID vacío"); return;} await jpost(`/api/execution/${encodeURIComponent(eid)}/stop`,{}); toast("Stop enviado"); };
-
-  // Acción inmediata (UI)
-  const btnImm=document.getElementById('btn_imm_exec'); if(btnImm){ btnImm.onclick = async ()=>{
-    const action=(document.getElementById('imm_action')||{}).value||'movement';
-    const duration=Number((document.getElementById('imm_duration')||{}).value||10);
-    const timeoutSeconds=Number((document.getElementById('imm_timeout')||{}).value||25);
-    const autoStop=Boolean((document.getElementById('imm_autostop')||{checked:true}).checked);
-    try{
-      const body={ type:'immediate', action_type: action, duration, auto_stop: autoStop };
-      if(!isNaN(timeoutSeconds)) body.timeout_seconds = timeoutSeconds;
-      const r = await jpost('/api/execute', body);
-      activeExecutionId = r.execution_id || null; if(execInfo) execInfo.textContent = `ID: ${activeExecutionId}`; if(execBanner) execBanner.style.display='block';
-      toast(`Acción inmediata en ejecución (${activeExecutionId||''})`);
-    }catch{ toast('Error en acción inmediata'); }
-  }; }
-
-  // ------------- Tareas -------------
-  async function reloadTasks(){
-    const arr=await jget("/api/tasks"); const tb=$("#tasks_tbl tbody"); tb.innerHTML="";
-    (arr||[]).forEach(t=>{
-      const tr=document.createElement("tr");
-      tr.innerHTML=`
-        <td>${t.id}</td><td>${t.nombre||t.n||""}</td>
-        <td>${(t.programacion&&t.programacion.dias)?(t.programacion.dias.join(',')):(t.dow!=null?t.dow:"")}</td>
-        <td>${(t.programacion&&t.programacion.hora)||((t.h!=null&&t.m!=null)?`${String(t.h).padStart(2,'0')}:${String(t.m).padStart(2,'0')}`:"")}</td>
-        <td>${t.volumenObjetivoML||t.vol||0}</td><td>${t.protocolo||t.protocol||""}</td><td>${(t.activo!=null?t.activo:t.enabled)?"Sí":"No"}</td>
-        <td>
-          <button data-act="load" data-id="${t.id}">Editar</button>
-          <button data-act="exec" data-id="${t.id}">Ejecutar</button>
-          <button class="warn" data-act="del" data-id="${t.id}">Borrar</button>
-        </td>`;
-      tb.appendChild(tr);
-    });
-    tb.querySelectorAll("button").forEach(b=>{
-      b.onclick = async ()=>{
-        const id=b.dataset.id, act=b.dataset.act;
-        if(act==="load"){
-          const arr=await jget("/api/tasks"); const t=(arr||[]).find(x=>String(x.id)===String(id)); if(!t) return;
-          $("#t_id").value=t.id;
-          $("#t_n").value=t.nombre||t.n||"";
-          // Programación
-          if(t.programacion && typeof t.programacion.hora==="string"){
-            const hm=(t.programacion.hora||"00:00").split(":");
-            $("#t_h").value=Number(hm[0]||0);
-            $("#t_m").value=Number(hm[1]||0);
-            const dias=(t.programacion.dias||[]);
-            $("#t_dow").value=Array.isArray(dias) && dias.length?Number(dias[0]):0;
-          }else{
-            $("#t_h").value=t.h||0; $("#t_m").value=t.m||0; $("#t_dow").value=t.dow||0;
-          }
-          $("#t_vol").value=(t.volumenObjetivoML!=null?t.volumenObjetivoML:(t.vol||0));
-          $("#t_protocol").value=t.protocolo||t.protocol||"";
-          $("#t_enabled").value=(t.activo!=null?t.activo:t.enabled)?"1":"0";
-          $("#t_params").value=t.params?JSON.stringify(t.params):"";
-          toast("Tarea cargada");
-        }else if(act==="exec"){
-          let timeoutSeconds=25; const tto=document.getElementById('t_timeout'); if(tto){ const v=Number(tto.value||25); if(!isNaN(v)) timeoutSeconds=v; }
-          const r=await jpost(`/api/execute`,{type:"task", id, timeout_seconds: timeoutSeconds}); activeExecutionId=r.execution_id||null; if(execInfo) execInfo.textContent = `ID: ${activeExecutionId}`; if(execBanner) execBanner.style.display='block'; toast("Tarea ejecutada");
-        }else if(act==="del"){
-          await jdel(`/api/tasks/${encodeURIComponent(id)}`); await reloadTasks(); toast("Tarea borrada");
-        }
-      };
-    });
-  }
-  $("#btn_reload_tasks").onclick = reloadTasks;
-  $("#btn_save_task").onclick = async ()=>{
-    let parsedParams={};
-    const raw=($("#t_params").value||"").trim();
-    if(raw){ try{ parsedParams=JSON.parse(raw);}catch{ parsedParams={}; } }
-    const payload={
-      id: ($("#t_id").value||"").trim(),
-      nombre: $("#t_n").value||"",
-      activo: ($("#t_enabled").value||"1")==="1",
-      protocolo: ($("#t_protocol").value||"").trim()||undefined,
-      params: parsedParams,
-      tipo: (($("#t_protocol").value||"").trim()?"protocolo":"accion"),
-      programacion: { tipo: "semanal", hora: `${String(Number($("#t_h").value||0)).padStart(2,'0')}:${String(Number($("#t_m").value||0)).padStart(2,'0')}`, dias: [Number($("#t_dow").value||0)] },
-      volumenObjetivoML: Number($("#t_vol").value||0)
-    };
-    await jpost("/api/tasks", payload); await reloadTasks(); toast("Tarea guardada");
-  };
-  reloadTasks();
-
-  // Logs deshabilitados
-
+  // ------------- Hotkeys -------------
   // ------------- Hotkeys -------------
   window.addEventListener("keydown", async (e)=>{
     if(e.target && ["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName)) return;

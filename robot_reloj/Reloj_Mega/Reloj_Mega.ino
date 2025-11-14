@@ -2,6 +2,7 @@
 #include <FlowMeter.h>
 #include <PID_v1.h>
 #include <Servo.h>
+#include <math.h>
 
 // ======================= Motores =======================
 AF_DCMotor motorAngulo(2);     // Motor angular (A)
@@ -273,39 +274,50 @@ void actualizarControlMotores() {
   cmdA = remapearEnergia((int)cmdA);
 
   // --- Bomba ---
+  const int BOMBA_MAX = 255;
   int cmdBomba = 0;
-  if (usarSensorFlujo) {
-    // Bombear hasta alcanzar volumen objetivo (ml)
-    if (volumenML < volumenObjetivoML) {
-      cmdBomba = remapearEnergia(255);
+  const float margenObjetivo = 0.05f;
+  const bool objetivoPendiente = (volumenObjetivoML - volumenML) > margenObjetivo;
+  const bool hayManual = (fabs(energiaBomba) > 1.0f);
+
+  if (objetivoPendiente) {
+    if (usarSensorFlujo) {
+      cmdBomba = remapearEnergia(BOMBA_MAX);
       motorBomba.setSpeed(abs(cmdBomba));
       motorBomba.run(FORWARD);
     } else {
-      cmdBomba = 0;
-      motorBomba.setSpeed(0);
-      motorBomba.run(RELEASE);
-    }
-  } else {
-    if (volumenObjetivoML > 0) {
-      if (tiempoInicioBombeo == 0) tiempoInicioBombeo = millis();
-      unsigned long duracion_ms = (unsigned long)((volumenObjetivoML / max(0.001, caudalBombaMLs)) * 1000.0);
-      if (millis() - tiempoInicioBombeo < duracion_ms) {
-        cmdBomba = remapearEnergia(255);
-        motorBomba.setSpeed(abs(cmdBomba));
-        motorBomba.run(FORWARD);
-      } else {
+      const float restante = max(0.0f, volumenObjetivoML - volumenML);
+      if (restante <= margenObjetivo) {
         cmdBomba = 0;
         motorBomba.setSpeed(0);
         motorBomba.run(RELEASE);
-        volumenObjetivoML = 0;
         tiempoInicioBombeo = 0;
+        volumenObjetivoML = volumenML;
+      } else {
+        if (tiempoInicioBombeo == 0) tiempoInicioBombeo = millis();
+        const unsigned long duracion_ms = (unsigned long)((restante / max(0.001f, caudalBombaMLs)) * 1000.0f);
+        if (millis() - tiempoInicioBombeo < duracion_ms) {
+          cmdBomba = remapearEnergia(BOMBA_MAX);
+          motorBomba.setSpeed(abs(cmdBomba));
+          motorBomba.run(FORWARD);
+        } else {
+          cmdBomba = 0;
+          motorBomba.setSpeed(0);
+          motorBomba.run(RELEASE);
+          tiempoInicioBombeo = 0;
+          volumenObjetivoML = volumenML;
+        }
       }
-    } else {
-      // Sin objetivo, energía manual (para pruebas)
-      cmdBomba = remapearEnergia((int)energiaBomba);
-      if (cmdBomba != 0) { motorBomba.setSpeed(abs(cmdBomba)); motorBomba.run(FORWARD); }
-      else               { motorBomba.setSpeed(0); motorBomba.run(RELEASE); }
     }
+  } else if (hayManual) {
+    cmdBomba = remapearEnergia((int)energiaBomba);
+    motorBomba.setSpeed(abs(cmdBomba));
+    motorBomba.run(cmdBomba > 0 ? FORWARD : BACKWARD);
+  } else {
+    cmdBomba = 0;
+    motorBomba.setSpeed(0);
+    motorBomba.run(RELEASE);
+    tiempoInicioBombeo = 0;
   }
 
   // Aplicar a motores A y X
@@ -344,12 +356,13 @@ void enviarDatos() {
   bool manualA = (codigoModo & 0x02) != 0;
   double cmdX = manualX ? energiaX : salidaPID_X;
   double cmdA = manualA ? energiaA : salidaPID_A;
+  const float margenObjetivo = 0.05f;
   int    cmdB = 0;
-  if (usarSensorFlujo) cmdB = (volumenML < volumenObjetivoML) ? 255 : 0;
-  else {
-    if (volumenObjetivoML > 0 && tiempoInicioBombeo != 0) cmdB = 255;
-    else cmdB = remapearEnergia((int)energiaBomba);
-  }
+  const bool objetivoPendiente = (volumenObjetivoML - volumenML) > margenObjetivo;
+  const bool hayManual = (fabs(energiaBomba) > 1.0f);
+  if (objetivoPendiente) cmdB = 255;
+  else if (hayManual)    cmdB = remapearEnergia((int)energiaBomba);
+  else                   cmdB = 0;
 
   // Reportar Z en mm
   float z_mm = (180.0f - z_current_deg) * z_mm_per_deg;
@@ -432,6 +445,7 @@ void procesarComando(String command) {
   energiaBomba = energiaBomba_rx;
   setpointX_mm = setpointX_mm_rx;
   setpointA_deg = setpointA_deg_rx;
+  float objetivoAnterior = volumenObjetivoML;
   volumenObjetivoML = volumenObj_rx;
   kpX = kpX_rx; kiX = kiX_rx; kdX = kdX_rx;
   kpA = kpA_rx; kiA = kiA_rx; kdA = kdA_rx;
@@ -441,6 +455,12 @@ void procesarComando(String command) {
   if (nuevosPasosGrado != 0) pasosPorGrado = nuevosPasosGrado;
   usarSensorFlujo = usarSensorFlujo_rx;
   caudalBombaMLs  = caudalBomba_rx;
+  if (fabs(volumenObjetivoML - objetivoAnterior) > 0.01f) {
+    tiempoInicioBombeo = 0;
+    if (volumenObjetivoML <= volumenML) {
+      volumenObjetivoML = volumenML;
+    }
+  }
 
   // Resets
   if (resetXFlag) reiniciarX = true;

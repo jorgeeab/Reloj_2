@@ -238,14 +238,31 @@ class VirtualRobotController:
                 self.state.a_deg = 0.0
             elif self.state.a_deg > 355.0:
                 self.state.a_deg = 355.0
-            energia_bomba = float(self.state.cmd_bomba)
-            flow = abs(energia_bomba) / 255.0 * (self.state.caudal_bomba_ml_s or 0.0)
-            if energia_bomba >= 0:
-                self.state.volumen_ml += flow * dt
+            # --- Bomba (modo virtual armonizado con firmware) ---
+            # Si hay objetivo pendiente, la bomba virtual se enciende automáticamente
+            # a energía equivalente 255 y se detiene al alcanzar el objetivo.
+            # Si no hay objetivo, respeta la energía manual (cmd_bomba).
+            margin = 0.05
+            objective_pending = (self._target_volume - self.state.volumen_ml) > margin
+            manual_cmd = float(self.state.cmd_bomba)
+            energy_eff = 255.0 if objective_pending else manual_cmd
+            flow = abs(energy_eff) / 255.0 * (self.state.caudal_bomba_ml_s or 0.0)
+            if energy_eff >= 0:
+                # Evitar sobrepasar el objetivo cuando hay meta
+                if objective_pending and self._target_volume > 0:
+                    max_add = max(0.0, self._target_volume - self.state.volumen_ml)
+                    self.state.volumen_ml += min(max_add, flow * dt)
+                else:
+                    self.state.volumen_ml += flow * dt
             else:
                 self.state.volumen_ml = max(0.0, self.state.volumen_ml - flow * dt)
+
+            # Clamp final por seguridad
             if self._target_volume > 0:
                 self.state.volumen_ml = min(self.state.volumen_ml, self._target_volume)
+
+            # Reportar el valor aplicado de bomba
+            self.state.valor_bomba = float(energy_eff)
             self.state.z_mm = self._approach(self.state.z_mm, self._target_z, self._max_speed_z * dt)
             self._update_pybullet_locked()
             frame = self._format_observation_locked()

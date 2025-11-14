@@ -17,8 +17,9 @@ except Exception:  # pyserial optional; allow simulation
 import asyncio
 import json
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, WebSocket
 from fastapi.responses import RedirectResponse, StreamingResponse
+from starlette.websockets import WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -302,6 +303,10 @@ if _cfg.get("serial_port") and not _pump.serial_port:
     except Exception:
         pass
 
+# Flow flags (persisted)
+_use_sensor_flow = bool(_cfg.get("usar_sensor_flujo", False))
+_actuators = _cfg.get("actuators") or ["pump"]
+
 
 @app.get("/")
 def home():
@@ -309,6 +314,31 @@ def home():
     if STATIC_DIR.exists():
         return RedirectResponse(url="/ui/")
     return {"name": "simple-pump-robot", "status": "ok"}
+
+
+@app.get("/api")
+def api_index():
+    return {
+        "name": "Simple Pump Robot API",
+        "version": "0.1",
+        "endpoints": {
+            "ws": {"control": "/ws/control", "telemetry": "/ws/telemetry"},
+            "status": "/api/status",
+            "status_stream": "/api/status/stream",
+            "control": "/api/control",
+            "ui_registry": "/api/ui/registry",
+            "tasks": {
+                "execute": "/api/tasks/execute",
+                "executions": "/api/executions",
+                "execution": "/api/execution/{exec_id}",
+                "stop": "/api/execution/{exec_id}/stop"
+            },
+            "config": "/api/config",
+            "serial": {"ports": "/api/serial/ports", "open": "/api/serial/open", "close": "/api/serial/close"},
+            "calibration": {"get": "/api/calibration", "apply": "/api/calibration/apply", "run": "/api/calibration/run"},
+            "visual": {"status": "/api/visual/status", "frame": "/api/visual/frame", "reset": "/api/visual/reset"}
+        }
+    }
 
 
 @app.get("/api/status")
@@ -320,8 +350,30 @@ def api_status():
         "ml_per_sec": _pump.ml_per_sec,
         "ts": datetime.utcnow().isoformat(),
         "serial": _pump.serial_status(),
-        "sensors": {"ml_per_sec": _pump.ml_per_sec},
+        "sensors": {"ml_per_sec": _pump.ml_per_sec, "usar_sensor_flujo": _use_sensor_flow},
     }
+
+
+def _status_snapshot() -> Dict:
+    """Build a richer status payload compatible with hub widgets and WS telemetry."""
+    payload = api_status().copy()
+    # include execution hint if any
+    try:
+        running = next((t for t in _runner.tasks.values() if t.status in ("running", "queued")), None)
+    except Exception:
+        running = None
+    if running is not None:
+        payload["progress"] = running.progress
+        payload["execution_id"] = running.execution_id
+        payload["exec_status"] = running.status
+    # aliases for widget registry paths
+    payload.setdefault("metrics", {})
+    payload["metrics"]["flow_ml_s"] = payload.get("ml_per_sec")
+    payload.setdefault("flow", {})
+    payload["flow"]["current"] = payload.get("ml_per_sec")
+    payload.setdefault("setpoints", {})
+    # volume/flow targets are tracked on demand; leave empty by default
+    return payload
 
 
 @app.get("/api/protocols")
@@ -346,17 +398,9 @@ async def api_status_stream():
     async def _gen():
         while True:
             try:
-                payload = api_status()
+                payload = _status_snapshot()
                 # include a hint about current execution progress if any
-                running = None
-                try:
-                    running = next((t for t in _runner.tasks.values() if t.status in ("running", "queued")), None)
-                except Exception:
-                    running = None
-                if running is not None:
-                    payload["progress"] = running.progress
-                    payload["execution_id"] = running.execution_id
-                    payload["exec_status"] = running.status
+                # already included by _status_snapshot
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             except Exception:
                 # On error, still keep the stream alive with a heartbeat
@@ -419,8 +463,21 @@ def api_config():
         "kind": "pump",
         "ml_per_sec": _pump.ml_per_sec,
         "serial": _pump.serial_status(),
+        "actuators": _actuators,
         "ui": {"visual_available": _viz is not None},
     }
+
+
+# ---- UI registry (widgets) ----
+@app.get("/api/ui/registry")
+def api_ui_registry():
+    """Return UI widget registry so UIs can build controls dynamically."""
+    reg_path = (BASE_DIR / "static" / "components" / "registry" / "pump.json")
+    try:
+        return json.loads(reg_path.read_text(encoding="utf-8"))
+    except Exception:
+        # Fallback minimal
+        return {"widgets": []}
 
 
 @app.get("/api/serial/ports")
@@ -470,6 +527,22 @@ def api_calib_apply(data: CalibApplyIn):
     return {"ok": True, "ml_per_sec": _pump.ml_per_sec}
 
 
+class FlowApplyIn(BaseModel):
+    ml_per_sec: float | None = None
+    usar_sensor_flujo: bool | None = None
+
+
+@app.post("/api/flow/apply")
+def api_flow_apply(data: FlowApplyIn):
+    global _use_sensor_flow
+    if data.ml_per_sec is not None:
+        _pump.ml_per_sec = float(data.ml_per_sec)
+    if data.usar_sensor_flujo is not None:
+        _use_sensor_flow = bool(data.usar_sensor_flujo)
+    cfg = _load_config(); cfg.update({"ml_per_sec": _pump.ml_per_sec, "usar_sensor_flujo": _use_sensor_flow}); _save_config(cfg)
+    return {"ok": True, "ml_per_sec": _pump.ml_per_sec, "usar_sensor_flujo": _use_sensor_flow}
+
+
 class CalibRunIn(BaseModel):
     duration_seconds: float
 
@@ -504,6 +577,135 @@ def api_visual_reset():
         return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------- WebSockets: control + telemetry ----------------
+
+def _apply_control_payload(data: Dict) -> Dict:
+    """Apply a control payload. Aligns with reloj robot schema where possible.
+
+    Supported fields:
+      - setpoints.volumen_ml
+      - flow.caudal_bomba_mls
+      - usar_sensor_flujo (bool) either top-level or in flow
+      - reset_volumen
+    """
+    global _use_sensor_flow
+    ack: Dict[str, any] = {"ok": True}
+
+    if not isinstance(data, dict):
+        return {"ok": False, "error": "invalid payload"}
+
+    sp = data.get("setpoints") or {}
+    flow = data.get("flow") or {}
+
+    target_vol = sp.get("volumen_ml") if isinstance(sp, dict) else None
+    target_flow = None
+    if isinstance(flow, dict):
+        target_flow = flow.get("caudal_bomba_mls") or flow.get("flow_ml_s") or flow.get("ml_per_sec")
+        if "usar_sensor_flujo" in flow:
+            _use_sensor_flow = bool(flow.get("usar_sensor_flujo"))
+    # top-level override for sensor flag
+    if "usar_sensor_flujo" in data:
+        _use_sensor_flow = bool(data.get("usar_sensor_flujo"))
+
+    # persist settings if changed
+    dirty = False
+    if target_flow is not None:
+        try:
+            _pump.ml_per_sec = float(target_flow)
+            dirty = True
+        except Exception:
+            pass
+    if dirty:
+        cfg = _load_config(); cfg.update({"ml_per_sec": _pump.ml_per_sec, "usar_sensor_flujo": _use_sensor_flow}); _save_config(cfg)
+
+    # reset volume hint (client-side in this simple robot)
+    if data.get("reset_volumen"):
+        ack["reset_volumen"] = True
+
+    # Execute/stop logic: if flow > 0 and volume target provided → start; if flow==0 → stop
+    try:
+        flow_value = float(target_flow) if target_flow is not None else None
+    except Exception:
+        flow_value = None
+    try:
+        vol_value = float(target_vol) if target_vol is not None else None
+    except Exception:
+        vol_value = None
+
+    if flow_value is not None and flow_value <= 0.0:
+        _pump.stop()
+        # mark running task stopped if any
+        try:
+            running = next((k for k, t in _runner.tasks.items() if t.status == "running"), None)
+            if running:
+                try:
+                    _runner.stop(running)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        ack["action"] = "stopped"
+    elif flow_value is not None and flow_value > 0.0 and vol_value is not None and vol_value > 0.0:
+        info = _runner.start_riego(volume_ml=vol_value, duration_seconds=None)
+        ack["action"] = "started"
+        ack["execution_id"] = info.execution_id
+    else:
+        # Only setpoints/settings updated
+        ack["action"] = "updated"
+
+    ack["status"] = _status_snapshot()
+    return ack
+
+
+@app.websocket("/ws/control")
+async def ws_control(ws: WebSocket):
+    await ws.accept()
+    try:
+        await ws.send_json({"type": "control_ready"})
+        while True:
+            msg = await ws.receive_text()
+            try:
+                data = json.loads(msg or "{}")
+            except Exception:
+                data = {}
+            if isinstance(data, dict) and data.get("type") == "ping":
+                await ws.send_json({"type": "pong", "ts": datetime.utcnow().isoformat()})
+                continue
+            ack = _apply_control_payload(data if isinstance(data, dict) else {})
+            await ws.send_json({"type": "control_ack", **ack})
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+
+@app.websocket("/ws/telemetry")
+async def ws_telemetry(ws: WebSocket):
+    await ws.accept()
+    try:
+        await ws.send_json({"type": "telemetry_ready"})
+        while True:
+            await ws.send_json({"type": "telemetry", "status": _status_snapshot()})
+            await asyncio.sleep(0.5)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+
+# HTTP control endpoint for hubs bridging
+@app.post("/api/control")
+def api_control(payload: Optional[Dict] = None):
+    ack = _apply_control_payload(payload or {})
+    return ack
 
 
 if __name__ == "__main__":

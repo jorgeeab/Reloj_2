@@ -32,7 +32,9 @@ from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from contextlib import nullcontext
 
-from flask import Flask, request, jsonify, Response, stream_with_context
+from flask import Flask, request, jsonify, make_response, render_template
+from flask_sock import Sock
+from simple_websocket import ConnectionClosed
 
 # Importaciones opcionales
 try:
@@ -92,6 +94,29 @@ SETTINGS_FILE = DATA_DIR / "settings_ui.json"
 # Inicializar archivos si no existen
 if not SETTINGS_FILE.exists():
     SETTINGS_FILE.write_text('{"version":1}', encoding="utf-8")
+
+
+def _load_settings_dict() -> dict:
+    """Lee el archivo de settings de forma segura incluso si aún no hay datos."""
+    try:
+        txt = SETTINGS_FILE.read_text(encoding="utf-8")
+        return json.loads(txt or "{}")
+    except Exception:
+        return {}
+
+
+def _save_settings_dict(d: dict) -> bool:
+    """Persiste el diccionario de settings en disco."""
+    try:
+        SETTINGS_FILE.write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
+        return True
+    except Exception as exc:
+        if "logger" in globals() and logger is not None:
+            logger.log(f"WARNING: No se pudo guardar settings: {exc}")
+        else:
+            print(f"[WARNING] No se pudo guardar settings: {exc}")
+        return False
+
 
 # Configuración del robot
 DEFAULT_SERIAL_PORT = "COM3"
@@ -196,6 +221,10 @@ logger = RobotLogger()
 app = Flask(__name__,
             template_folder=str(TEMPLATES_DIR),
             static_folder=str(STATIC_DIR))
+sock = Sock(app)
+
+# Verbose flags (pueden habilitarse temporalmente para depurar)
+STATUS_DEBUG = False
 
 # Lock global para operaciones sobre el entorno
 env_lock = threading.Lock()
@@ -419,6 +448,36 @@ def _available_robot_profiles() -> List[Dict[str, Any]]:
     ]
 
 
+@app.route("/api/robots", methods=["GET"])
+def api_list_robots():
+    """Lista los perfiles disponibles y cuál está activo."""
+    return jsonify({
+        "active": active_robot_id,
+        "robots": _available_robot_profiles(),
+    })
+
+
+@app.route("/api/robots/select", methods=["POST"])
+def api_select_robot():
+    """Permite alternar entre robot físico y virtual desde la UI."""
+    data = get_request_data() or {}
+    rid = data.get("id")
+    if not rid:
+        return jsonify({"error": "id requerido"}), 400
+    if rid not in ROBOT_PROFILES:
+        return jsonify({"error": f"robot '{rid}' no encontrado"}), 404
+    try:
+        summary = switch_robot(rid)
+    except Exception as exc:
+        logger.log(f"[robots.select] error cambiando a {rid}: {exc}", "ERROR")
+        return jsonify({"error": str(exc)}), 500
+    return jsonify({
+        "status": "ok",
+        "active": summary,
+        "robots": _available_robot_profiles(),
+    })
+
+
 # Estado del robot y caché del último válido
 # Estado del robot y caché del último válido
 robot_status = RobotStatus()
@@ -490,6 +549,26 @@ def _pb_gui_stop() -> bool:
         logger.log(f"[PyBullet GUI] Error al detener: {exc}", "WARNING")
         return False
 
+
+@app.route("/api/pybullet/frame")
+def api_pybullet_frame():
+    """Devuelve la última imagen renderizada por PyBullet (si está disponible)."""
+    if visualizer is None:
+        return jsonify({"error": "pybullet_unavailable"}), 404
+    try:
+        frame = visualizer.render_frame()
+    except Exception as exc:
+        logger.log(f"[Visualizer] Error renderizando frame: {exc}", "WARNING")
+        frame = None
+    if not frame:
+        return jsonify({"error": "no_frame"}), 503
+    resp = make_response(frame)
+    resp.headers["Content-Type"] = getattr(visualizer, "mimetype", "image/jpeg")
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
 def _set_last_rx(txt: str):
     global last_rx_text
     global last_rx_ts
@@ -537,9 +616,11 @@ def get_robot_status(force_fresh=False) -> RobotStatus:
                 if obs_arr is not None:
                     obs = obs_arr.tolist()
                     _set_last_rx(" ".join(f"{v:.2f}" for v in obs))
-                    print(f"[DEBUG] get_robot_status: Datos frescos - X={obs[0]}, A={obs[1]}, Z={obs[21] if len(obs) > 21 else 'N/A'}")
+                    if STATUS_DEBUG:
+                        print(f"[DEBUG] get_robot_status: Datos frescos - X={obs[0]}, A={obs[1]}, Z={obs[21] if len(obs) > 21 else 'N/A'}")
                 else:
-                    print("[DEBUG] get_robot_status: No hay datos frescos disponibles")
+                    if STATUS_DEBUG:
+                        print("[DEBUG] get_robot_status: No hay datos frescos disponibles")
                     obs = [0.0]*21
             else:
                 # Sin RX reciente: usar caché si existe
@@ -551,11 +632,13 @@ def get_robot_status(force_fresh=False) -> RobotStatus:
                         cached_dict["rx_age_ms"] = int(max(0.0, time.time() - last_rx_ts) * 1000)
                     except Exception:
                         cached_dict["rx_age_ms"] = 0
-                    print(f"[DEBUG] get_robot_status: Usando caché - X={cached_dict.get('x_mm', 0)}, A={cached_dict.get('a_deg', 0)}")
+                    if STATUS_DEBUG:
+                        print(f"[DEBUG] get_robot_status: Usando caché - X={cached_dict.get('x_mm', 0)}, A={cached_dict.get('a_deg', 0)}")
                     return RobotStatus(**cached_dict)
                 # Sin caché disponible: caerá a valores por defecto (ceros)
                 obs = [0.0]*21
-                print("[DEBUG] get_robot_status: Usando valores por defecto (ceros)")
+                if STATUS_DEBUG:
+                    print("[DEBUG] get_robot_status: Usando valores por defecto (ceros)")
 
             # Conexión serial actual
             ser = getattr(robot_env, "ser", None)
@@ -696,9 +779,15 @@ def get_robot_status(force_fresh=False) -> RobotStatus:
     return status
 
 def _is_serial_connected() -> bool:
-    """Indica si el puerto serial está abierto y listo para operar."""
+    """Indica si el puerto serial está abierto, o si estamos en modo virtual."""
     try:
-        return hasattr(robot_env, 'ser') and robot_env.ser and robot_env.ser.is_open
+        if getattr(robot_env, "is_virtual", False):
+            return True
+        port_value = str(getattr(robot_env, "port", "") or "").strip().upper()
+        if port_value == "VIRTUAL":
+            return True
+        ser = getattr(robot_env, "ser", None)
+        return bool(ser and getattr(ser, "is_open", False))
     except Exception:
         return False
 
@@ -708,7 +797,10 @@ def list_serial_ports() -> List[str]:
         return []
     
     try:
-        return [p.device for p in list_ports.comports()]
+        ports = [p.device for p in list_ports.comports()]
+        if not ports:
+            ports = []
+        return ports
     except Exception:
         return []
 
@@ -742,23 +834,45 @@ def stop_all_actuators():
 
 ALLOWED_ENDPOINTS = {
     "/",               # página principal
-    "/calendar",       # vista calendario
-    "/api/config",     # configuración básica
+    "/api",
+    "/api/config",
+    "/api/settings",
+    "/api/robots",
+    "/api/robots/select",
+    "/api/tasks/execute",
+    "/api/executions",
     "/api/serial/ports",
     "/api/serial/open",
-    "/api/serial/close"
+    "/api/serial/close",
+    "/api/stop",
+    "/api/home",
+    "/api/emergency_stop",
 }
+
+ALLOWED_PREFIXES = (
+    "/api/execution/",
+    "/ws/",
+    "/static",
+    "/hub",
+)
+
+ENFORCE_ENDPOINT_FILTER = False
 
 @app.before_request
 def restrict_endpoints():
+    if not ENFORCE_ENDPOINT_FILTER:
+        return
     path = request.path
-    if path.startswith( ("/static", "/favicon.ico") ):
-        return  # recursos estáticos permitidos
-    # Permitir APIs mínimas
-    allowed_prefixes = ("/api/", "/serial/", "/entorno/", "/control", "/debug/", "/robots")
-    if path in {"/"} or path.startswith(allowed_prefixes):
-        return  # permitido
-    # bloquea cualquier ruta antigua no usada (por ejemplo /game, /calendar eliminada)
+    upgrade = request.headers.get("Upgrade", "").lower()
+    if path.startswith("/ws/") or upgrade == "websocket":
+        return
+    if path in ALLOWED_ENDPOINTS:
+        return
+    if any(path.startswith(prefix) for prefix in ALLOWED_PREFIXES):
+        return
+    if path.startswith("/favicon.ico"):
+        return
+    logger.log(f"[HTTP] Bloqueado {path}", "WARNING")
     return jsonify({"error": "Endpoint deshabilitado"}), 404
 
 # =============================================================================
@@ -767,9 +881,13 @@ def restrict_endpoints():
 
 @app.route("/")
 def root_index():
-    # Mostrar la interfaz HTML existente
-    from flask import render_template  # import local para mantener import global mínimo
-    return render_template("reloj.html")
+    """Entrega la interfaz principal y evita que el navegador use una versión en caché."""
+    html = render_template("reloj.html")
+    resp = make_response(html)
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 @app.route("/api")
 def api_index():
@@ -777,480 +895,37 @@ def api_index():
         "name": "Robot Reloj API",
         "version": "1.0",
         "endpoints": {
-            "status": "/api/status",
+            "ws": {
+                "control": "/ws/control",
+                "telemetry": "/ws/telemetry"
+            },
+            "tasks": {
+                "execute": "/api/tasks/execute",
+                "executions": "/api/executions",
+                "execution": "/api/execution/<execution_id>",
+                "stop": "/api/execution/<execution_id>/stop"
+            },
+            "config": "/api/config",
+            "ui_registry": "/api/ui/registry",
             "serial": {
                 "ports": "/api/serial/ports",
                 "open": "/api/serial/open",
                 "close": "/api/serial/close"
             },
-            "control": "/api/control",
-            "protocols": {
-                "list": "/api/protocols",
-                "execute": "/api/protocols/<name>/execute",
-                "status": "/api/protocols/status",
-                "stop": "/api/protocols/stop"
-            },
-            "tasks": {
-                "execute": "/api/tasks/execute",
-                "execute_id": "/api/tasks/<task_id>/execute",
-                "list": "/api/tasks"
+            "safety": {
+                "stop": "/api/stop",
+                "home": "/api/home",
+                "emergency": "/api/emergency_stop"
             }
         }
     })
 
 ## Versión mínima: sin rutas de UI
 
-@app.route("/api/status")
-def api_status():
-    """API para obtener estado del robot"""
-    status = get_robot_status()
-    return jsonify(asdict(status))
-
-@app.route("/api/status/stream")
-def api_status_stream():
-    """SSE: emite el estado del robot a ~5 Hz en formato event-stream."""
-    def _gen():
-        hb_ts = time.time()
-        while True:
-            try:
-                rs = get_robot_status()
-                payload = json.dumps(asdict(rs), ensure_ascii=False)
-                yield f"data: {payload}\n\n"
-                # Heartbeat cada 10s para mantener vivo detrás de proxies
-                now = time.time()
-                if now - hb_ts > 10.0:
-                    hb_ts = now
-                    yield ":keepalive\n\n"
-                time.sleep(0.2)  # 5 Hz
-            except GeneratorExit:
-                break
-            except Exception as exc:
-                logger.log(f"[SSE] error emitiendo estado: {exc}", "WARNING")
-                time.sleep(1.0)
-    resp = Response(stream_with_context(_gen()), mimetype="text/event-stream")
-    resp.headers["Cache-Control"] = "no-cache"
-    resp.headers["X-Accel-Buffering"] = "no"
-    return resp
-
-@app.route("/api/status/fresh")
-def api_status_fresh():
-    """API para obtener estado del robot forzando actualización de datos"""
-    global last_status_cache
-    # Limpiar caché para forzar actualización
-    last_status_cache = None
-    
-    # Forzar actualización de datos del robot
-    try:
-        with env_lock:
-            # Intentar obtener datos frescos del robot
-            obs_arr = robot_env._obs_now()
-            if obs_arr is not None:
-                obs = obs_arr.tolist()
-                _set_last_rx(" ".join(f"{v:.2f}" for v in obs))
-                print(f"[DEBUG] Datos frescos obtenidos: X={obs[0]}, A={obs[1]}, Z={obs[21] if len(obs) > 21 else 'N/A'}")
-            else:
-                print("[DEBUG] No se obtuvieron datos frescos del robot")
-    except Exception as e:
-        print(f"[DEBUG] Error obteniendo datos frescos: {e}")
-    
-    status = get_robot_status(force_fresh=True)
-    return jsonify(asdict(status))
-
-@app.route("/api/visual/frame")
-def api_visual_frame():
-    if visualizer is None:
-        logger.log("[Visualizer] unavailable (not initialized)", "WARNING")
-        return jsonify({"error": "visualizer unavailable"}), 503
-    frame = None
-    try:
-        frame = visualizer.render_frame()
-    except Exception as exc:
-        logger.log(f"[Visualizer] render exception: {exc}", "WARNING")
-        frame = None
-    if not frame:
-        detail = getattr(visualizer, "last_error", None)
-        if detail:
-            logger.log(f"[Visualizer] frame unavailable: {detail}", "WARNING")
-        return jsonify({"error": "frame unavailable", "detail": detail}), 503
-    mime = getattr(visualizer, "mimetype", "image/jpeg")
-    response = Response(frame, mimetype=mime)
-    response.headers["Cache-Control"] = "no-store"
-    return response
 
 
-@app.route("/api/visual/debug")
-def api_visual_debug():
-    if visualizer is None:
-        return jsonify({
-            "available": False,
-            "reason": "not initialized",
-            "imported": PyBulletVisualizer is not None,
-            "search_paths": [
-                str((BASE_DIR.parent / "Protocolo_Reloj" / "Reloj_1_description" / "urdf" / "Reloj_1.xacro").resolve()),
-                str((BASE_DIR / "Robot Virtual" / "Robot Virtual" / "urdf" / "Reloj_1.xacro").resolve()),
-            ],
-        })
-    info = {
-        "available": True,
-        "client_id": getattr(visualizer, "client_id", None),
-        "robot_id": getattr(visualizer, "robot_id", None),
-        "have_fallback": getattr(visualizer, "_have_fallback", False),
-        "mimetype": getattr(visualizer, "mimetype", None),
-        "last_error": getattr(visualizer, "last_error", None),
-        "size": [getattr(visualizer, "width", None), getattr(visualizer, "height", None)],
-        "urdf": getattr(visualizer, "robot_urdf", None),
-        "resolved_urdf": getattr(visualizer, "_debug_urdf_path", None),
-        "package_dir": getattr(visualizer, "_debug_pkg_dir", None),
-    }
-    return jsonify(info)
 
-
-@app.route("/api/visual/init", methods=["POST"])
-def api_visual_init():
-    ok = _start_visualizer()
-    return jsonify({"ok": ok, "available": visualizer is not None})
-
-
-@app.route("/api/visual/gui/status")
-def api_visual_gui_status():
-    return jsonify({"running": _pb_gui_is_running()})
-
-
-@app.route("/api/visual/gui/start", methods=["POST"])
-def api_visual_gui_start():
-    ok = _pb_gui_start()
-    if not ok:
-        return jsonify({"ok": False}), 500
-    return jsonify({"ok": True, "running": True})
-
-
-@app.route("/api/visual/gui/stop", methods=["POST"])
-def api_visual_gui_stop():
-    ok = _pb_gui_stop()
-    if not ok:
-        return jsonify({"ok": False}), 500
-    return jsonify({"ok": True, "running": False})
-
-@app.route("/api/debug/raw_obs")
-def api_debug_raw_obs():
-    """API para debug - obtener observaciones raw del robot"""
-    try:
-        with env_lock:
-            obs_arr = robot_env._obs_now()
-            if obs_arr is not None:
-                obs_list = obs_arr.tolist()
-                return jsonify({
-                    "raw_obs": obs_list,
-                    "length": len(obs_list),
-                    "x_mm": obs_list[0] if len(obs_list) > 0 else None,
-                    "a_deg": obs_list[1] if len(obs_list) > 1 else None,
-                    "z_mm": obs_list[21] if len(obs_list) > 21 else None,
-                    "timestamp": time.time()
-                })
-            else:
-                return jsonify({
-                    "raw_obs": None,
-                    "error": "No data available",
-                    "timestamp": time.time()
-                })
-    except Exception as e:
-        return jsonify({
-            "error": str(e),
-            "timestamp": time.time()
-        })
-
-def parse_robot_response(response_text):
-    """Parsea la respuesta del robot y la convierte a array de observaciones"""
-    try:
-        # Limpiar la respuesta
-        response = response_text.strip()
-        if response.startswith('.'):
-            response = response[1:]  # Quitar el punto inicial
-        if response.endswith(','):
-            response = response[:-1]  # Quitar la coma final
-        
-        # Dividir por comas y convertir a float
-        values = []
-        for val in response.split(','):
-            try:
-                values.append(float(val.strip()))
-            except ValueError:
-                values.append(0.0)
-        
-        # Rellenar con ceros si no hay suficientes valores
-        while len(values) < 22:
-            values.append(0.0)
-        
-        print(f"[DEBUG] Respuesta parseada: {values[:10]}... (total: {len(values)})")
-        return values
-        
-    except Exception as e:
-        print(f"[DEBUG] Error parseando respuesta: {e}")
-        return [0.0] * 22
-
-@app.route("/api/debug/force_update")
-def api_debug_force_update():
-    """API para debug - forzar actualización completa de datos"""
-    global last_status_cache, last_rx_ts, last_rx_text
-    
-    try:
-        # Limpiar todo el caché
-        last_status_cache = None
-        last_rx_ts = None
-        last_rx_text = None
-        
-        # Diagnóstico completo de la comunicación
-        debug_info = {
-            "serial_available": hasattr(robot_env, 'ser'),
-            "serial_open": False,
-            "serial_port": None,
-            "baudrate": None,
-            "queue_size": 0,
-            "last_rx_ts": last_rx_ts,
-            "last_rx_text": last_rx_text,
-            "obs_arr": None,
-            "obs_length": 0
-        }
-        
-        # Verificar estado de la comunicación serial
-        if hasattr(robot_env, 'ser'):
-            debug_info["serial_open"] = robot_env.ser.is_open if robot_env.ser else False
-            debug_info["serial_port"] = getattr(robot_env, 'port', None)
-            debug_info["baudrate"] = getattr(robot_env, 'baudrate', None)
-            
-            if hasattr(robot_env, 'q'):
-                debug_info["queue_size"] = robot_env.q.qsize()
-        
-        # Forzar actualización de datos
-        with env_lock:
-            # Intentar obtener datos frescos del sistema normal
-            obs_arr = robot_env._obs_now()
-            debug_info["obs_arr"] = obs_arr is not None
-            debug_info["obs_length"] = len(obs_arr) if obs_arr is not None else 0
-            
-            print(f"[DEBUG] Diagnóstico completo:")
-            print(f"  Serial disponible: {debug_info['serial_available']}")
-            print(f"  Serial abierto: {debug_info['serial_open']}")
-            print(f"  Puerto: {debug_info['serial_port']}")
-            print(f"  Baudrate: {debug_info['baudrate']}")
-            print(f"  Tamaño cola: {debug_info['queue_size']}")
-            print(f"  Última RX: {debug_info['last_rx_ts']}")
-            print(f"  Texto RX: {debug_info['last_rx_text']}")
-            print(f"  Obs array: {debug_info['obs_arr']}")
-            print(f"  Longitud obs: {debug_info['obs_length']}")
-            
-            # Si no hay datos del sistema normal, obtener datos directamente del serial
-            if obs_arr is None and debug_info["serial_open"]:
-                print("[DEBUG] Obteniendo datos directamente del serial...")
-                try:
-                    # Enviar comando STATUS y obtener respuesta
-                    robot_env.ser.write("STATUS\n".encode())
-                    robot_env.ser.flush()
-                    
-                    # Leer respuesta
-                    response = ""
-                    start_time = time.time()
-                    timeout = 1.0
-                    
-                    while time.time() - start_time < timeout:
-                        if robot_env.ser.in_waiting > 0:
-                            data = robot_env.ser.read(robot_env.ser.in_waiting)
-                            response += data.decode('utf-8', errors='ignore')
-                            if '\n' in response:
-                                break
-                        time.sleep(0.01)
-                    
-                    if response:
-                        print(f"[DEBUG] Respuesta directa del serial: {response.strip()}")
-                        obs = parse_robot_response(response.strip())
-                        obs_arr = np.array(obs, dtype=np.float32)
-                        debug_info["obs_arr"] = True
-                        debug_info["obs_length"] = len(obs)
-                        _set_last_rx(" ".join(f"{v:.2f}" for v in obs))
-                        print(f"[DEBUG] Datos parseados - X={obs[0]}, A={obs[1]}, Z={obs[21] if len(obs) > 21 else 'N/A'}")
-                except Exception as e:
-                    print(f"[DEBUG] Error obteniendo datos del serial: {e}")
-            
-            if obs_arr is not None:
-                obs = obs_arr.tolist()
-                print(f"[DEBUG] Force update: Datos frescos - X={obs[0]}, A={obs[1]}, Z={obs[21] if len(obs) > 21 else 'N/A'}")
-                
-                # Crear status directamente
-                status = RobotStatus()
-                status.serial_open = debug_info["serial_open"]
-                status.serial_port = debug_info["serial_port"]
-                status.baudrate = debug_info["baudrate"] or DEFAULT_BAUDRATE
-                
-                if len(obs) >= 21:
-                    status.x_mm = float(obs[0])
-                    status.a_deg = float(obs[1])
-                    status.volumen_ml = float(obs[3])
-                    status.lim_x = int(obs[4])
-                    status.lim_a = int(obs[5])
-                    status.homing_x = int(obs[6])
-                    status.homing_a = int(obs[7])
-                    status.modo = int(obs[11])
-                    status.kpX = float(obs[12])
-                    status.kiX = float(obs[13])
-                    status.kdX = float(obs[14])
-                    status.kpA = float(obs[15])
-                    status.kiA = float(obs[16])
-                    status.kdA = float(obs[17])
-                    status.pasosPorMM = float(obs[18])
-                    status.pasosPorGrado = float(obs[19])
-                
-                if len(obs) >= 22:
-                    status.z_mm = float(obs[21])
-                
-                return jsonify({
-                    "success": True,
-                    "status": asdict(status),
-                    "raw_obs": obs,
-                    "debug_info": debug_info,
-                    "timestamp": time.time()
-                })
-            else:
-                return jsonify({
-                    "success": False,
-                    "error": "No data available from robot",
-                    "debug_info": debug_info,
-                    "timestamp": time.time()
-                })
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "debug_info": debug_info if 'debug_info' in locals() else {},
-            "timestamp": time.time()
-        })
-
-@app.route("/api/debug/serial_connect")
-def api_debug_serial_connect():
-    """API para abrir la conexión serial automáticamente"""
-    try:
-        # Verificar si ya está abierto
-        if hasattr(robot_env, 'ser') and robot_env.ser and robot_env.ser.is_open:
-            return jsonify({
-                "success": True,
-                "message": "Puerto serial ya está abierto",
-                "port": robot_env.port,
-                "baudrate": getattr(robot_env, 'baudrate', DEFAULT_BAUDRATE),
-                "timestamp": time.time()
-            })
-        
-        # Intentar abrir la conexión serial
-        port = robot_env.port or "COM3"
-        baudrate = getattr(robot_env, 'baudrate', DEFAULT_BAUDRATE) or DEFAULT_BAUDRATE
-        
-        print(f"[DEBUG] Intentando abrir puerto serial: {port} @ {baudrate}")
-        
-        # Importar serial si no está disponible
-        try:
-            import serial
-        except ImportError:
-            return jsonify({
-                "success": False,
-                "error": "Módulo serial no disponible",
-                "timestamp": time.time()
-            })
-        
-        # Crear conexión serial
-        ser = serial.Serial(port, baudrate, timeout=1)
-        robot_env.ser = ser
-        robot_env.port = port
-        robot_env.baudrate = baudrate
-        
-        # Esperar un poco para que se establezca la conexión
-        time.sleep(0.5)
-        
-        return jsonify({
-            "success": True,
-            "message": "Puerto serial abierto exitosamente",
-            "port": port,
-            "baudrate": baudrate,
-            "timestamp": time.time()
-        })
-        
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Error abriendo puerto serial: {str(e)}",
-            "timestamp": time.time()
-        })
-
-@app.route("/api/debug/serial_test")
-def api_debug_serial_test():
-    """API para probar la comunicación serial con el robot"""
-    try:
-        # Primero intentar abrir la conexión si no está abierta
-        if not hasattr(robot_env, 'ser') or not robot_env.ser or not robot_env.ser.is_open:
-            # Intentar abrir automáticamente
-            connect_response = api_debug_serial_connect()
-            if not connect_response[0].get('success', False):
-                return jsonify({
-                    "success": False,
-                    "error": "No se pudo abrir el puerto serial",
-                    "connect_error": connect_response[0].get('error', 'Unknown error'),
-                    "timestamp": time.time()
-                })
-        
-        # Enviar comando de prueba al robot
-        test_command = "STATUS\n"
-        robot_env.ser.write(test_command.encode())
-        robot_env.ser.flush()
-        
-        # Esperar respuesta
-        response = ""
-        start_time = time.time()
-        timeout = 2.0  # 2 segundos de timeout
-        
-        while time.time() - start_time < timeout:
-            if robot_env.ser.in_waiting > 0:
-                data = robot_env.ser.read(robot_env.ser.in_waiting)
-                response += data.decode('utf-8', errors='ignore')
-                if '\n' in response:
-                    break
-            time.sleep(0.01)
-        
-        return jsonify({
-            "success": True,
-            "command_sent": test_command.strip(),
-            "response": response.strip(),
-            "response_length": len(response),
-            "timeout_reached": time.time() - start_time >= timeout,
-            "timestamp": time.time()
-        })
-        
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "timestamp": time.time()
-        })
-
-@app.route("/api/health")
-def api_health():
-    """API de salud del sistema"""
-    # Verificar estado de conexión
-    connection_status = "disconnected"
-    try:
-        if hasattr(robot_env, 'ser') and robot_env.ser and robot_env.ser.is_open:
-            connection_status = "connected"
-        else:
-            connection_status = "disconnected"
-    except:
-        connection_status = "error"
-    
-    return jsonify({
-        "status": "ok",
-        "timestamp": datetime.now().isoformat(),
-        "version": "2.0 Compatible",
-        "robot_connection": connection_status,
-        "serial_port": robot_env.port
-    })
-
-# === CONFIG ENDPOINT ===
-
+# PROMPT(config): exponer solo parámetros necesarios para el hub
 @app.route("/api/config", methods=["GET"])
 def api_config():
     """Devuelve configuración básica necesaria para la UI mínima."""
@@ -1260,21 +935,16 @@ def api_config():
         "robot_connected": getattr(robot_env, 'ser', None) is not None and getattr(robot_env.ser, 'is_open', False)
     })
 
-# === SETTINGS (guardar/cargar) ===
-
-def _load_settings_dict() -> dict:
+@app.route("/api/ui/registry", methods=["GET"])
+def api_ui_registry():
+    """Entrega el registro de widgets para que una UI dinámica se construya sola."""
     try:
-        txt = SETTINGS_FILE.read_text(encoding="utf-8")
-        return json.loads(txt or "{}")
+        reg_path = (STATIC_DIR / "components" / "registry" / "reloj.json")
+        if reg_path.exists():
+            return jsonify(json.loads(reg_path.read_text(encoding="utf-8")))
     except Exception:
-        return {}
-
-def _save_settings_dict(d: dict) -> bool:
-    try:
-        SETTINGS_FILE.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
-        return True
-    except Exception:
-        return False
+        pass
+    return jsonify({"widgets": []})
 
 @app.route("/api/settings", methods=["GET"])  # carga
 def api_settings_get():
@@ -1303,397 +973,205 @@ def api_settings_save():
 # (bloque duplicado eliminado; se conservan las definiciones originales)
 
 # =============================================================================
-# RUTAS DE CONTROL DEL ROBOT (CORREGIDAS PARA COMPATIBILIDAD)
+# CONTROL VIA WEBSOCKET
 # =============================================================================
 
-@app.route("/api/control", methods=["POST"])
-def api_control():
-    """API para control del robot"""
-    try:
-        if not _is_serial_connected():
-            logger.log("/api/control rechazado: serial desconectado", "WARN")
-            return jsonify({
-                "error": "Serial desconectado. No se pueden enviar comandos.",
-                "robot_connection": "disconnected"
-            }), 409
-        data = get_request_data()
-        logger.log(f"/api/control payload: {data}")
-        logger.log(f"Control recibido: {data}")
-        
-        with env_lock:
-            # Setpoints (USANDO MÉTODOS CORRECTOS)
-            if "setpoints" in data:
-                sp = data["setpoints"]
-                if "x_mm" in sp:
-                    robot_env.set_corredera_mm(float(sp["x_mm"]))  # ✅ Método correcto
-                if "a_deg" in sp:
-                    robot_env.set_angulo_deg(float(sp["a_deg"]))    # ✅ Método correcto
-                if "volumen_ml" in sp:
-                    robot_env.set_volumen_objetivo_ml(float(sp["volumen_ml"]))  # ✅ Método correcto
-                # Z: puede venir en mm o grados
-                if "z_mm" in sp:
-                    robot_env.set_z_mm(float(sp["z_mm"]))
-                if "servo_z_deg" in sp:
-                    robot_env.set_servo_z_deg(float(sp["servo_z_deg"]))
-            
-            # Energías manuales (USANDO MÉTODOS CORRECTOS)
-            if "energies" in data:
-                en = data["energies"]
-                if "x" in en:
-                    robot_env.set_energia_corredera(int(en["x"]))  # ✅ Método correcto
-                if "a" in en:
-                    robot_env.set_energia_angulo(int(en["a"]))     # ✅ Método correcto
-                if "bomba" in en:
-                    robot_env.set_energia_bomba(int(en["bomba"]))  # ✅ Método correcto
+TELEMETRY_INTERVAL = float(os.environ.get("RELOJ_TELEMETRY_INTERVAL", "0.2"))
 
-            # Movimiento (velocidad Z en deg/s)
-            if "motion" in data:
-                mv = data["motion"] or {}
-                if "z_speed_deg_s" in mv:
-                    robot_env.set_servo_z_speed(float(mv["z_speed_deg_s"]))
-            
-            # PID (USANDO MÉTODOS CORRECTOS)
-            if "pid_settings" in data:
-                pid_settings = data["pid_settings"]
-                if "pidX" in pid_settings:
-                    pid = pid_settings["pidX"]
-                    if all(k in pid for k in ["kp", "ki", "kd"]):
-                        robot_env.set_pid_corredera(
-                            float(pid["kp"]), float(pid["ki"]), float(pid["kd"])
-                        )  # ✅ Método correcto
-                
-                if "pidA" in pid_settings:
-                    pid = pid_settings["pidA"]
-                    if all(k in pid for k in ["kp", "ki", "kd"]):
-                        robot_env.set_pid_angulo(
-                            float(pid["kp"]), float(pid["ki"]), float(pid["kd"])
-                        )  # ✅ Método correcto
 
-            # Calibración (pasos/mm y pasos/grado)
-            if "calibration" in data:
-                calib = data["calibration"] or {}
-                if "steps_mm" in calib:
-                    robot_env.set_pasos_por_mm(float(calib["steps_mm"]))
-                if "steps_deg" in calib:
-                    robot_env.set_pasos_por_grado(float(calib["steps_deg"]))
-
-            # Flujo (sensor y caudal)
-            if "flow" in data:
-                fl = data["flow"] or {}
-                if "usar_sensor_flujo" in fl:
-                    robot_env.set_usar_sensor_flujo(bool(int(fl["usar_sensor_flujo"])) if isinstance(fl["usar_sensor_flujo"], (int, str)) else bool(fl["usar_sensor_flujo"]))
-                if "caudal_bomba_mls" in fl:
-                    robot_env.set_caudal_bomba_ml_s(float(fl["caudal_bomba_mls"]))
-            
-            # Modo (USANDO MÉTODOS CORRECTOS)
-            if "modo" in data:
-                modo = int(data["modo"])
-                robot_env.set_modo(
-                    mx=bool(modo & 1),
-                    ma=bool(modo & 2)
-                )  # ✅ Método correcto
-            
-            # Resets (USANDO MÉTODOS CORRECTOS)
-            if data.get("reset_volumen"):
-                robot_env.reset_volumen()  # ✅ Método correcto
-            if data.get("reset_x"):
-                robot_env.reset_x()        # ✅ Método correcto
-            if data.get("reset_a"):
-                robot_env.reset_a()        # ✅ Método correcto
-            
-            # Aplicar cambios
-            robot_env.step()
-            _set_last_tx(json.dumps(data))
-        
-        # Preparar respuesta con comandos aplicados
-        commands_applied = {}
+def apply_control_payload(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Aplica un payload de control directo sobre el robot."""
+    if not _is_serial_connected():
+        raise RuntimeError("Serial desconectado. No se pueden enviar comandos.")
+    logger.log(f"[control] payload: {data}")
+    # PROMPT(ws/control): definir handshake, payloads y reintentos
+    with env_lock:
         if "setpoints" in data:
-            commands_applied["setpoints"] = data["setpoints"]
+            sp = data["setpoints"] or {}
+            if "x_mm" in sp:
+                robot_env.set_corredera_mm(float(sp["x_mm"]))
+            if "a_deg" in sp:
+                robot_env.set_angulo_deg(float(sp["a_deg"]))
+            if "volumen_ml" in sp:
+                robot_env.set_volumen_objetivo_ml(float(sp["volumen_ml"]))
+            if "z_mm" in sp:
+                robot_env.set_z_mm(float(sp["z_mm"]))
+            if "servo_z_deg" in sp:
+                robot_env.set_servo_z_deg(float(sp["servo_z_deg"]))
+
         if "energies" in data:
-            commands_applied["energies"] = data["energies"]
+            en = data["energies"] or {}
+            if "x" in en:
+                robot_env.set_energia_corredera(int(en["x"]))
+            if "a" in en:
+                robot_env.set_energia_angulo(int(en["a"]))
+            if "bomba" in en:
+                robot_env.set_energia_bomba(int(en["bomba"]))
+
         if "motion" in data:
-            commands_applied["motion"] = data["motion"]
+            mv = data["motion"] or {}
+            if "z_speed_deg_s" in mv:
+                robot_env.set_servo_z_speed(float(mv["z_speed_deg_s"]))
+
         if "pid_settings" in data:
-            commands_applied["pid_settings"] = data["pid_settings"]
+            pid_settings = data["pid_settings"] or {}
+            pid_x = pid_settings.get("pidX")
+            pid_a = pid_settings.get("pidA")
+            if pid_x and all(k in pid_x for k in ("kp", "ki", "kd")):
+                robot_env.set_pid_corredera(float(pid_x["kp"]), float(pid_x["ki"]), float(pid_x["kd"]))
+            if pid_a and all(k in pid_a for k in ("kp", "ki", "kd")):
+                robot_env.set_pid_angulo(float(pid_a["kp"]), float(pid_a["ki"]), float(pid_a["kd"]))
+
+        if "calibration" in data:
+            calib = data["calibration"] or {}
+            if "steps_mm" in calib:
+                robot_env.set_pasos_por_mm(float(calib["steps_mm"]))
+            if "steps_deg" in calib:
+                robot_env.set_pasos_por_grado(float(calib["steps_deg"]))
+
+        if "flow" in data:
+            fl = data["flow"] or {}
+            if "usar_sensor_flujo" in fl:
+                val = fl["usar_sensor_flujo"]
+                robot_env.set_usar_sensor_flujo(bool(int(val)) if isinstance(val, (int, str)) else bool(val))
+            if "caudal_bomba_mls" in fl:
+                robot_env.set_caudal_bomba_ml_s(float(fl["caudal_bomba_mls"]))
+
         if "modo" in data:
-            commands_applied["modo"] = data["modo"]
-        
-        return jsonify({
-            "status": "ok",
-            "timestamp": datetime.now().isoformat(),
-            "commands_applied": commands_applied
-        })
-        
-    except Exception as e:
-        logger.log(f"Error en control: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
+            modo = int(data["modo"])
+            robot_env.set_modo(mx=bool(modo & 1), ma=bool(modo & 2))
 
-# =============================================================================
-# ENDPOINTS DE POLÍTICAS Y SCHEDULER
-# =============================================================================
+        if data.get("reset_volumen"):
+            robot_env.reset_volumen()
+        if data.get("reset_x"):
+            robot_env.reset_x()
+        if data.get("reset_a"):
+            robot_env.reset_a()
 
-@app.route("/api/command_policy", methods=["POST"])
-def api_command_policy():
-    try:
-        data = get_request_data() or {}
-        pol = str(data.get("policy", "stop_only"))
-        with env_lock:
-            robot_env.set_command_policy(pol)
-        return jsonify({"status": "ok", "policy": pol})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/scheduler", methods=["POST"])
-def api_scheduler_toggle():
-    try:
-        data = get_request_data() or {}
-        ena = bool(data.get("enabled", True))
-        with env_lock:
-            robot_env.set_scheduler_enabled(ena)
-        return jsonify({"status": "ok", "enabled": ena})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-
-
-
-
-@app.route("/api/protocols/<name>/execute", methods=["POST"])
-def api_execute_protocol(name: str):
-    """Activa el protocolo step-wise en el runner (reemplaza al anterior)."""
-    try:
-        if not _is_serial_connected():
-            logger.log(f"/api/protocols/{name}/execute rechazado: serial desconectado", "WARN")
-            return jsonify({"error": "Serial desconectado"}), 409
-        data = get_request_data()
-        logger.log(f"/api/protocols/{name}/execute payload: {data}")
-        
-        # Usar el payload completo como parámetros del protocolo
-        # El payload ya contiene x_mm, a_deg, threshold, etc.
-        params = data.copy() if data else {}
-        
-        # Permitir timeout y objetivos con umbral desde el body
-        # params: { timeout_seconds?, target_x_mm?, target_a_deg?, threshold_x_mm?, threshold_a_deg? }
-        # Permitir comandos durante ejecución de protocolo para que funcione
+        robot_env.step()
         try:
-            with env_lock:
-                robot_env.set_command_policy("all")
+            _set_last_tx(json.dumps(data, ensure_ascii=False))
         except Exception:
-            pass
-        protocol_runner.activate(name, params=params)
-        logger.log(f"Protocolo '{name}' activado en runner")
-        st = protocol_runner.status()
-        return jsonify({
-            "status": "running" if st.activo else "stopped",
-            "name": st.nombre,
-            "started_at": st.started_at,
-            "elapsed_s": st.elapsed_s,
-            "done": st.done,
-            "last_log": st.last_log
-        })
-    except Exception as e:
-        logger.log(f"Error activando protocolo: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
+            _set_last_tx(str(data))
 
-@app.route("/api/protocols/status", methods=["GET"])
-def api_protocol_status():
-    """Consulta estado del protocolo activo del runner."""
-    st = protocol_runner.status()
-    return jsonify({
-        "status": "running" if st.activo else "stopped",
-        "name": st.nombre,
-        "started_at": st.started_at,
-        "elapsed_s": st.elapsed_s,
-        "done": st.done,
-        "last_log": st.last_log,
-        "final_obs": st.final_obs,
-        "execution_history": st.execution_history,
-        "sensor_config": st.sensor_config
-    })
-
-@app.route("/api/protocols/stop", methods=["POST"])
-def api_protocol_stop():
-    """Detiene el protocolo activo del runner (parada segura)."""
-    protocol_runner.stop()
-    return jsonify({"status": "stopped"})
-
-@app.route("/api/protocols/execute_direct", methods=["POST"])
-def api_execute_protocol_direct():
-    """Ejecuta un protocolo directamente sin guardarlo - para pruebas rápidas"""
-    try:
-        data = get_request_data()
-        codigo = data.get("code")
-        if not codigo:
-            return jsonify({"error": "Se requiere 'code' para ejecución directa"}), 400
-        
-        params = data.get("params", {})
-        
-        # Permitir comandos durante ejecución de tarea para que funcione
-        try:
-            with env_lock:
-                robot_env.set_command_policy("all")
-        except Exception:
-            pass
-        
-        # Ejecutar protocolo directamente
-        temp_name = protocol_runner.execute_direct(codigo, params)
-        logger.log(f"Protocolo temporal '{temp_name}' ejecutado directamente")
-        
-        # Esperar a que termine y obtener estado final
-        time.sleep(0.5)  # Pequeña espera para que termine
-        st = protocol_runner.status()
-        
-        return jsonify({
-            "status": "completed",
-            "temp_name": temp_name,
-            "name": st.nombre,
-            "started_at": st.started_at,
-            "elapsed_s": st.elapsed_s,
-            "done": st.done,
-            "last_log": st.last_log,
-            "final_obs": st.final_obs,
-            "execution_history": st.execution_history,
-            "sensor_config": st.sensor_config
-        })
-        
-    except Exception as e:
-        logger.log(f"Error en ejecución directa: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/protocols/configure_sensors", methods=["POST"])
-def api_configure_sensors():
-    """Configura qué sensores devolver al cliente"""
-    try:
-        data = get_request_data()
-        sensor_config = data.get("sensor_config", {})
-        
-        # Validar configuración de sensores
-        valid_sensors = {
-            "x_mm", "a_deg", "z_mm", "modo", "energia_x", "energia_a", "energia_bomba",
-            "volumen_ml", "caudal_est_mls", "flow_est", "homing_x", "homing_a",
-            "lim_x", "lim_a", "servo_z_deg", "usar_sensor_flujo", "baudrate",
-            "pasos_por_mm", "pasos_por_grado", "kp_x", "ki_x", "kd_x",
-            "kp_a", "ki_a", "kd_a", "rx_age_ms", "serial_open", "stale"
+    commands_applied: Dict[str, Any] = {}
+    for key in ("setpoints", "energies", "motion", "pid_settings", "calibration", "flow", "modo"):
+        if key in data:
+            commands_applied[key] = data[key]
+    if data.get("reset_volumen") or data.get("reset_x") or data.get("reset_a"):
+        commands_applied["reset"] = {
+            "volumen": bool(data.get("reset_volumen")),
+            "x": bool(data.get("reset_x")),
+            "a": bool(data.get("reset_a")),
         }
-        
-        # Filtrar solo sensores válidos
-        filtered_config = {}
-        for sensor, enabled in sensor_config.items():
-            if sensor in valid_sensors:
-                filtered_config[sensor] = bool(enabled)
-        
-        # Aplicar configuración al runner actual
-        if hasattr(protocol_runner, '_sensor_config'):
-            protocol_runner._sensor_config.update(filtered_config)
-        
-        logger.log(f"Configuración de sensores actualizada: {filtered_config}")
-        
-        return jsonify({
-            "status": "configured",
-            "sensor_config": filtered_config,
-            "message": f"Configuración aplicada. {len(filtered_config)} sensores configurados."
-        })
-        
-    except Exception as e:
-        logger.log(f"Error configurando sensores: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
+    return {
+        "commands_applied": commands_applied,
+        "serial": {
+            "port": robot_env.port if robot_env else None,
+            "baudrate": getattr(robot_env, "baudrate", DEFAULT_BAUDRATE),
+        },
+    }
 
-# =============================================================================
-# CRUD DE PROTOCOLOS (Compatibilidad con la UI)
-# =============================================================================
 
-@app.route("/api/protocols", methods=["GET"])
-def api_list_protocols():
-    """Lista restringida: solo 'riego_basico' con metadata de parámetros."""
+@sock.route("/ws/control")
+def ws_control(ws):
+    """Canal principal para control manual del robot."""
+    session_id = f"ctrl-{int(time.time()*1000)}"
+    logger.log(f"[ws/control] sesión abierta ({session_id})")
+    hello = {
+        "type": "control_ready",
+        "robot_id": active_robot_id,
+        "kind": ROBOT_PROFILES.get(active_robot_id or "real", {}).get("kind", "hardware"),
+        "ts": datetime.utcnow().isoformat(),
+    }
     try:
-        return jsonify({
-            "protocols": ["riego_basico", "ir_posicion"],
-            "meta": {
-                "riego_basico": {
-                    "label": "Riego básico",
-                    "params": {
-                        "x_mm": {"type": "number", "min": 0, "max": 400, "step": 0.5, "label": "X (mm)", "default": 0},
-                        "a_deg": {"type": "number", "min": 0, "max": 360, "step": 0.5, "label": "A (°)", "default": 0},
-                        "volume_ml": {"type": "number", "min": 0, "max": 1000, "step": 1, "label": "Volumen (ml)", "default": 50},
-                        "intensity": {"type": "number", "min": 0, "max": 255, "step": 1, "label": "Intensidad", "default": 100}
-                    },
-                    "reward": {
-                        "defaults": {"key": "volumen_ml", "threshold": 0, "expr": "", "cumulative": True},
-                        "suggested_keys": ["volumen_ml", "flow_est", "caudal_est_mls"]
-                    }
-                },
-                "ir_posicion": {
-                    "label": "Ir a posición",
-                    "params": {
-                        "x_mm": {"type": "number", "min": 0, "max": 400, "step": 0.5, "label": "X (mm)", "default": 0},
-                        "a_deg": {"type": "number", "min": 0, "max": 360, "step": 0.5, "label": "A (°)", "default": 0},
-                        "threshold": {"type": "number", "min": 0, "max": 10, "step": 0.1, "label": "Umbral (mm)", "default": 1.0}
-                    },
-                    "reward": {
-                        "defaults": {"key": "", "threshold": 0, "expr": "", "cumulative": True},
-                        "suggested_keys": ["x_mm", "a_deg", "volumen_ml"]
-                    }
-                }
+        ws.send(json.dumps(hello, ensure_ascii=False))
+    except Exception:
+        pass
+    try:
+        while True:
+            raw = ws.receive()
+            if raw is None:
+                continue
+            try:
+                payload = json.loads(raw)
+            except Exception as exc:
+                ws.send(json.dumps({"type": "control_ack", "status": "error", "error": f"invalid_json: {exc}"}))
+                continue
+            if isinstance(payload, dict) and payload.get("type") == "ping":
+                ws.send(json.dumps({"type": "pong", "ts": datetime.utcnow().isoformat()}))
+                continue
+            body = payload.get("body") if isinstance(payload, dict) and "body" in payload else payload
+            if not isinstance(body, dict):
+                ws.send(json.dumps({"type": "control_ack", "status": "error", "error": "body_required"}))
+                continue
+            try:
+                result = apply_control_payload(body)
+                ws.send(json.dumps({
+                    "type": "control_ack",
+                    "status": "ok",
+                    "ts": datetime.utcnow().isoformat(),
+                    "body": result,
+                }, ensure_ascii=False))
+            except Exception as exc:
+                logger.log(f"[ws/control] error: {exc}", "ERROR")
+                ws.send(json.dumps({"type": "control_ack", "status": "error", "error": str(exc)}))
+    except ConnectionClosed:
+        logger.log(f"[ws/control] sesión cerrada ({session_id})", "INFO")
+    except Exception as exc:
+        logger.log(f"[ws/control] fallo crítico ({session_id}): {exc}", "ERROR")
+        try:
+            ws.send(json.dumps({"type": "control_ack", "status": "error", "error": str(exc)}))
+        except Exception:
+            pass
+    finally:
+        try:
+            ws.close()
+        except Exception:
+            pass
+
+
+@sock.route("/ws/telemetry")
+def ws_telemetry(ws):
+    """Canal SSE->WS para telemetría periódica."""
+    # PROMPT(ws/telemetry): campos mínimos (ts, axes, energies, tasks)
+    session_id = f"tele-{int(time.time()*1000)}"
+    logger.log(f"[ws/telemetry] sesión abierta ({session_id})")
+    try:
+        ws.send(json.dumps({
+            "type": "telemetry_ready",
+            "robot_id": active_robot_id,
+            "interval_s": TELEMETRY_INTERVAL,
+            "ts": datetime.utcnow().isoformat(),
+        }, ensure_ascii=False))
+        while True:
+            status = get_robot_status()
+            payload = {
+                "type": "telemetry",
+                "ts": datetime.utcnow().isoformat(),
+                "robot_id": active_robot_id,
+                "status": asdict(status),
             }
-        })
-    except Exception as e:
-        logger.log(f"Error listando protocolos: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/areas", methods=["GET"])
-def api_areas_stub():
-    """Compat: algunas vistas piden /api/areas; devolvemos lista vacía."""
-    return jsonify([])
-
-@app.route("/api/protocols/<name>/vars", methods=["POST"])
-def api_protocol_update_vars(name: str):
-    """Actualiza en vivo los vars del protocolo activo (ctx.vars)."""
-    try:
-        data = get_request_data() or {}
-        params = data.get("params") or {}
-        if not isinstance(params, dict):
-            return jsonify({"error": "'params' debe ser objeto"}), 400
-        st = protocol_runner.status()
-        if not st.activo:
-            return jsonify({"error": "No hay protocolo activo"}), 400
-        if hasattr(protocol_runner, 'update_vars'):
-            protocol_runner.update_vars(params)
-        return jsonify({"status": "vars_updated", "protocol": st.nombre, "applied": params})
-    except Exception as e:
-        logger.log(f"Error actualizando vars: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/protocols/<name>", methods=["GET"])
-def api_get_protocol(name: str):
-    """Obtiene el código fuente del protocolo permitido desde disco."""
-    try:
-        if name not in ("riego_basico", "ir_posicion"):
-            return jsonify({"error": "Protocolo deshabilitado"}), 404
-        # Leer directamente el archivo del protocolo
-        proto_path = PROTOCOLS_DIR / f"{name}.py"
-        if not proto_path.exists():
-            return jsonify({"error": "Protocolo no encontrado"}), 404
-        with open(proto_path, "r", encoding="utf-8") as f:
-            code = f.read()
-        return jsonify({"name": name, "code": code})
-    except Exception as e:
-        logger.log(f"Error obteniendo protocolo: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/protocols", methods=["POST"])
-def api_save_protocol():
-    """Deshabilitado: no se permite guardar otros protocolos."""
-    return jsonify({"error": "Guardar protocolos está deshabilitado en modo simplificado"}), 404
-
-@app.route("/api/protocols/<name>", methods=["DELETE"])
-def api_delete_protocol(name: str):
-    """Deshabilitado en modo simplificado."""
-    return jsonify({"error": "Eliminar protocolos está deshabilitado"}), 404
+            ws.send(json.dumps(payload, ensure_ascii=False))
+            time.sleep(max(0.05, TELEMETRY_INTERVAL))
+    except ConnectionClosed:
+        logger.log(f"[ws/telemetry] sesión cerrada ({session_id})", "INFO")
+    except Exception as exc:
+        logger.log(f"[ws/telemetry] error ({session_id}): {exc}", "ERROR")
+        try:
+            ws.send(json.dumps({"type": "telemetry_error", "error": str(exc)}))
+        except Exception:
+            pass
+    finally:
+        try:
+            ws.close()
+        except Exception:
+            pass
 
 # =============================================================================
-# NUEVOS ENDPOINTS PARA ARQUITECTURA UNIFICADA
+# ENDPOINTS HTTP PARA TAREAS
 # =============================================================================
-
+# PROMPT(tasks-http): validar payloads y mapear a ProtocolRunner
 @app.route("/api/tasks/execute", methods=["POST"])
 def api_execute_task_v2():
     """Nuevo endpoint para ejecutar tareas con arquitectura unificada"""
@@ -1918,94 +1396,6 @@ def _track_exec_end(eid: str, status: str):
         if len(_recent_exec) > 50:
             _recent_exec[:] = _recent_exec[:50]
 
-@app.route("/api/execute", methods=["POST"])
-def api_execute_compat():
-    """Endpoint de compatibilidad que mapea a /api/tasks/execute."""
-    try:
-        data = get_request_data() or {}
-        typ = (data.get("type") or "").lower()
-        timeout_seconds = float(data.get("timeout_seconds", 25.0))
-
-        if typ == "protocol":
-            prot = data.get("id")
-            if prot != "riego_basico":
-                return jsonify({"error": "Solo 'riego_basico' está habilitado"}), 400
-            params = data.get("params", {})
-            duration = float(data.get("duration", 10.0))
-            # delegar a tareas v2 async
-            payload = {
-                "name": f"Run {prot}",
-                "protocol_name": prot,
-                "duration_seconds": duration,
-                "timeout_seconds": timeout_seconds,
-                "params": params,
-                "mode": "async"
-            }
-            # ejecutar directamente y devolver execution_id
-            with app.test_request_context(json=payload):
-                resp = api_execute_task_v2().json
-            eid = resp.get("execution_id") or resp.get("task_id") or _track_exec_start("protocol", prot)
-            # track local (para UI legacy) y enlazar con TaskExecutor
-            if eid and eid not in _active_exec:
-                _track_exec_start("protocol", prot)
-            return jsonify({"execution_id": eid})
-
-        if typ == "task":
-            task_id = data.get("id") or ""
-            # Ejecutar la tarea programada ahora a través del scheduler si existe
-            try:
-                result = task_scheduler.execute_task_now(task_id, ExecutionMode.ASYNC)
-                eid = str(result)
-            except Exception:
-                # fallback: ejecutar como protocolo con params de la tarea guardada
-                if _tasks_mgr is None:
-                    return jsonify({"error": "Tarea no encontrada"}), 404
-                try:
-                    t = _tasks_mgr.get_tarea(task_id)
-                except Exception:
-                    return jsonify({"error": "Tarea no encontrada"}), 404
-                prot = t.get("protocolo") or t.get("protocol")
-                params = t.get("params") or {}
-                duration = float(t.get("duration_seconds") or 10.0)
-                payload = {
-                    "name": t.get("nombre") or task_id,
-                    "protocol_name": prot,
-                    "duration_seconds": duration,
-                    "timeout_seconds": timeout_seconds,
-                    "params": params,
-                    "mode": "async"
-                }
-                with app.test_request_context(json=payload):
-                    resp = api_execute_task_v2().json
-                eid = resp.get("execution_id") or _track_exec_start("task", task_id)
-            # track
-            if eid and eid not in _active_exec:
-                _track_exec_start("task", task_id)
-            return jsonify({"execution_id": eid})
-
-        if typ == "immediate":
-            action_type = data.get("action_type") or "irrigation"
-            duration = float(data.get("duration", 5.0))
-            payload = {
-                "name": f"Immediate {action_type}",
-                "protocol_name": "riego_basico",
-                "duration_seconds": duration,
-                "timeout_seconds": timeout_seconds,
-                "params": data.get("params", {}),
-                "mode": "async"
-            }
-            with app.test_request_context(json=payload):
-                resp = api_execute_task_v2().json
-            eid = resp.get("execution_id") or _track_exec_start("immediate", action_type)
-            if eid and eid not in _active_exec:
-                _track_exec_start("immediate", action_type)
-            return jsonify({"execution_id": eid})
-
-        return jsonify({"error": "Tipo no soportado"}), 400
-    except Exception as e:
-        logger.log(f"Error en /api/execute: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
 @app.route("/api/executions", methods=["GET"])
 def api_executions_list():
     with _exec_lock:
@@ -2039,72 +1429,6 @@ def api_execution_get(execution_id: str):
             return jsonify({"error": "No encontrado"}), 404
         return jsonify(item)
 
-@app.route("/api/execution/<execution_id>/history", methods=["GET"])
-def api_execution_history(execution_id: str):
-    """Devuelve historial de observaciones con timestamp, filtrable por sensores.
-    Params opcionales:
-      - sensors: lista separada por comas (ej. x_mm,a_deg,volumen_ml)
-      - limit: máximo de muestras (por defecto 100)
-      - since_ts: epoch seconds; devuelve muestras con timestamp > since_ts
-    """
-    try:
-        sensors_q = (request.args.get("sensors") or "").strip()
-        wanted = [s.strip() for s in sensors_q.split(",") if s.strip()]
-        limit = int(request.args.get("limit", 100))
-        since_ts = request.args.get("since_ts")
-        try:
-            since_ts = float(since_ts) if since_ts is not None else None
-        except Exception:
-            since_ts = None
-
-        st = protocol_runner.status()
-        hist = st.execution_history or []
-        # Filtrar por since_ts
-        if since_ts is not None:
-            hist = [h for h in hist if (h.get("timestamp") or 0) > since_ts]
-        # Limitar
-        if limit and limit > 0:
-            hist = hist[-limit:]
-        # Seleccionar sensores
-        def pick(d):
-            if not isinstance(d, dict):
-                return {}
-            out = {"timestamp": d.get("timestamp")}
-            if wanted:
-                for k in wanted:
-                    if k in d:
-                        out[k] = d[k]
-            else:
-                out.update(d)
-            return out
-
-        data = [pick(h) for h in hist]
-        last_ts = data[-1]["timestamp"] if data else None
-        return jsonify({"execution_id": execution_id, "count": len(data), "last_ts": last_ts, "samples": data})
-    except Exception as e:
-        logger.log(f"Error en /api/execution/history: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/execution/protocolo_activo", methods=["GET"])
-def api_execution_protocolo_activo():
-    """Endpoint especial para 'protocolo_activo' que devuelve el estado del protocolo runner."""
-    try:
-        st = protocol_runner.status()
-        return jsonify({
-            "execution_id": "protocolo_activo",
-            "status": "running" if st.activo else "stopped",
-            "protocol_name": st.nombre,
-            "started_at": st.started_at,
-            "elapsed_s": st.elapsed_s,
-            "done": st.done,
-            "last_log": st.last_log,
-            "type": "protocol",
-            "target_id": st.nombre
-        })
-    except Exception as e:
-        logger.log(f"Error en /api/execution/protocolo_activo: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
 @app.route("/api/execution/<execution_id>/stop", methods=["POST"])
 def api_execution_stop(execution_id: str):
     try:
@@ -2122,372 +1446,19 @@ def api_execution_stop(execution_id: str):
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@app.route("/api/tasks/status/<task_id>", methods=["GET"])
-def api_task_status_v2(task_id: str):
-    """Consulta el estado de una tarea"""
-    try:
-        status = task_executor.get_task_status(task_id)
-        if status is None:
-            return jsonify({"error": "Tarea no encontrada"}), 404
-        
-        return jsonify({
-            "task_id": status.task_id,
-            "status": status.status.value,
-            "started_at": status.started_at,
-            "ended_at": status.ended_at,
-            "duration": status.duration,
-            "result": status.result,
-            "error": status.error,
-            "log": status.log,
-            "progress": status.progress
-        })
-        
-    except Exception as e:
-        logger.log(f"Error consultando estado de tarea: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/tasks/stop/<task_id>", methods=["POST"])
-def api_stop_task_v2(task_id: str):
-    """Detiene una tarea en ejecución"""
-    try:
-        if task_executor.stop_task(task_id):
-            return jsonify({
-                "status": "stopped",
-                "task_id": task_id,
-                "stopped_at": datetime.now().isoformat()
-            })
-        else:
-            return jsonify({"error": "Tarea no encontrada o ya completada"}), 404
-        
-    except Exception as e:
-        logger.log(f"Error deteniendo tarea: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/tasks/active", methods=["GET"])
-def api_list_active_tasks_v2():
-    """Lista tareas activas"""
-    try:
-        active_tasks = task_executor.list_active_tasks()
-        return jsonify({
-            "active_tasks": [
-                {
-                    "task_id": task.task_id,
-                    "status": task.status.value,
-                    "started_at": task.started_at,
-                    "duration": task.duration,
-                    "log": task.log[-5:] if task.log else []  # Últimos 5 logs
-                }
-                for task in active_tasks
-            ]
-        })
-        
-    except Exception as e:
-        logger.log(f"Error listando tareas activas: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/tasks/recent", methods=["GET"])
-def api_list_recent_tasks_v2():
-    """Lista tareas recientes"""
-    try:
-        limit = int(request.args.get("limit", 10))
-        recent_tasks = task_executor.list_recent_tasks(limit)
-        
-        return jsonify({
-            "recent_tasks": [
-                {
-                    "task_id": task.task_id,
-                    "status": task.status.value,
-                    "started_at": task.started_at,
-                    "ended_at": task.ended_at,
-                    "duration": task.duration,
-                    "error": task.error,
-                    "log": task.log[-3:] if task.log else []  # Últimos 3 logs
-                }
-                for task in recent_tasks
-            ]
-        })
-        
-    except Exception as e:
-        logger.log(f"Error listando tareas recientes: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-# =============================================================================
-# ENDPOINTS PARA PROGRAMACIÓN DE TAREAS
-# =============================================================================
-
-@app.route("/api/schedules", methods=["GET", "POST"])
-def api_schedules():
-    """API para gestión de programaciones de tareas"""
-    if request.method == "GET":
-        try:
-            schedules = task_scheduler.list_schedules()
-            return jsonify({
-                "schedules": [
-                    {
-                        "task_id": s.task_id,
-                        "name": s.name,
-                        "protocol_name": s.protocol_name,
-                        "schedule_type": s.schedule_type.value,
-                        "duration_seconds": s.duration_seconds,
-                        "active": s.active,
-                        "last_execution": s.last_execution.isoformat() if s.last_execution else None,
-                        "next_execution": s.next_execution.isoformat() if s.next_execution else None,
-                        "execution_count": s.execution_count,
-                        "max_executions": s.max_executions
-                    }
-                    for s in schedules
-                ]
-            })
-        except Exception as e:
-            return jsonify({"error": str(e)}), 400
-    
-    # POST - Crear nueva programación
-    try:
-        data = get_request_data()
-        
-        # Parámetros requeridos
-        name = data.get("name")
-        protocol_name = data.get("protocol_name")
-        schedule_type = data.get("schedule_type", "una_vez")
-        
-        if not name or not protocol_name:
-            return jsonify({"error": "Se requiere 'name' y 'protocol_name'"}), 400
-        if protocol_name != "riego_basico":
-            return jsonify({"error": "Solo 'riego_basico' está habilitado"}), 400
-        
-        # Crear programación
-        schedule = TaskSchedule(
-            task_id=f"schedule_{int(time.time())}",
-            name=name,
-            protocol_name=protocol_name,
-            schedule_type=ScheduleType(schedule_type),
-            duration_seconds=float(data.get("duration_seconds", 10.0)),
-            timeout_seconds=float(data.get("timeout_seconds", 25.0)),
-            params=data.get("params", {}),
-            auto_stop=bool(data.get("auto_stop", True)),
-            schedule_params=data.get("schedule_params", {}),
-            max_executions=data.get("max_executions")
-        )
-        
-        task_id = task_scheduler.add_schedule(schedule)
-        
-        return jsonify({
-            "status": "created",
-            "task_id": task_id,
-            "schedule": {
-                "name": schedule.name,
-                "protocol_name": schedule.protocol_name,
-                "schedule_type": schedule.schedule_type.value,
-                "next_execution": schedule.next_execution.isoformat() if schedule.next_execution else None
-            }
-        })
-        
-    except Exception as e:
-        logger.log(f"Error creando programación: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-
-# =============================================================================
-# CRUD DE TAREAS (Compatibilidad con la UI existente)
-# =============================================================================
-
-# control_tareas.py eliminado - era un sistema legacy no utilizado
-# El sistema actual usa TaskScheduler y TaskExecutor
-_tasks_mgr = None
-
-@app.route("/api/tasks", methods=["GET"])
-def api_tasks_list():
-    """Lista tareas persistidas para el calendario."""
-    try:
-        if _tasks_mgr is None:
-            return jsonify([])
-        return jsonify(_tasks_mgr.obtener_tareas())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/tasks", methods=["POST"])
-def api_tasks_create_or_update():
-    """Crea o actualiza una tarea (por id)."""
-    try:
-        if _tasks_mgr is None:
-            return jsonify({"error": "Task manager no disponible"}), 500
-        data = get_request_data() or {}
-        # Normalizar payload básico que usa la UI
-        tarea = {
-            "id": data.get("id") or f"t_{int(time.time())}",
-            "nombre": data.get("nombre") or data.get("n") or "",
-            "activo": bool(data.get("activo", True)),
-            # Forzar protocolo único
-            "protocolo": "riego_basico",
-            "volumenObjetivoML": data.get("volumenObjetivoML") or data.get("vol") or 0,
-            "params": data.get("params") or {},
-            "programacion": data.get("programacion") or {},
-        }
-        # Normalizar params volumen
-        if "volume_ml" not in tarea["params"] and tarea.get("volumenObjetivoML"):
-            try:
-                tarea["params"]["volume_ml"] = float(tarea["volumenObjetivoML"])
-            except Exception:
-                pass
-        _tasks_mgr.agregar_tarea(tarea)
-        return jsonify({"status": "saved", "id": tarea["id"]})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/tasks/<task_id>", methods=["GET"])
-def api_tasks_get(task_id: str):
-    try:
-        if _tasks_mgr is None:
-            return jsonify({"error": "Task manager no disponible"}), 500
-        return jsonify(_tasks_mgr.get_tarea(task_id))
-    except KeyError:
-        return jsonify({"error": "No existe"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/tasks/<task_id>", methods=["PUT"])
-def api_tasks_update(task_id: str):
-    try:
-        if _tasks_mgr is None:
-            return jsonify({"error": "Task manager no disponible"}), 500
-        data = get_request_data() or {}
-        data["id"] = task_id
-        _tasks_mgr.agregar_tarea(data)
-        return jsonify({"status": "updated", "id": task_id})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/tasks/<task_id>", methods=["DELETE"])
-def api_tasks_delete(task_id: str):
-    try:
-        if _tasks_mgr is None:
-            return jsonify({"error": "Task manager no disponible"}), 500
-        _tasks_mgr.eliminar_tarea(task_id)
-        return jsonify({"status": "deleted", "id": task_id})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/tasks/<task_id>/execute", methods=["POST"])
-def api_task_execute_now(task_id: str):
-    """Compatibilidad: ejecutar una tarea por ID ahora (async por defecto)."""
-    try:
-        mode = request.args.get("mode", "async")
-        execution_mode = ExecutionMode.SYNC if mode == "sync" else ExecutionMode.ASYNC
-        try:
-            result = task_scheduler.execute_task_now(task_id, execution_mode)
-            if execution_mode == ExecutionMode.SYNC:
-                return jsonify({
-                    "status": "completed",
-                    "task_id": result.task_id,
-                    "execution_status": result.status.value,
-                    "duration": result.duration,
-                    "result": result.result
-                })
-            else:
-                eid = str(result)
-                # Registrar en tracker de compatibilidad
-                if eid and eid not in _active_exec:
-                    _track_exec_start("task", task_id)
-                return jsonify({"execution_id": eid})
-        except Exception:
-            # Fallback a TaskExecutor directo usando _tasks_mgr
-            if _tasks_mgr is None:
-                return jsonify({"error": "Tarea no encontrada"}), 404
-            try:
-                t = _tasks_mgr.get_tarea(task_id)
-            except Exception:
-                return jsonify({"error": "Tarea no encontrada"}), 404
-            prot = t.get("protocolo") or t.get("protocol")
-            params = t.get("params") or {}
-            duration = float(t.get("duration_seconds") or 10.0)
-            payload = {
-                "name": t.get("nombre") or task_id,
-                "protocol_name": prot,
-                "duration_seconds": duration,
-                "timeout_seconds": float(request.args.get("timeout_seconds", 25) or 25),
-                "params": params,
-                "mode": "async" if execution_mode == ExecutionMode.ASYNC else "sync"
-            }
-            with app.test_request_context(json=payload):
-                resp = api_execute_task_v2()
-            return resp
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-@app.route("/api/schedules/<task_id>/execute", methods=["POST"])
-def api_execute_schedule_now(task_id: str):
-    """Ejecuta una tarea programada inmediatamente"""
-    try:
-        mode = request.args.get("mode", "async")
-        execution_mode = ExecutionMode.SYNC if mode == "sync" else ExecutionMode.ASYNC
-        
-        result = task_scheduler.execute_task_now(task_id, execution_mode)
-        
-        if execution_mode == ExecutionMode.SYNC:
-            return jsonify({
-                "status": "completed",
-                "task_id": result.task_id,
-                "execution_status": result.status.value,
-                "duration": result.duration,
-                "result": result.result
-            })
-        else:
-            return jsonify({
-                "status": "executing",
-                "execution_id": result,
-                "message": f"Tarea programada ejecutándose. Use /api/tasks/v2/status/{result} para consultar estado."
-            })
-        
-    except Exception as e:
-        logger.log(f"Error ejecutando tarea programada: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-
-
-# =============================================================================
-# RUTAS DE PUERTO SERIAL (CORREGIDAS PARA COMPATIBILIDAD)
-# =============================================================================
-
-
-@app.route("/api/robots", methods=["GET"])
-def api_list_robots():
-    return jsonify({
-        "active": active_robot_id,
-        "robots": _available_robot_profiles(),
-    })
-
-# Alias de compatibilidad
-@app.route("/robots", methods=["GET"])
-def robots_alias():
-    return api_list_robots()
-
-@app.route("/api/robots/select", methods=["POST"])
-def api_select_robot():
-    data = request.get_json(silent=True) or {}
-    robot_id = str(data.get("id") or data.get("robot_id") or "").strip().lower()
-    if not robot_id or robot_id not in ROBOT_PROFILES:
-        return jsonify({"error": "robot desconocido"}), 400
-    summary = switch_robot(robot_id)
-    return jsonify({
-        "active": summary["id"],
-        "profile": summary,
-        "robots": _available_robot_profiles(),
-    })
-
-# Alias de compatibilidad
-@app.route("/robots/select", methods=["POST"])
-def robots_select_alias():
-    return api_select_robot()
-
 @app.route("/api/serial/ports")
 def api_serial_ports():
     """API para listar puertos serial"""
-    ports = list_serial_ports()
     is_virtual = bool(getattr(robot_env, "is_virtual", False))
+    ports = list_serial_ports()
+    if is_virtual:
+        ports = ["VIRTUAL"]
     ser = getattr(robot_env, "ser", None)
     open_state = bool(ser and getattr(ser, "is_open", False))
     if is_virtual:
         open_state = True
+        if not getattr(robot_env, "port", None):
+            robot_env.port = "VIRTUAL"
     return jsonify({
         "ports": ports,
         "current": robot_env.port,
@@ -2503,6 +1474,17 @@ def api_serial_open():
         data = get_request_data()
         port = data.get("port", DEFAULT_SERIAL_PORT)
         baud = int(data.get("baudrate", DEFAULT_BAUDRATE))
+
+        if getattr(robot_env, "is_virtual", False):
+            robot_env.port = "VIRTUAL"
+            robot_env.baudrate = baud
+            return jsonify({
+                "status": "ok",
+                "port": "VIRTUAL",
+                "baudrate": baud,
+                "open": True,
+                "virtual": True,
+            })
         
         with env_lock:
             # Usar métodos existentes de reloj_env.py
@@ -2534,6 +1516,13 @@ def api_serial_open():
 def api_serial_close():
     """API para cerrar puerto serial"""
     try:
+        if getattr(robot_env, "is_virtual", False):
+            return jsonify({
+                "status": "ok",
+                "port": "VIRTUAL",
+                "open": False,
+                "virtual": True,
+            })
         with env_lock:
             # Usar método existente
             if robot_env.ser:
@@ -2554,36 +1543,7 @@ def api_serial_close():
 
 ## Versión mínima: sin API direccional
 
-@app.route("/api/move_to", methods=["POST"])
-def api_move_to():
-    """API para mover robot a posición específica"""
-    try:
-        if not _is_serial_connected():
-            logger.log("/api/move_to rechazado: serial desconectado", "WARN")
-            return jsonify({"error": "Serial desconectado"}), 409
-        data = get_request_data()
-        logger.log(f"/api/move_to payload: {data}")
-        x = data.get("x")
-        y = data.get("y")
-        # Alias de compatibilidad con test: x_mm / a_deg
-        if x is None:
-            x = data.get("x_mm")
-        if y is None:
-            y = data.get("a_deg")
-        
-        with env_lock:
-            if x is not None:
-                robot_env.set_corredera_mm(float(x))
-            if y is not None:
-                robot_env.set_angulo_deg(float(y))
-            
-            robot_env.step()
-        
-        return jsonify({"status": "moved_to", "x": x, "y": y})
-    except Exception as e:
-        logger.log(f"Error moviendo robot a posición: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 500
-
+# PROMPT(safety): garantizar ejecución aunque ws/control falle
 @app.route("/api/stop", methods=["POST"])
 def api_stop():
     """API para detener inmediatamente todos los actuadores y apagar la bomba"""
@@ -2642,160 +1602,8 @@ def api_emergency_stop():
         logger.log(f"Error en parada de emergencia: {e}", "ERROR")
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/water", methods=["POST"])
-def api_water():
-    """API para activar riego"""
-    try:
-        with env_lock:
-            robot_env.set_energia_bomba(100)
-            robot_env.step()
-        
-        return jsonify({"status": "watering"})
-    except Exception as e:
-        logger.log(f"Error activando riego: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/suck", methods=["POST"])
-def api_suck():
-    """API para activar aspiración"""
-    try:
-        with env_lock:
-            robot_env.set_energia_bomba(-100)
-            robot_env.step()
-        
-        return jsonify({"status": "sucking"})
-    except Exception as e:
-        logger.log(f"Error activando aspiración: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 500
-
-## Versión mínima: sin rutas de cámara
-
-## Versión mínima: solo compatibilidad necesaria
-
-@app.route("/entorno/actualizar_acciones", methods=["POST"])
-def compat_entorno_actualizar_acciones():
-    """Ruta de compatibilidad para interfaces antiguas"""
-    try:
-        data = get_request_data()
-        logger.log(f"Compatibilidad: {data}")
-        
-        with env_lock:
-            # Modo manual (USANDO MÉTODOS CORRECTOS)
-            if "manual_corredera" in data or "manual_angulo" in data:
-                x_manual = bool(int(data.get("manual_corredera", 0)))
-                a_manual = bool(int(data.get("manual_angulo", 0)))
-                robot_env.set_modo(mx=x_manual, ma=a_manual)  # ✅ Método correcto
-            
-            # Setpoints (USANDO MÉTODOS CORRECTOS)
-            if "setpoints" in data:
-                sp = data["setpoints"]
-                if "slide" in sp:
-                    robot_env.set_corredera_mm(float(sp["slide"]))  # ✅ Método correcto
-                if "angle" in sp:
-                    robot_env.set_angulo_deg(float(sp["angle"]))     # ✅ Método correcto
-                if "volume" in sp:
-                    robot_env.set_volumen_objetivo_ml(float(sp["volume"]))  # ✅ Método correcto
-            
-            # Resets (USANDO MÉTODOS CORRECTOS)
-            if data.get("reset_volume"):
-                robot_env.reset_volumen()  # ✅ Método correcto
-            
-            # PID (USANDO MÉTODOS CORRECTOS)
-            if "pid_settings" in data:
-                pid = data["pid_settings"]
-                if all(k in pid for k in ["kpX", "kiX", "kdX"]):
-                    robot_env.set_pid_corredera(
-                        float(pid["kpX"]), float(pid["kiX"]), float(pid["kdX"])
-                    )  # ✅ Método correcto
-                if all(k in pid for k in ["kpA", "kiA", "kdA"]):
-                    robot_env.set_pid_angulo(
-                        float(pid["kpA"]), float(pid["kiA"]), float(pid["kdA"])
-                    )  # ✅ Método correcto
-            
-            robot_env.step()
-        
-        return jsonify({"status": "ok"})
-        
-    except Exception as e:
-        logger.log(f"Error en compatibilidad: {e}", "ERROR")
-        return jsonify({"error": str(e)}), 400
-
-# === ALIAS DE COMPATIBILIDAD (evitar 404 de la UI antigua) ===
-
-@app.route("/status")
-def compat_status():
-    return api_config()
-
-@app.route("/serial/ports")
-def compat_serial_ports():
-    return api_serial_ports()
-
-@app.route("/serial/open", methods=["POST"])
-def compat_serial_open():
-    return api_serial_open()
-
-@app.route("/serial/close", methods=["POST"])
-def compat_serial_close():
-    return api_serial_close()
-
-## Versión mínima: sin endpoints /debug
-@app.route("/debug/serial", methods=["GET"])
-def debug_serial():
-    """Devuelve última RX y edad en ms (para watchdog de UI)."""
-    try:
-        now = time.time()
-        age_ms = int(max(0, (now - (last_rx_ts or 0)) * 1000)) if 'last_rx_ts' in globals() else None
-        return jsonify({
-            "last_rx": last_rx_text if 'last_rx_text' in globals() else None,
-            "age_ms": age_ms
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/debug/serial_tx", methods=["GET"])
-def debug_serial_tx():
-    """Devuelve último TX y edad en ms (para UI)."""
-    try:
-        now = time.time()
-        age_ms = int(max(0, (now - (last_tx_ts or 0)) * 1000)) if 'last_tx_ts' in globals() else None
-        return jsonify({
-            "last_tx": last_tx_text if 'last_tx_text' in globals() else None,
-            "age_ms": age_ms
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# ---- Alias GET /control (compat UI) ----
-
-@app.route("/control")
-def compat_control_get():
-    """Permite llamadas GET /control?x_mm=...&a_deg=... etc. Convierte a JSON y reenvía a api_control."""
-    data = {}
-    # map query params
-    for k,v in request.args.items():
-        if k in ("x_mm","a_deg","vol_ml"):  # setpoints directos
-            data.setdefault("setpoints",{})
-            if k=="x_mm": data["setpoints"]["x_mm"] = float(v)
-            elif k=="a_deg": data["setpoints"]["a_deg"] = float(v)
-            else: data["setpoints"]["volumen_ml"] = float(v)
-        elif k=="modo":
-            data["modo"] = int(v)
-        elif k=="pid_on":
-            data["pid_settings"] = {"pidX":{"kp":1,"ki":1,"kd":0.1}}  # placeholder
-        elif k.startswith("energy_"):
-            axis=k.split("_")[1]
-            key_map={"x":"x","a":"a","bomba":"bomba"}
-            data.setdefault("energies",{})[key_map.get(axis,axis)] = int(v)
-    # Reutilizar lógica de api_control
-    with app.test_request_context(json=data):
-        resp = api_control()
-        _set_last_tx(json.dumps(data))
-        return resp
-
-ALLOWED_ENDPOINTS.add("/control")
-
-## Versión mínima: sin API /simple
-
+# =============================================================================
+# HILOS EN BACKGROUND
 # =============================================================================
 # HILOS EN BACKGROUND
 # =============================================================================
@@ -2912,21 +1720,21 @@ if __name__ == "__main__":
     
     # Función para abrir el navegador automáticamente
     def open_browser():
-        """Abre automáticamente la interfaz del calendario en el navegador"""
-        time.sleep(1.5)  # Esperar a que el servidor esté listo
+        """Abre la interfaz del Reloj en el navegador por defecto."""
+        time.sleep(1.5)
+        url = f"http://127.0.0.1:{PORT}/"
         try:
-            url = f"http://localhost:{PORT}/"
             logger.log(f"WEB: Abriendo navegador automáticamente: {url}")
-            webbrowser.open(url)
-        except Exception as e:
-            logger.log(f"WARNING: Error abriendo navegador: {e}")
+            webbrowser.open(url, new=1, autoraise=True)
+        except Exception as exc:
+            logger.log(f"WARNING: Error abriendo navegador: {exc} (seguirá ejecutando)")
     
-    # Iniciar hilo para abrir el navegador
     threading.Thread(target=open_browser, daemon=True).start()
     
     app.run(
         host="0.0.0.0",
         port=PORT,
         debug=False,
-        use_reloader=False
+        use_reloader=False,
+        threaded=True,
     )
