@@ -4,6 +4,22 @@
 */
 
 (() => {
+  // ------------- Widgets Registry (global) -------------
+  if(typeof window !== 'undefined'){
+    // Upgrade bootstrap stub (if present) into full registry and drain queue
+    const queued = Array.isArray(window.__WIDGET_QUEUE__) ? window.__WIDGET_QUEUE__ : [];
+    const prev = window.RelojWidgets;
+    window.RelojWidgets = {
+      _mods: [],
+      register(name, factory){ this._mods.push({ name, factory, inst:null }); },
+      initAll(ctx){ this._mods.forEach(m=>{ try{ const inst = m.factory(ctx) || {}; m.inst = inst; if(typeof inst.initControl==='function') inst.initControl(); if(typeof inst.initSettings==='function') inst.initSettings(); }catch(e){ console.warn('[widgets]', m.name, 'init failed', e); } }); },
+      broadcast(kind, payload){ this._mods.forEach(m=>{ const inst=m.inst; const fn = inst && (kind==='telemetry'?inst.onTelemetry:(kind==='online'?inst.onOnline:null)); if(typeof fn==='function'){ try{ fn(payload); }catch(e){} } }); },
+      get(name){ const m=this._mods.find(mm=>mm.name===name); return m && m.inst || null; }
+    };
+    // If there were previous registrations via bootstrap, register them now
+    queued.forEach(item=>{ try{ window.RelojWidgets.register(item.name, item.factory); }catch(e){} });
+    try{ window.__WIDGET_QUEUE__ = []; }catch{}
+  }
   // ------------- Utils -------------
   const $ = s => document.querySelector(s);
   const $$ = s => Array.from(document.querySelectorAll(s));
@@ -201,6 +217,8 @@
     window.ControlChannel = ControlChannel;
   }
   updateRxPillLabel();
+  // Legacy flow ctrl placeholder (use existing top-level var)
+  // FlowWidgetCtrl = null;
 
   // ------------- Serial (toggle único) -------------
   async function refreshPorts(){
@@ -390,6 +408,20 @@
     }
   })();
 
+  // Abrir Settings y llevar a un ancla
+  function openSettingsAndScrollTo(targetId){
+    try{
+      const btn = document.querySelector('.tabs button[data-tab="set"]');
+      if(btn){ btn.click(); }
+      const el = typeof targetId === 'string' ? document.getElementById(targetId) : targetId;
+      if(!el){ return; }
+      setTimeout(()=>{
+        try{ el.scrollIntoView({ behavior:'smooth', block:'center' }); }catch{}
+        try{ el.classList.add('highlight'); setTimeout(()=> el.classList.remove('highlight'), 1500); }catch{}
+      }, 120);
+    }catch{}
+  }
+
   // Selector de tema (tabs cambian de color)
   const themeSel = document.getElementById('themeSel');
   const bodyRoot = document.getElementById('bodyRoot');
@@ -410,45 +442,20 @@
     try{
       const s = await jget('/api/settings');
       const baudEl=document.getElementById('sel_baud'); if(baudEl && s.baudrate){ baudEl.value=String(s.baudrate); }
-      const mm=document.getElementById('steps_mm'); if(mm && s.steps_mm!=null){ mm.value=String(s.steps_mm); }
-      const dg=document.getElementById('steps_deg'); if(dg && s.steps_deg!=null){ dg.value=String(s.steps_deg); }
-      const cf=document.getElementById('caudal'); if(cf && s.caudal_bomba_mls!=null){ cf.value=String(s.caudal_bomba_mls); }
-      const uf=document.getElementById('chk_sensor_flujo'); if(uf && s.usar_sensor_flujo!=null){ uf.checked = !!s.usar_sensor_flujo; }
-      const zsc=document.getElementById('z_mm_por_grado'); if(zsc && s.z_mm_por_grado!=null){ zsc.value=String(s.z_mm_por_grado); }
       // Guardar/cargar últimos setpoints
       const spx=document.getElementById('sp_x'); if(spx && s.last_sp_x_mm!=null){ spx.value=String(s.last_sp_x_mm); }
       const spa=document.getElementById('sp_a'); if(spa && s.last_sp_a_deg!=null){ spa.value=String(s.last_sp_a_deg); }
       const spz=document.getElementById('sp_z'); if(spz && s.last_sp_z_mm!=null){ spz.value=String(s.last_sp_z_mm); }
       const spv=document.getElementById('sp_vol'); if(spv && s.last_sp_vol_ml!=null){ spv.value=String(s.last_sp_vol_ml); }
-      // PID defaults
-      const dk=['def_kpX','def_kiX','def_kdX','def_kpA','def_kiA','def_kdA'];
-      dk.forEach(k=>{ const el=document.getElementById(k); const key=k.replace('def_',''); if(el && s[key]!=null){ el.value=String(s[key]); } });
-      // policy/scheduler
-      const pol=document.getElementById('sel_policy'); if(pol && s.command_policy){ pol.value = String(s.command_policy); }
-      const sch=document.getElementById('chk_scheduler'); if(sch && typeof s.scheduler_enabled!=='undefined'){ sch.checked = !!s.scheduler_enabled; }
     }catch{}
   }
   async function saveSettings(){
     const baud=Number((document.getElementById('sel_baud')||{}).value||115200);
-    const steps_mm=Number((document.getElementById('steps_mm')||{}).value||0);
-    const steps_deg=Number((document.getElementById('steps_deg')||{}).value||0);
-    const caudal_bomba_mls=Number((document.getElementById('caudal')||{}).value||0);
-    const usar_sensor_flujo=(document.getElementById('chk_sensor_flujo')||{}).checked?1:0;
-    const z_scale=Number((document.getElementById('z_mm_por_grado')||{}).value||1);
     const last_sp_x_mm=Number((document.getElementById('sp_x')||{}).value||0);
     const last_sp_a_deg=Number((document.getElementById('sp_a')||{}).value||0);
     const last_sp_z_mm=Number((document.getElementById('sp_z')||{}).value||0);
     const last_sp_vol_ml=Number((document.getElementById('sp_vol')||{}).value||0);
-    const payload={ baudrate: baud, steps_mm, steps_deg, caudal_bomba_mls, usar_sensor_flujo, z_mm_por_grado: z_scale, last_sp_x_mm, last_sp_a_deg, last_sp_z_mm, last_sp_vol_ml };
-    // PID defaults
-    const getv=id=> Number((document.getElementById(id)||{}).value||0);
-    Object.assign(payload, {
-      kpX:getv('def_kpX'), kiX:getv('def_kiX'), kdX:getv('def_kdX'),
-      kpA:getv('def_kpA'), kiA:getv('def_kiA'), kdA:getv('def_kdA')
-    });
-    // policy/scheduler
-    const polEl=document.getElementById('sel_policy'); if(polEl){ payload.command_policy = polEl.value; }
-    const schEl=document.getElementById('chk_scheduler'); if(schEl){ payload.scheduler_enabled = schEl.checked; }
+    const payload={ baudrate: baud, last_sp_x_mm, last_sp_a_deg, last_sp_z_mm, last_sp_vol_ml };
     try{
       await jpost('/api/settings', payload);
       toast('Settings guardados');
@@ -456,18 +463,6 @@
   }
   const btnSaveSettings=document.getElementById('btn_save_settings'); if(btnSaveSettings){ btnSaveSettings.onclick = saveSettings; }
 
-  const btnApplyPIDDef=document.getElementById('btn_apply_pid_defaults'); if(btnApplyPIDDef){ btnApplyPIDDef.onclick = async ()=>{
-    const payload={ pid_settings: {
-      pidX:{ kp:Number(document.getElementById('def_kpX').value||0), ki:Number(document.getElementById('def_kiX').value||0), kd:Number(document.getElementById('def_kdX').value||0) },
-      pidA:{ kp:Number(document.getElementById('def_kpA').value||0), ki:Number(document.getElementById('def_kiA').value||0), kd:Number(document.getElementById('def_kdA').value||0) }
-    } };
-    try{ await ControlChannel.send(payload); toast('PID aplicados'); }catch{ toast('Error aplicando PID'); }
-  }; }
-
-  const btnApplyPolicy=document.getElementById('btn_apply_policy'); if(btnApplyPolicy){
-    btnApplyPolicy.onclick = ()=> toast('Políticas gestionadas automáticamente por el hub');
-    btnApplyPolicy.disabled = true;
-  }
 
   // ------------- Real-time Chart -------------
   const canvas = document.getElementById('chart');
@@ -622,6 +617,18 @@
     updateSVG(s.x_mm, s.a_deg);
     $("#t_vol").textContent = fmt(s.volumen_ml||0);
     $("#t_flow").textContent = fmt(flowActual);
+    // Broadcast telemetry to modular widgets
+    try{
+      if(window.RelojWidgets){
+        window.RelojWidgets.broadcast('telemetry', {
+          snapshot: s,
+          flowActual,
+          flowTarget: (s.caudalBombaMLs!=null)?Number(s.caudalBombaMLs):null,
+          volumeActual: (s.volumen_ml!=null)?Number(s.volumen_ml):null,
+          volumeTarget: (s.volumen_objetivo_ml!=null)?Number(s.volumen_objetivo_ml):null
+        });
+      }
+    }catch(e){}
     const rdV=document.getElementById('rd_vol_ml'); if(rdV){ rdV.textContent = fmt(s.volumen_ml||0); }
     $("#t_limx").textContent = s.lim_x||0; $("#t_lima").textContent = s.lim_a||0;
     $("#t_homx").textContent = s.homing_x||0; $("#t_homa").textContent = s.homing_a||0;
@@ -655,9 +662,9 @@
     const ex = clamp((Math.abs((s.energies&&s.energies.x)||0)/255)*100,0,100);
     const ea = clamp((Math.abs((s.energies&&s.energies.a)||0)/255)*100,0,100);
     const eb = clamp((Math.abs((s.energies&&s.energies.bomba)||0)/255)*100,0,100);
-    $("#g_ex").style.width = ex+"%";
-    $("#g_ea").style.width = ea+"%";
-    $("#g_eb").style.width = eb+"%";
+    const bx = document.getElementById('wg_g_ex'); if(bx) bx.style.width = ex+"%";
+    const ba = document.getElementById('wg_g_ea'); if(ba) ba.style.width = ea+"%";
+    const bb = document.getElementById('wg_g_eb'); if(bb) bb.style.width = eb+"%";
     const rdEX=document.getElementById('rd_en_x'); if(rdEX){ rdEX.textContent = String((s.energies&&s.energies.x)||0); }
     const rdEA=document.getElementById('rd_en_a'); if(rdEA){ rdEA.textContent = String((s.energies&&s.energies.a)||0); }
     const pumpEnergy = (s.energies&&s.energies.bomba)||0;
@@ -671,7 +678,7 @@
     try{
       const goal = Number((s.volumen_objetivo_ml!=null)?s.volumen_objetivo_ml:0);
       const cur = Number(s.volumen_ml||0);
-      const bar = document.getElementById('g_vol_goal');
+      const bar = document.getElementById('wg_g_vol');
       if(bar){
         if(goal>0){
           const pct = clamp((cur/goal)*100,0,100);
@@ -728,21 +735,25 @@
 
     const setT=(id,val)=>{ const el=document.getElementById(id); if(el){ el.textContent = fmt(val); } };
     setT('gx', s.x_mm||0); setT('ga', s.a_deg||0); setT('gvol', s.volumen_ml||0); setT('gflow', flowActual);
-    if(FlowWidgetCtrl){
-      FlowWidgetCtrl.updateTelemetry({
-        flowActual,
-        flowTarget: (s.caudalBombaMLs!=null)?Number(s.caudalBombaMLs):null,
-        volumeActual: Number(s.volumen_ml||0),
-        volumeTarget: (s.volumen_objetivo_ml!=null)?Number(s.volumen_objetivo_ml):null
-      });
-    }
+    // Telemetría para widgets modulares (bomba_simple)
+    try{
+      if(window.RelojWidgets){
+        window.RelojWidgets.broadcast('telemetry', {
+          snapshot: s,
+          flowActual,
+          flowTarget: (s.caudalBombaMLs!=null)?Number(s.caudalBombaMLs):null,
+          volumeActual: Number(s.volumen_ml||0),
+          volumeTarget: (s.volumen_objetivo_ml!=null)?Number(s.volumen_objetivo_ml):null
+        });
+      }
+    }catch{}
 
     const ang = Math.max(0, Math.min(360, Number(s.a_deg||0)));
     const track = document.getElementById('arena_track'); if(track){ track.setAttribute('transform', `rotate(${ang} 160 160)`); }
     const ac = document.getElementById('arena_carro'); if(ac){ const x = 70 + Math.max(0, Math.min(400, Number(s.x_mm||0))) * (180/400); ac.setAttribute('x', String(x)); }
     const aa = document.getElementById('arena_aguja'); if(aa){ const rad=(ang-90)*Math.PI/180; const cx=160, cy=160, r=120; aa.setAttribute('x2', String(cx+Math.cos(rad)*r)); aa.setAttribute('y2', String(cy+Math.sin(rad)*r)); }
 
-    if(!freeze){
+    if(ctx && !freeze){
       const now=Date.now()/1000;
       history.push({t:now, x:s.x_mm, a:s.a_deg, vol:s.volumen_ml, flow:(s.caudal_est_mls!=null?s.caudal_est_mls:s.flow_est), z:zmm});
       while(history.length && (now-history[0].t)>MAX_SEC) history.shift();
@@ -814,10 +825,12 @@
   }; }
   const bClr = document.getElementById('btn_clear_dbg'); if(bClr){ bClr.onclick = ()=>{ const el=document.getElementById('dbg_serial'); if(el) el.textContent=''; }; }
 
-  // ------------- PyBullet frame polling -------------
+  // ------------- PyBullet frame polling + start/stop -------------
   (function initPyBulletFeed(){
     const img = document.getElementById('pybullet_view');
     const status = document.getElementById('pybullet_status');
+    const btnStart = document.getElementById('btn_pb_gui_start');
+    const btnStop = document.getElementById('btn_pb_gui_stop');
     if(!img || !window.fetch) return;
     let lastUrl = null;
     let timer = null;
@@ -847,6 +860,8 @@
     };
     fetchFrame();
     timer = setInterval(fetchFrame, 1500);
+    if(btnStart){ btnStart.addEventListener('click', async ()=>{ try{ await fetch('/api/pybullet/start', { method:'POST' }); fetchFrame(); }catch{} }); }
+    if(btnStop){ btnStop.addEventListener('click', async ()=>{ try{ await fetch('/api/pybullet/stop', { method:'POST' }); fetchFrame(); }catch{} }); }
     window.addEventListener('beforeunload', ()=>{
       if(lastUrl){ URL.revokeObjectURL(lastUrl); }
       if(timer){ clearInterval(timer); }
@@ -1057,7 +1072,8 @@
     };
   }
 
-  FlowWidgetCtrl = initFlowWidget();
+  // Flow widget now provided via modular widgets (bomba_simple)
+  FlowWidgetCtrl = null;
 
   // ------------- Control helpers (POST unificado a /api/control) -------------
   async function sendControl(params){
@@ -1109,13 +1125,45 @@
     await ControlChannel.send(body);
   }
 
+  // Initialize modular widgets with context
+  try{
+    if(window.RelojWidgets){
+      const init = ()=>{
+        const ctx = {
+          $, $$, toast, jget, jpost,
+          getStatus: ()=> window._statusCache,
+          sendControl,
+          ControlChannel,
+          openSettings: (id)=> openSettingsAndScrollTo(id),
+          hosts: {
+            settings: {
+              general: document.getElementById('widgets_settings_all'),
+              actuators: null,
+              sensors: null,
+              mixed: null
+            },
+            op: {
+              general: document.getElementById('widgets_op_all'),
+              actuators: null,
+              sensors: null,
+              mixed: null
+            },
+            flowWidget: document.getElementById('flow_widget')
+          }
+        };
+        window.RelojWidgets.initAll(ctx);
+      };
+      if(document.readyState === 'complete') init(); else window.addEventListener('load', init);
+    }
+  }catch(e){ console.warn('[widgets] init error', e); }
+
   // ------------- Operación -------------
   const chkX = $("#chk_manual_x"), chkA = $("#chk_manual_a");
 
-  const recomputeModoBits = ()=> (Number(chkX.checked)*1) | (Number(chkA.checked)*2);
+  const recomputeModoBits = ()=> ((chkX && chkX.checked ? 1:0) | (chkA && chkA.checked ? 2:0));
 
-  chkX.onchange = async ()=>{ await sendControl({modo:recomputeModoBits()}); toast("Modo actualizado"); };
-  chkA.onchange = async ()=>{ await sendControl({modo:recomputeModoBits()}); toast("Modo actualizado"); };
+  if(chkX){ chkX.onchange = async ()=>{ await sendControl({modo:recomputeModoBits()}); toast("Modo actualizado"); }; }
+  if(chkA){ chkA.onchange = async ()=>{ await sendControl({modo:recomputeModoBits()}); toast("Modo actualizado"); }; }
 
   const btnPidOn = document.getElementById('btn_pid_on');
   if(btnPidOn){ btnPidOn.style.display='none'; }
@@ -1124,14 +1172,16 @@
   const applySetpointsNow = async ()=>{
     const sx = Number($("#sp_x") && $("#sp_x").value || 0);
     const sa = Number($("#sp_a") && $("#sp_a").value || 0);
-    const sv = Number($("#sp_vol") && $("#sp_vol").value || 0);
+    const svEl = document.getElementById('sp_vol');
     const sz = Number($("#sp_z") && $("#sp_z").value || 0);
     // Forzar automático en ambos ejes al aplicar setpoints
     if(chkX) chkX.checked = false;
     if(chkA) chkA.checked = false;
     const motion={};
     const zspeedEl=document.getElementById('sp_z_speed'); if(zspeedEl){ motion.z_speed_deg_s = Number(zspeedEl.value||0); }
-    await sendControl({ setpoints:{ x_mm: sx, a_deg: sa, volumen_ml: sv, z_mm: sz }, motion, modo: (Number(chkX.checked)*1) | (Number(chkA.checked)*2) });
+    const sp = { x_mm: sx, a_deg: sa, z_mm: sz };
+    if(svEl){ sp.volumen_ml = Number(svEl.value || 0); }
+    await sendControl({ setpoints: sp, motion, modo: (Number(chkX.checked)*1) | (Number(chkA.checked)*2) });
   };
   const debouncedSetpoints = debounce(applySetpointsNow, 250);
   const spX = document.getElementById('sp_x'); if(spX){ spX.oninput = debouncedSetpoints; spX.onchange = applySetpointsNow; }
@@ -1163,9 +1213,9 @@
   const btnResetVol = document.getElementById('btn_reset_vol');
   if(btnResetVol){ btnResetVol.onclick = async ()=>{ await sendControl({reset_volumen:1}); toast("Volumen reseteado"); }; }
 
-  $("#en_x").oninput = e=> { $("#en_x_o").textContent = e.target.value; };
-  $("#en_a").oninput = e=> { $("#en_a_o").textContent = e.target.value; };
-  $("#en_b").oninput = e=> { $("#en_b_o").textContent = e.target.value; };
+  const _enx0 = document.getElementById('en_x'); if(_enx0){ _enx0.oninput = e=> { const o=document.getElementById('en_x_o'); if(o){ o.textContent = e.target.value; } }; }
+  const _ena0 = document.getElementById('en_a'); if(_ena0){ _ena0.oninput = e=> { const o=document.getElementById('en_a_o'); if(o){ o.textContent = e.target.value; } }; }
+  const _enb0 = document.getElementById('en_b'); if(_enb0){ _enb0.oninput = e=> { const o=document.getElementById('en_b_o'); if(o){ o.textContent = e.target.value; } }; }
 
   // Auto-aplicar energías con debounce continuo y forzar modo manual según sliders
   const ALLOW_MANUAL_PUMP_ENERGY = false;
@@ -1200,11 +1250,14 @@
     }
   }
 
-  $("#btn_stop_all").onclick = async ()=>{
-    $("#en_x").value=0; $("#en_a").value=0; $("#en_b").value=0; $("#en_x_o").textContent="0"; $("#en_a_o").textContent="0"; $("#en_b_o").textContent="0";
+  const _btnStopAll = document.getElementById('btn_stop_all');
+  if(_btnStopAll){ _btnStopAll.onclick = async ()=>{
+    const ex=document.getElementById('en_x'), ea=document.getElementById('en_a'), eb=document.getElementById('en_b');
+    const exo=document.getElementById('en_x_o'), eao=document.getElementById('en_a_o'), ebo=document.getElementById('en_b_o');
+    if(ex) ex.value=0; if(ea) ea.value=0; if(eb) eb.value=0; if(exo) exo.textContent='0'; if(eao) eao.textContent='0'; if(ebo) ebo.textContent='0';
     await sendControl({energy_x:0, energy_a:0, energy_bomba:0});
     toast("Paro enviado");
-  };
+  }; }
 
   const btnHomeX = document.getElementById('btn_home_x'); if(btnHomeX){ btnHomeX.onclick = async ()=>{ await sendControl({reset_x:1}); toast("Homing X"); }; }
   const btnHomeA = document.getElementById('btn_home_a'); if(btnHomeA){ btnHomeA.onclick = async ()=>{ await sendControl({reset_a:1}); toast("Homing A"); }; }

@@ -388,6 +388,14 @@ def apply_persisted_settings(lock_held: bool = False) -> None:
                     robot_env.set_z_mm_por_grado(float(s["z_mm_por_grado"]))
             except Exception:
                 pass
+            # Aplicar calibraciones persistidas de pasos
+            try:
+                if s.get("steps_mm") is not None:
+                    robot_env.set_pasos_por_mm(float(s["steps_mm"]))
+                if s.get("steps_deg") is not None:
+                    robot_env.set_pasos_por_grado(float(s["steps_deg"]))
+            except Exception:
+                pass
             try:
                 kpx = s.get("kpX"); kix = s.get("kiX"); kdx = s.get("kdX")
                 if kpx is not None and kix is not None and kdx is not None:
@@ -888,6 +896,17 @@ def root_index():
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
     return resp
+
+@app.post("/api/pybullet/start")
+def api_pybullet_start():
+    ok = _pb_gui_start()
+    return jsonify({ "status": "ok" if ok else "error", "running": ok })
+
+@app.post("/api/pybullet/stop")
+def api_pybullet_stop():
+    ok = _pb_gui_stop()
+    return jsonify({ "status": "ok" if ok else "error", "running": _pb_gui_is_running() })
+
 
 @app.route("/api")
 def api_index():

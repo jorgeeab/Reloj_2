@@ -5,6 +5,7 @@
   <title>Reloj Labs — Cabina Única</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="/static/styles.css?v=4">
+  <script src="/static/js/widgets_bootstrap.js?v=1"></script>
 </head>
 <body class="theme-teal" id="bodyRoot">
   <header class="topbar">
@@ -81,63 +82,19 @@
           </details>
         </div>
 
-        <div class="grid two" style="margin-top:10px">
-          <div class="card">
-            <h3>Calibraciones & Flujo</h3>
-            <div class="row">
-              <div class="field"><label>pasos/mm</label><input type="number" id="steps_mm" step="0.001" value="0"></div>
-              <div class="field"><label>pasos/grado</label><input type="number" id="steps_deg" step="0.001" value="0"></div>
-              <div class="field"><label>Z mm/°</label><input type="number" id="z_mm_por_grado" step="0.001" value="1"></div>
-              <button id="btn_apply_steps">Aplicar Calibración</button>
+        <!-- Zona de settings agregada por widgets modulares (una sola columna) -->
+        <div class="card" id="widgets_settings_container" style="margin-top:10px">
+          <h3>Widgets — Ajustes</h3>
+            <div id="widgets_settings_all" class="grid two" style="gap:10px">
+              {% include 'widgets/corredera_config.html' %}
+              {% include 'widgets/angulo_config.html' %}
+              {% include 'widgets/bomba_config.html' %}
             </div>
-            <div class="row">
-              <label class="chk"><input type="checkbox" id="chk_sensor_flujo" checked> Usar sensor de flujo</label>
-              <div class="field"><label>Caudal por tiempo (ml/s)</label><input type="number" id="caudal" step="0.1" value="50"></div>
-              <button id="btn_apply_flujo">Aplicar Flujo</button>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>PyBullet GUI (opcional)</h3>
-            <div class="row" style="align-items:center; gap:8px; flex-wrap:wrap">
-              <button id="btn_pb_gui_start">Iniciar GUI</button>
-              <button id="btn_pb_gui_stop" class="warn">Detener GUI</button>
-              <span class="muted">Estado: <b id="pb_gui_status">desconocido</b></span>
-            </div>
-            <p class="muted">La GUI abre una ventana PyBullet adicional para simulación interactiva. La visualización web seguirá funcionando.</p>
-          </div>
-          <div class="card">
-            <h3>PID por defecto</h3>
-            <div class="row">
-              <div class="field"><label>kpX</label><input type="number" id="def_kpX" step="0.01" value="1.00"></div>
-              <div class="field"><label>kiX</label><input type="number" id="def_kiX" step="0.01" value="1.00"></div>
-              <div class="field"><label>kdX</label><input type="number" id="def_kdX" step="0.01" value="0.20"></div>
-            </div>
-            <div class="row">
-              <div class="field"><label>kpA</label><input type="number" id="def_kpA" step="0.01" value="1.00"></div>
-              <div class="field"><label>kiA</label><input type="number" id="def_kiA" step="0.01" value="1.00"></div>
-              <div class="field"><label>kdA</label><input type="number" id="def_kdA" step="0.01" value="0.20"></div>
-            </div>
-            <div class="mini-actions"><button id="btn_apply_pid_defaults">Aplicar ahora</button></div>
-          </div>
         </div>
 
-        <div class="grid two" style="margin-top:10px">
-          <div class="card">
-            <h3>Políticas & Planificador</h3>
-            <div class="row">
-              <div class="field"><label>command_policy</label>
-                <select id="sel_policy">
-                  <option value="stop_only">stop_only</option>
-                  <option value="all">all</option>
-                  <option value="none">none</option>
-                </select>
-              </div>
-              <label class="chk"><input type="checkbox" id="chk_scheduler"> Scheduler habilitado</label>
-              <button id="btn_apply_policy">Aplicar políticas</button>
-            </div>
-          </div>
-        </div>
+        
+
+        
         <div class="mini-actions" style="justify-content:flex-end; margin-top:8px">
           <button id="btn_save_settings">Guardar Settings</button>
         </div>
@@ -145,354 +102,60 @@
 
     <!-- OPERACIÓN + TELEMETRÍA -->
     <section class="tabview" data-tab="op">
-      <div class="grid two">
-        <div class="card control-board" style="position:relative">
+      <!-- Visualización primero -->
+      <div class="card">
+        <h2>Visualización</h2>
+        <div class="row" style="gap:20px;align-items:center;flex-wrap:wrap">
+          <div id="pybullet_panel" class="pybullet-box">
+            <img id="pybullet_view" alt="Visualizacion PyBullet" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-placeholder="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />
+            <span class="muted" id="pybullet_status">Visualizacion pendiente...</span>
+            <div class="row" style="margin-top:6px; gap:6px">
+              <button id="btn_pb_gui_start" type="button">Iniciar GUI</button>
+              <button id="btn_pb_gui_stop" type="button" class="warn">Detener GUI</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Operación + Telemetría debajo de Visualización -->
+      <div class="card control-board" style="position:relative">
           <div id="op_overlay" class="overlay-block" hidden>
             <div class="overlay-content"><span id="overlay_msg">Ejecución en curso…</span> <button id="btn_overlay_reconnect" style="margin-left:8px; display:none">Reconectar</button></div>
           </div>
           <h2>Operación + Telemetría</h2>
           <div class="control-switches">
-            <label class="chk"><input type="checkbox" id="chk_manual_x"> X Manual</label>
-            <label class="chk"><input type="checkbox" id="chk_manual_a"> A Manual</label>
-            <button id="btn_pid_on" title="Ambos automáticos">PID ON</button>
-            <span class="muted small">La UI no forzará los checks con /status (evita el “rebote” sin RX).</span>
+            <span class="muted small">Controles manuales y energías están dentro de cada widget.</span>
           </div>
 
-          <div class="control-grid">
-            <div class="control-pair">
-              <div class="pair-header">
-                <label>Setpoint X (mm)</label>
-                <span class="live-val">Actual: <b id="t_x">0.00</b></span>
-              </div>
-              <div class="pair-body">
-                <div class="row" style="gap:8px; align-items:center">
-                  <button id="btn_x_dec10">−10</button>
-                  <button id="btn_x_dec1">−1</button>
-                  <input type="number" id="sp_x" step="0.5" value="0" min="0" max="400" style="width:90px">
-                  <button id="btn_x_inc1">+1</button>
-                  <button id="btn_x_inc10">+10</button>
-                </div>
-                <input type="range" id="sl_x" min="0" max="400" step="0.5" value="0" style="width:100%">
-                <div class="pair-meta">
-                  <span>X: <b id="rd_x_mm">0.00</b> mm</span>
-                  <span>Lim: <b id="t_limx">0</b></span>
-                  <span>Home: <b id="t_homx">0</b></span>
-                </div>
-              </div>
-            </div>
+          {# Bloque de controles original oculto para centrar en Widgets — Operación #}
 
-            <div class="control-pair">
-              <div class="pair-header">
-                <label>Setpoint A (°)</label>
-                <span class="live-val">Actual: <b id="t_a">0.00</b></span>
-              </div>
-              <div class="pair-body">
-                <div class="row" style="gap:8px; align-items:center">
-                  <button id="btn_a_dec10">−10°</button>
-                  <button id="btn_a_dec1">−1°</button>
-                  <input type="number" id="sp_a" step="0.5" value="0" min="0" max="300" style="width:90px">
-                  <button id="btn_a_inc1">+1°</button>
-                  <button id="btn_a_inc10">+10°</button>
-                </div>
-                <input type="range" id="sl_a" min="0" max="300" step="0.5" value="0" style="width:100%">
-                <div class="pair-meta">
-                  <span>A: <b id="rd_a_deg">0.00</b> °</span>
-                  <span>Lim: <b id="t_lima">0</b></span>
-                  <span>Home: <b id="t_homa">0</b></span>
-                </div>
-              </div>
-            </div>
+          {# Widget Bomba/Flujo movido a contenedor de Widgets — Operación #}
 
-            <div class="control-pair">
-              <div class="pair-header">
-                <label>Volumen objetivo (ml)</label>
-                <span class="live-val">Actual: <b id="t_vol">0.00</b></span>
-              </div>
-              <div class="pair-body">
-                <div class="row" style="gap:8px; align-items:center">
-                  <button id="btn_v_dec10">−10</button>
-                  <button id="btn_v_dec1">−1</button>
-                  <input type="number" id="sp_vol" step="1" value="0" min="0" max="100" style="width:90px">
-                  <button id="btn_v_inc1">+1</button>
-                  <button id="btn_v_inc10">+10</button>
-                </div>
-                <input type="range" id="sl_vol" min="0" max="100" step="1" value="0" style="width:100%">
-                <div class="pair-meta">
-                  <span>Actual: <b id="rd_vol_ml">0.00</b> ml</span>
-                  <span>Flux: <b id="t_flow">0.00</b> ml/s</span>
-                </div>
-              </div>
-            </div>
+          {# KPIs y barras globales eliminados para evitar duplicados; cada widget muestra su lectura #}
 
-            <div class="control-pair">
-              <div class="pair-header">
-                <label>Setpoint Z (mm)</label>
-                <span class="live-val">Actual: <b id="t_z">0.00</b></span>
-              </div>
-              <div class="pair-body">
-                <div class="row" style="gap:8px; align-items:center">
-                  <button id="btn_z_dec10">−10</button>
-                  <button id="btn_z_dec1">−1</button>
-                  <input type="number" id="sp_z" step="0.5" value="0" min="0" max="200" style="width:90px">
-                  <button id="btn_z_inc1">+1</button>
-                  <button id="btn_z_inc10">+10</button>
-                </div>
-                <input type="range" id="sl_z" min="0" max="200" step="0.5" value="0" style="width:100%">
-                <div class="pair-meta">
-                  <span>Actual: <b id="rd_z_mm">0.00</b> mm</span>
-                  <label style="display:flex; gap:6px; align-items:center">Velocidad Z (deg/s)<input type="number" id="sp_z_speed" step="1" value="90" style="width:70px"></label>
-                </div>
-              </div>
+          <!-- Widgets — Operación en una sola columna -->
+          <div class="card" id="widgets_op_container" style="margin-top:10px">
+            <h3>Widgets — Operación</h3>
+            <div id="widgets_op_all" class="grid two" style="gap:10px">
+              {% include 'widgets/corredera_operacion.html' %}
+              {% include 'widgets/angulo_operacion.html' %}
+              {% include 'widgets/z_control.html' %}
+              {% include 'widgets/bomba_operacion.html' %}
             </div>
           </div>
 
-          <div class="pair-actions">
-            <button id="btn_apply_sp">Aplicar Setpoints</button>
-            <button id="btn_reset_vol">Reset Volumen</button>
-          </div>
+          {# Controles de energías ocultos (migrables a widgets) #}
+          <!--div class="row energy-row"-->
+            
+          <!--/div-->
 
-          <div class="flow-widget" id="flow_widget">
-            <div class="fw-layout">
-              <aside class="fw-side">
-                <div class="control-stats compact flow-side-panel">
-                  <div class="flow-meta">
-                    <div>
-                      <label>Caudal bomba (ml/s)</label>
-                      <span id="k_caudal_bomba">0</span>
-                    </div>
-                    <div>
-                      <label>Sensor flujo</label>
-                      <span id="k_usar_flujo">—</span>
-                    </div>
-                  </div>
-                  <div class="tank-visual" id="tank_box" title="Nivel (relativo)">
-                    <div class="tank-glow"></div>
-                    <svg class="tank-svg" viewBox="0 0 140 200" aria-label="Tank level">
-                      <defs>
-                        <linearGradient id="tankWaterGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stop-color="#38bdf8"/>
-                          <stop offset="60%" stop-color="#0ea5e9"/>
-                          <stop offset="100%" stop-color="#0369a1"/>
-                        </linearGradient>
-                        <linearGradient id="tankGlassGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stop-color="#1e293b" stop-opacity="0.35"/>
-                          <stop offset="45%" stop-color="#38bdf8" stop-opacity="0.55"/>
-                          <stop offset="100%" stop-color="#020617" stop-opacity="0.5"/>
-                        </linearGradient>
-                        <clipPath id="tankClipMini">
-                          <rect x="30" y="25" width="80" height="140" rx="16" ry="16"/>
-                        </clipPath>
-                      </defs>
-                      <ellipse cx="70" cy="182" rx="42" ry="12" fill="#020617" opacity="0.7"/>
-                      <rect x="30" y="25" width="80" height="140" rx="16" ry="16" fill="url(#tankGlassGradient)" stroke="#48d6ff" stroke-width="2"/>
-                      <g clip-path="url(#tankClipMini)">
-                        <rect id="tank_water" x="30" y="165" width="80" height="0" fill="url(#tankWaterGradient)" opacity="0.95"/>
-                        <rect id="tank_highlight" x="36" y="165" width="14" height="0" fill="#ffffff" opacity="0.45"/>
-                      </g>
-                    </svg>
-                    <div class="tank-label">
-                      <span id="tank_pct">0%</span>
-                    </div>
-                  </div>
-                </div>
-              </aside>
-              <div class="fw-main">
-                <div class="fw-header">
-                  <div>
-                    <h3 style="margin:0">Control de Flujo</h3>
-                    <p class="muted small" style="margin:2px 0 0 0">Replica el panel de la bomba en el Hub para ajustar volumen y caudal.</p>
-                  </div>
-                  <div class="fw-stats">
-                    <div class="fw-stat">
-                      <label>Flujo actual</label>
-                      <span id="fw_flow_actual">0.0 ml/s</span>
-                    </div>
-                    <div class="fw-stat">
-                      <label>Objetivo de flujo</label>
-                      <span id="fw_flow_target">0.0 ml/s</span>
-                    </div>
-                    <div class="fw-stat">
-                      <label>Volumen entregado</label>
-                      <span id="fw_volume_actual">0 ml</span>
-                    </div>
-                    <div class="fw-stat">
-                      <label>Objetivo de volumen</label>
-                      <span id="fw_volume_target">0 ml</span>
-                    </div>
-                    <div class="fw-stat">
-                      <label>Restante</label>
-                      <span id="fw_volume_remaining">0 ml</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="fw-step-grid">
-              <div class="fw-stepper">
-                <div class="stepper-head">
-                  <label>Volumen objetivo</label>
-                  <span class="unit">ml</span>
-                </div>
-                <div class="stepper-body">
-                  <button type="button" data-fw-step="-100" data-target="volume">−100</button>
-                  <button type="button" data-fw-step="-10" data-target="volume">−10</button>
-                  <input type="number" id="fw_volume" value="150" min="0" max="2000" step="1">
-                  <button type="button" data-fw-step="10" data-target="volume">+10</button>
-                  <button type="button" data-fw-step="100" data-target="volume">+100</button>
-                </div>
-              </div>
-              <div class="fw-stepper">
-                <div class="stepper-head">
-                  <label>Caudal objetivo</label>
-                  <span class="unit">ml/s</span>
-                </div>
-                <div class="stepper-body">
-                  <button type="button" data-fw-step="-5" data-target="flow">−5</button>
-                  <button type="button" data-fw-step="-1" data-target="flow">−1</button>
-                  <input type="number" id="fw_flow" value="5" min="0" max="40" step="0.5">
-                  <button type="button" data-fw-step="1" data-target="flow">+1</button>
-                  <button type="button" data-fw-step="5" data-target="flow">+5</button>
-                </div>
-              </div>
-            </div>
-            <div class="fw-actions">
-              <button type="button" id="fw_start">Ejecutar</button>
-              <button type="button" id="fw_stop" class="warn">Detener</button>
-              <button type="button" id="fw_reset" class="ghost">Reiniciar volumen</button>
-            </div>
-          </div>
+          {# Acciones rápidas ocultas (migrables a widgets) #}
+          <!--div class="row"-->
+            
+          <!--/div-->
 
-          <div class="kpis">
-            <div class="kpi"><span class="lbl">pasos/mm</span><span class="val" id="k_steps_mm">0</span></div>
-            <div class="kpi"><span class="lbl">pasos/°</span><span class="val" id="k_steps_deg">0</span></div>
-            <div class="kpi"><span class="lbl">kpX</span><span class="val" id="k_kpX">0</span></div>
-            <div class="kpi"><span class="lbl">kiX</span><span class="val" id="k_kiX">0</span></div>
-            <div class="kpi"><span class="lbl">kdX</span><span class="val" id="k_kdX">0</span></div>
-            <div class="kpi"><span class="lbl">kpA</span><span class="val" id="k_kpA">0</span></div>
-            <div class="kpi"><span class="lbl">kiA</span><span class="val" id="k_kiA">0</span></div>
-            <div class="kpi"><span class="lbl">kdA</span><span class="val" id="k_kdA">0</span></div>
-          </div>
-
-          <div class="gauges">
-            <div class="gauge"><label>Energy X</label><div class="bar"><div id="g_ex"></div></div></div>
-            <div class="gauge"><label>Energy A</label><div class="bar"><div id="g_ea"></div></div></div>
-            <div class="gauge"><label>Bomba</label><div class="bar"><div id="g_eb"></div></div></div>
-            <div class="gauge"><label>Progreso Volumen</label><div class="bar"><div id="g_vol_goal"></div></div></div>
-          </div>
-
-          <div class="row energy-row">
-            <div class="slider">
-              <label>Energy X</label>
-              <input type="range" id="en_x" min="-255" max="255" value="0">
-              <output id="en_x_o">0</output>
-              <span class="reading">Lectura: <b id="rd_en_x">0</b></span>
-            </div>
-            <div class="slider">
-              <label>Energy A</label>
-              <input type="range" id="en_a" min="-255" max="255" value="0">
-              <output id="en_a_o">0</output>
-              <span class="reading">Lectura: <b id="rd_en_a">0</b></span>
-            </div>
-            <div class="slider">
-              <label>Energy Bomba</label>
-              <input type="range" id="en_b" min="0" max="255" value="0">
-              <output id="en_b_o">0</output>
-              <span class="reading">Lectura: <b id="rd_en_b">0</b></span>
-            </div>
-            <button id="btn_apply_energy" style="display:none">Aplicar Energías</button>
-            <button id="btn_stop_all" class="warn">Paro (energías=0)</button>
-          </div>
-
-          <div class="row">
-            <button id="btn_home_x">Homing X</button>
-            <button id="btn_home_a">Homing A</button>
-            <button id="btn_reset_all" class="warn">Reset X + A + Volumen</button>
-          </div>
-
-          <div class="mini-actions" style="margin-top:8px">
-            <button id="btn_water">Agua</button>
-            <button id="btn_home_global">Home</button>
-            <button id="btn_stop_global" class="warn">Paro inmediato</button>
-          </div>
+          {# Botones globales ocultos (se pueden reubicar via widgets) #}
         </div>
-
-        <div class="card">
-          <h2>Visualización y Gráfico</h2>
-          <div class="row" style="gap:20px;align-items:center;flex-wrap:wrap">
-            <svg id="robot_svg" width="220" height="220" viewBox="0 0 220 220">
-              <defs>
-                <filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.5"/></filter>
-              </defs>
-              <circle cx="110" cy="110" r="100" fill="#0b1023" stroke="#273059" />
-              <!-- pista corredera -->
-              <rect x="55" y="105" width="110" height="10" rx="5" fill="#101736" stroke="#273059" />
-              <!-- carro corredera -->
-              <rect id="carro" x="55" y="100" width="14" height="20" rx="4" fill="#7ab6ff" filter="url(#shadow)" />
-              <!-- aguja ángulo -->
-              <line id="aguja" x1="110" y1="110" x2="110" y2="30" stroke="#7affc2" stroke-width="4" stroke-linecap="round" />
-              <circle cx="110" cy="110" r="5" fill="#7affc2" />
-            </svg>
-            <canvas id="chart" width="640" height="240"></canvas>
-            <div id="pybullet_panel" class="pybullet-box">
-              <img id="pybullet_view" alt="Visualizacion PyBullet" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-placeholder="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />
-              <span class="muted" id="pybullet_status">Visualizacion pendiente...</span>
-            </div>
-          </div>
-          <div class="legend">
-            <span class="c1">X(mm)</span>
-            <span class="c2">A(°)</span>
-            <span class="c3">Vol(ml)</span>
-            <span class="c4">Flow(ml/s, auto)</span>
-            <span class="muted" style="margin-left:8px">Autoescala por serie</span>
-          </div>
-          <div class="mini-actions" style="justify-content:flex-start">
-            <button id="btn-freeze">Pausar</button>
-            <button id="btn-clear">Limpiar</button>
-          </div>
-          <div class="svg-gauges">
-            <div class="svg-gauge">
-              <svg width="120" height="120" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="48" class="bg" />
-                <circle id="sg_x_fg" cx="60" cy="60" r="48" class="fg c1" transform="rotate(-90 60 60)" />
-                <text id="sg_x_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
-                <text x="60" y="100" text-anchor="middle" class="lbl">X (mm)</text>
-              </svg>
-            </div>
-            <div class="svg-gauge">
-              <svg width="120" height="120" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="48" class="bg" />
-                <circle id="sg_a_fg" cx="60" cy="60" r="48" class="fg c2" transform="rotate(-90 60 60)" />
-                <text id="sg_a_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
-                <text x="60" y="100" text-anchor="middle" class="lbl">A (°)</text>
-              </svg>
-            </div>
-            <div class="svg-gauge">
-              <svg width="120" height="120" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="48" class="bg" />
-                <circle id="sg_vol_fg" cx="60" cy="60" r="48" class="fg c3" transform="rotate(-90 60 60)" />
-                <text id="sg_vol_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
-                <text x="60" y="100" text-anchor="middle" class="lbl">Vol (ml)</text>
-              </svg>
-            </div>
-            <div class="svg-gauge">
-              <svg width="120" height="120" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="48" class="bg" />
-                <circle id="sg_z_fg" cx="60" cy="60" r="48" class="fg c4" transform="rotate(-90 60 60)" />
-                <text id="sg_z_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
-                <text x="60" y="100" text-anchor="middle" class="lbl">Z (mm)</text>
-              </svg>
-            </div>
-            <div class="svg-gauge">
-              <svg width="120" height="120" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="48" class="bg" />
-                <circle id="sg_flow_fg" cx="60" cy="60" r="48" class="fg c4" transform="rotate(-90 60 60)" />
-                <text id="sg_flow_txt" x="60" y="64" text-anchor="middle" class="txt">0.00</text>
-                <text x="60" y="100" text-anchor="middle" class="lbl">Flow (ml/s)</text>
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
     </section>
 
 
@@ -506,6 +169,7 @@
     <span id="toast" class="toast" hidden>ok</span>
   </footer>
 
-  <script src="/static/js/reloj.js?v=4"></script>
+  <script src="/static/js/reloj.js?v=5"></script>
+  <!-- Widgets modulares -->
 </body>
 </html>

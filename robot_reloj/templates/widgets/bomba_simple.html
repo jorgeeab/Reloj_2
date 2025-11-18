@@ -1,0 +1,118 @@
+<div class="flow-widget" id="flow_widget">
+  <button type="button" class="gear-btn gear-floating" id="gear_bomba" title="Bomba: —">⚙</button>
+  <div class="fw-layout">
+    <aside class="fw-side">
+      <div class="control-stats compact flow-side-panel">
+        <div class="flow-meta">
+          <div>
+            <label>Caudal bomba (ml/s)</label>
+            <span id="k_caudal_bomba">0</span>
+          </div>
+          <div>
+            <label>Sensor flujo</label>
+            <span id="k_usar_flujo">—</span>
+          </div>
+        </div>
+        <div class="tank-visual" id="tank_box" title="Nivel (relativo)">
+          <div class="tank-glow"></div>
+          <svg class="tank-svg" viewBox="0 0 140 200" aria-label="Tank level">
+            <defs>
+              <linearGradient id="tankWaterGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#38bdf8"/>
+                <stop offset="60%" stop-color="#0ea5e9"/>
+                <stop offset="100%" stop-color="#0369a1"/>
+              </linearGradient>
+              <linearGradient id="tankGlassGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#1e293b" stop-opacity="0.35"/>
+                <stop offset="45%" stop-color="#38bdf8" stop-opacity="0.55"/>
+                <stop offset="100%" stop-color="#020617" stop-opacity="0.5"/>
+              </linearGradient>
+              <clipPath id="tankClipMini">
+                <rect x="30" y="25" width="80" height="140" rx="16" ry="16"/>
+              </clipPath>
+            </defs>
+            <ellipse cx="70" cy="182" rx="42" ry="12" fill="#020617" opacity="0.7"/>
+            <rect x="30" y="25" width="80" height="140" rx="16" ry="16" fill="url(#tankGlassGradient)" stroke="#48d6ff" stroke-width="2"/>
+            <g clip-path="url(#tankClipMini)">
+              <rect id="tank_water" x="30" y="165" width="80" height="0" fill="url(#tankWaterGradient)" opacity="0.95"/>
+              <rect id="tank_highlight" x="36" y="165" width="14" height="0" fill="#ffffff" opacity="0.45"/>
+            </g>
+          </svg>
+          <div class="tank-label">
+            <span id="tank_pct">0%</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="fw-main">
+      <div class="fw-header">
+        <div>
+          <h3 style="margin:0">Control de Flujo</h3>
+          <p class="muted small" style="margin:2px 0 0 0">Replica el panel de la bomba en el Hub para ajustar volumen y caudal.</p>
+        </div>
+        <div class="fw-stats">
+          <div class="fw-stat">
+            <label>Flujo actual</label>
+            <span id="fw_flow_actual">0.0 ml/s</span>
+          </div>
+          <div class="fw-stat">
+            <label>Objetivo de flujo</label>
+            <span id="fw_flow_target">0.0 ml/s</span>
+          </div>
+          <div class="fw-stat">
+            <label>Volumen entregado</label>
+            <span id="fw_volume_actual">0 ml</span>
+          </div>
+          <div class="fw-stat">
+            <label>Objetivo de volumen</label>
+            <span id="fw_volume_target">0 ml</span>
+          </div>
+          <div class="fw-stat">
+            <label>Restante</label>
+            <span id="fw_volume_remaining">0 ml</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="fw-step-grid">
+    <div class="fw-stepper">
+      <div class="stepper-head">
+        <label>Volumen objetivo</label>
+        <span class="unit">ml</span>
+      </div>
+      <div class="stepper-body">
+        <button type="button" data-fw-step="-100" data-target="volume">−100</button>
+        <button type="button" data-fw-step="-10" data-target="volume">−10</button>
+        <input type="number" id="fw_volume" value="150" min="0" max="2000" step="1">
+        <button type="button" data-fw-step="10" data-target="volume">+10</button>
+        <button type="button" data-fw-step="100" data-target="volume">+100</button>
+      </div>
+    </div>
+    <div class="fw-stepper">
+      <div class="stepper-head">
+        <label>Caudal objetivo</label>
+        <span class="unit">ml/s</span>
+      </div>
+      <div class="stepper-body">
+        <button type="button" data-fw-step="-5" data-target="flow">−5</button>
+        <button type="button" data-fw-step="-1" data-target="flow">−1</button>
+        <input type="number" id="fw_flow" value="5" min="0" max="40" step="0.5">
+        <button type="button" data-fw-step="1" data-target="flow">+1</button>
+        <button type="button" data-fw-step="5" data-target="flow">+5</button>
+      </div>
+    </div>
+  </div>
+  <div class="fw-actions">
+    <button type="button" id="fw_start">Ejecutar</button>
+    <button type="button" id="fw_stop" class="warn">Detener</button>
+    <button type="button" id="fw_reset" class="ghost">Reiniciar volumen</button>
+  </div>
+  <div class="gauges" style="margin-top:8px">
+    <div class="gauge"><label>Bomba</label><div class="bar"><div id="wg_g_eb"></div></div></div>
+    <div class="gauge"><label>Progreso Volumen</label><div class="bar"><div id="wg_g_vol"></div></div></div>
+  </div>
+</div>
+
+<!-- Script del widget (bomba) -->
+<script src="/static/js/widgets/bomba_simple.js?v=1"></script>
