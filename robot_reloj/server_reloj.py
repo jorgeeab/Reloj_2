@@ -26,14 +26,20 @@ import json
 import time
 import threading
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from contextlib import nullcontext
 
 from flask import Flask, request, jsonify, make_response, render_template
+import logging
+from logging.handlers import RotatingFileHandler
 from flask_sock import Sock
+try:
+    from werkzeug.serving import WSGIRequestHandler as _WerkReq
+except Exception:
+    _WerkReq = None  # type: ignore
 from simple_websocket import ConnectionClosed
 
 # Importaciones opcionales
@@ -181,6 +187,20 @@ class RobotLogger:
         self._capacity = capacity
         self._buffer: List[str] = []
         self._lock = threading.Lock()
+        # Logger de archivo con rotación
+        try:
+            self._py_logger = logging.getLogger('reloj_server')
+            self._py_logger.setLevel(logging.INFO)
+            log_path = str((LOGS_DIR / 'reloj_server.log').resolve())
+            handler = RotatingFileHandler(log_path, maxBytes=1_000_000, backupCount=5, encoding='utf-8')
+            handler.setLevel(logging.INFO)
+            fmt = logging.Formatter('%(message)s')
+            handler.setFormatter(fmt)
+            # Evitar duplicados si se reimporta
+            if not any(isinstance(h, RotatingFileHandler) for h in self._py_logger.handlers):
+                self._py_logger.addHandler(handler)
+        except Exception:
+            self._py_logger = None  # type: ignore
     
     def log(self, message: str, level: str = "INFO"):
         """Registra un mensaje con timestamp"""
@@ -192,7 +212,18 @@ class RobotLogger:
             if len(self._buffer) > self._capacity:
                 self._buffer = self._buffer[-self._capacity:]
         
+        # Consola
         print(log_entry, flush=True)
+        # Archivo (rotativo)
+        try:
+            if self._py_logger is not None:
+                lvl = level.upper().strip()
+                if   lvl == 'DEBUG':   self._py_logger.debug(log_entry)
+                elif lvl == 'WARNING': self._py_logger.warning(log_entry)
+                elif lvl == 'ERROR':   self._py_logger.error(log_entry)
+                else:                  self._py_logger.info(log_entry)
+        except Exception:
+            pass
     
     def get_logs(self) -> List[str]:
         """Obtiene todos los logs"""
@@ -727,13 +758,22 @@ def get_robot_status(force_fresh=False) -> RobotStatus:
                     dvol = max(0.0, status.volumen_ml - prev_vol)
                     dt = now_ts - prev_ts
                     deriv = dvol / dt if dt > 0 else 0.0
-                    # Si no se usa sensor de flujo, estimar con caudalBombaMLs cuando bomba activa
                     if status.usarSensorFlujo:
+                        # Con sensor: derivada real del volumen
                         status.caudal_est_mls = float(deriv)
                     else:
+                        # Sin sensor: fallback por configuración de caudal cuando la bomba está activa
                         status.caudal_est_mls = float(status.energies.get("bomba", 0) != 0 and status.caudalBombaMLs or 0.0)
+                # Guardar referencias para el próximo ciclo
                 setattr(get_robot_status, "_last_vol_ts", now_ts)
                 setattr(get_robot_status, "_last_vol_ml", status.volumen_ml)
+            except Exception:
+                pass
+
+            # Refuerzo: si NO hay sensor, fija caudal_est_mls al caudal configurado siempre que la bomba esté activa
+            try:
+                if not status.usarSensorFlujo:
+                    status.caudal_est_mls = float(status.energies.get("bomba", 0) != 0 and status.caudalBombaMLs or 0.0)
             except Exception:
                 pass
 
@@ -1012,7 +1052,9 @@ def apply_control_payload(data: Dict[str, Any]) -> Dict[str, Any]:
             if "a_deg" in sp:
                 robot_env.set_angulo_deg(float(sp["a_deg"]))
             if "volumen_ml" in sp:
-                robot_env.set_volumen_objetivo_ml(float(sp["volumen_ml"]))
+                v = float(sp["volumen_ml"])
+                robot_env.set_volumen_objetivo_ml(v)
+                logger.log(f"[FLOW] set objetivo volumen_ml={v}", "DEBUG")
             if "z_mm" in sp:
                 robot_env.set_z_mm(float(sp["z_mm"]))
             if "servo_z_deg" in sp:
@@ -1025,7 +1067,9 @@ def apply_control_payload(data: Dict[str, Any]) -> Dict[str, Any]:
             if "a" in en:
                 robot_env.set_energia_angulo(int(en["a"]))
             if "bomba" in en:
-                robot_env.set_energia_bomba(int(en["bomba"]))
+                eb = int(en["bomba"])
+                robot_env.set_energia_bomba(eb)
+                logger.log(f"[FLOW] energia bomba={eb}", "DEBUG")
 
         if "motion" in data:
             mv = data["motion"] or {}
@@ -1052,9 +1096,13 @@ def apply_control_payload(data: Dict[str, Any]) -> Dict[str, Any]:
             fl = data["flow"] or {}
             if "usar_sensor_flujo" in fl:
                 val = fl["usar_sensor_flujo"]
-                robot_env.set_usar_sensor_flujo(bool(int(val)) if isinstance(val, (int, str)) else bool(val))
+                u = bool(int(val)) if isinstance(val, (int, str)) else bool(val)
+                robot_env.set_usar_sensor_flujo(u)
+                logger.log(f"[FLOW] usar_sensor_flujo={int(u)}", "DEBUG")
             if "caudal_bomba_mls" in fl:
-                robot_env.set_caudal_bomba_ml_s(float(fl["caudal_bomba_mls"]))
+                c = float(fl["caudal_bomba_mls"])
+                robot_env.set_caudal_bomba_ml_s(c)
+                logger.log(f"[FLOW] caudal_bomba_mls={c}", "DEBUG")
 
         if "modo" in data:
             modo = int(data["modo"])
@@ -1067,7 +1115,14 @@ def apply_control_payload(data: Dict[str, Any]) -> Dict[str, Any]:
         if data.get("reset_a"):
             robot_env.reset_a()
 
+        # Paso de control → envía TX al firmware / virtual
         robot_env.step()
+        try:
+            act = getattr(robot_env, 'act', None)
+            if act is not None and len(act) >= 7:
+                logger.log(f"[TX] modo={int(act[0])} eA={int(act[1])} eX={int(act[2])} eB={int(act[3])} volObj={float(act[6]):.2f} caudal={float(act[19]) if len(act)>19 else 0.0}", "DEBUG")
+        except Exception:
+            pass
         try:
             _set_last_tx(json.dumps(data, ensure_ascii=False))
         except Exception:
@@ -1101,7 +1156,7 @@ def ws_control(ws):
         "type": "control_ready",
         "robot_id": active_robot_id,
         "kind": ROBOT_PROFILES.get(active_robot_id or "real", {}).get("kind", "hardware"),
-        "ts": datetime.utcnow().isoformat(),
+        "ts": datetime.now(timezone.utc).isoformat(),
     }
     try:
         ws.send(json.dumps(hello, ensure_ascii=False))
@@ -1118,7 +1173,7 @@ def ws_control(ws):
                 ws.send(json.dumps({"type": "control_ack", "status": "error", "error": f"invalid_json: {exc}"}))
                 continue
             if isinstance(payload, dict) and payload.get("type") == "ping":
-                ws.send(json.dumps({"type": "pong", "ts": datetime.utcnow().isoformat()}))
+                ws.send(json.dumps({"type": "pong", "ts": datetime.now(timezone.utc).isoformat()}))
                 continue
             body = payload.get("body") if isinstance(payload, dict) and "body" in payload else payload
             if not isinstance(body, dict):
@@ -1129,7 +1184,7 @@ def ws_control(ws):
                 ws.send(json.dumps({
                     "type": "control_ack",
                     "status": "ok",
-                    "ts": datetime.utcnow().isoformat(),
+                    "ts": datetime.now(timezone.utc).isoformat(),
                     "body": result,
                 }, ensure_ascii=False))
             except Exception as exc:
@@ -1161,13 +1216,13 @@ def ws_telemetry(ws):
             "type": "telemetry_ready",
             "robot_id": active_robot_id,
             "interval_s": TELEMETRY_INTERVAL,
-            "ts": datetime.utcnow().isoformat(),
+            "ts": datetime.now(timezone.utc).isoformat(),
         }, ensure_ascii=False))
         while True:
             status = get_robot_status()
             payload = {
                 "type": "telemetry",
-                "ts": datetime.utcnow().isoformat(),
+                "ts": datetime.now(timezone.utc).isoformat(),
                 "robot_id": active_robot_id,
                 "status": asdict(status),
             }
@@ -1750,10 +1805,29 @@ if __name__ == "__main__":
     
     threading.Thread(target=open_browser, daemon=True).start()
     
+    # Handler silencioso para no imprimir 'GET ... 200' en consola
+    QuietHandler = None
+    if _WerkReq is not None:
+        class QuietHandler(_WerkReq):  # type: ignore
+            def log(self, type, message, *args):
+                pass
+            def log_request(self, *args, **kwargs):
+                pass
+
     app.run(
         host="0.0.0.0",
         port=PORT,
         debug=False,
         use_reloader=False,
         threaded=True,
+        request_handler=QuietHandler if QuietHandler is not None else None,
     )
+# Silenciar logs verbosos de HTTP (por ejemplo, /api/pybullet/frame) y dejar nuestros debug propios
+try:
+    # Reduce o desactiva logs HTTP del devserver (GET ... 200)
+    wl = logging.getLogger('werkzeug')
+    wl.setLevel(logging.ERROR)
+    wl.disabled = True
+    app.logger.disabled = True  # solo afecta a app.logger, no a nuestro RobotLogger
+except Exception:
+    pass

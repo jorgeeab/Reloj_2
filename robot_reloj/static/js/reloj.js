@@ -32,6 +32,21 @@
   async function jpost(url, body){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); if(!r.ok) throw new Error(`${r.status} ${url}`); return r.json(); }
   async function jdel(url){ const r=await fetch(url,{method:'DELETE'}); if(!r.ok) throw new Error(`${r.status} ${url}`); return r.json(); }
 
+  // UI Debug console (bottom panel). Keeps last 150 lines.
+  const __uiDbgLines = [];
+  function uiDebug(msg){
+    try{
+      const el = document.getElementById('ui_debug_console');
+      const ts = new Date().toLocaleTimeString();
+      const line = `[${ts}] ${typeof msg==='string'?msg:JSON.stringify(msg)}`;
+      __uiDbgLines.push(line);
+      if(__uiDbgLines.length > 150){ __uiDbgLines.splice(0, __uiDbgLines.length - 150); }
+      if(el){ el.textContent = __uiDbgLines.join('\n'); el.scrollTop = el.scrollHeight; }
+      if(window && window.console){ console.log('[ui]', line); }
+    }catch(e){}
+  }
+  if(typeof window !== 'undefined'){ window.uiDebug = uiDebug; }
+
   const WS_BASE = (location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host;
   const connectionFlags = { control: false, telemetry: false };
   let isSerialOpen = false;
@@ -568,8 +583,14 @@
     const carro = document.getElementById('arena_carro');
     const center = {x:160, y:160};
     let drag = null; // 'x' | 'a'
-    const sendX = debounce((mm)=>{ if(chkX) chkX.checked=false; sendControl({ x_mm:mm, modo:(Number(chkX.checked)*1)|(Number(chkA.checked)*2) }); }, 80);
-    const sendA = debounce((dg)=>{ if(chkA) chkA.checked=false; sendControl({ a_deg:dg, modo:(Number(chkX.checked)*1)|(Number(chkA.checked)*2) }); }, 80);
+    const sendX = debounce((mm)=>{
+      const mx = document.getElementById('wg_x_manual'); if(mx) mx.checked=false; if(chkX) chkX.checked=false;
+      sendControl({ x_mm:mm, modo: recomputeModoBits() });
+    }, 80);
+    const sendA = debounce((dg)=>{
+      const ma = document.getElementById('wg_a_manual'); if(ma) ma.checked=false; if(chkA) chkA.checked=false;
+      sendControl({ a_deg:dg, modo: recomputeModoBits() });
+    }, 80);
 
     function clientToLocal(ev){ const r=svg.getBoundingClientRect(); return { x:(ev.clientX||0)-r.left, y:(ev.clientY||0)-r.top }; }
     function onDown(ev){ const t=ev.target; if(t===carro){ drag='x'; ev.preventDefault(); return; } drag='a'; ev.preventDefault(); }
@@ -625,7 +646,8 @@
           flowActual,
           flowTarget: (s.caudalBombaMLs!=null)?Number(s.caudalBombaMLs):null,
           volumeActual: (s.volumen_ml!=null)?Number(s.volumen_ml):null,
-          volumeTarget: (s.volumen_objetivo_ml!=null)?Number(s.volumen_objetivo_ml):null
+          volumeTarget: (s.volumen_objetivo_ml!=null)?Number(s.volumen_objetivo_ml):null,
+          nowMs: Date.now()
         });
       }
     }catch(e){}
@@ -680,17 +702,20 @@
       const cur = Number(s.volumen_ml||0);
       const bar = document.getElementById('wg_g_vol');
       if(bar){
+        // Preferir volumen estimado por UI cuando esté disponible
+        let curEst = cur;
+        try{ if(window._ui_est_vol!=null) curEst = Number(window._ui_est_vol); }catch{}
         if(goal>0){
-          const pct = clamp((cur/goal)*100,0,100);
+          const pct = clamp((curEst/goal)*100,0,100);
           bar.style.width = pct+"%";
           let eta='';
           const flow = flowActual;
-          if(flow>0 && cur<goal){
-            const secs = Math.max(0, (goal-cur)/flow);
+          if(flow>0 && curEst<goal){
+            const secs = Math.max(0, (goal-curEst)/flow);
             const mm = Math.floor(secs/60), ss = Math.round(secs%60);
             eta = ` • ETA ${mm}m ${ss}s`;
           }
-          bar.dataset.goal = `${fmt(cur,1)} / ${fmt(goal,1)}${eta}`;
+          bar.dataset.goal = `${fmt(curEst,1)} / ${fmt(goal,1)}${eta}`;
           bar.parentElement.dataset.visible = "1";
         }else{
           bar.style.width = "0%";
@@ -705,7 +730,8 @@
       const tankPct = document.getElementById('tank_pct');
       if(tank && tankPct){
         const goal = Number.isFinite(s.volumen_objetivo_ml) ? Number(s.volumen_objetivo_ml) : 0;
-        const cur = Number.isFinite(s.volumen_ml) ? Number(s.volumen_ml) : 0;
+        let cur = Number.isFinite(s.volumen_ml) ? Number(s.volumen_ml) : 0;
+        try{ if(window._ui_est_vol!=null) cur = Number(window._ui_est_vol); }catch{}
         const manualInput = document.getElementById('fw_volume') || document.getElementById('sp_vol');
         let fallback = manualInput ? Number(manualInput.value) : NaN;
         if(!Number.isFinite(fallback) || fallback <= 0){
@@ -743,7 +769,8 @@
           flowActual,
           flowTarget: (s.caudalBombaMLs!=null)?Number(s.caudalBombaMLs):null,
           volumeActual: Number(s.volumen_ml||0),
-          volumeTarget: (s.volumen_objetivo_ml!=null)?Number(s.volumen_objetivo_ml):null
+          volumeTarget: (s.volumen_objetivo_ml!=null)?Number(s.volumen_objetivo_ml):null,
+          nowMs: Date.now()
         });
       }
     }catch{}
@@ -1160,7 +1187,13 @@
   // ------------- Operación -------------
   const chkX = $("#chk_manual_x"), chkA = $("#chk_manual_a");
 
-  const recomputeModoBits = ()=> ((chkX && chkX.checked ? 1:0) | (chkA && chkA.checked ? 2:0));
+  const recomputeModoBits = ()=>{
+    const mx = document.getElementById('wg_x_manual');
+    const ma = document.getElementById('wg_a_manual');
+    const bx = (chkX && chkX.checked) || (mx && mx.checked);
+    const ba = (chkA && chkA.checked) || (ma && ma.checked);
+    return (bx ? 1:0) | (ba ? 2:0);
+  };
 
   if(chkX){ chkX.onchange = async ()=>{ await sendControl({modo:recomputeModoBits()}); toast("Modo actualizado"); }; }
   if(chkA){ chkA.onchange = async ()=>{ await sendControl({modo:recomputeModoBits()}); toast("Modo actualizado"); }; }
@@ -1175,13 +1208,15 @@
     const svEl = document.getElementById('sp_vol');
     const sz = Number($("#sp_z") && $("#sp_z").value || 0);
     // Forzar automático en ambos ejes al aplicar setpoints
+    const mx = document.getElementById('wg_x_manual'); if(mx) mx.checked = false;
+    const ma = document.getElementById('wg_a_manual'); if(ma) ma.checked = false;
     if(chkX) chkX.checked = false;
     if(chkA) chkA.checked = false;
     const motion={};
     const zspeedEl=document.getElementById('sp_z_speed'); if(zspeedEl){ motion.z_speed_deg_s = Number(zspeedEl.value||0); }
     const sp = { x_mm: sx, a_deg: sa, z_mm: sz };
     if(svEl){ sp.volumen_ml = Number(svEl.value || 0); }
-    await sendControl({ setpoints: sp, motion, modo: (Number(chkX.checked)*1) | (Number(chkA.checked)*2) });
+    await sendControl({ setpoints: sp, motion, modo: recomputeModoBits() });
   };
   const debouncedSetpoints = debounce(applySetpointsNow, 250);
   const spX = document.getElementById('sp_x'); if(spX){ spX.oninput = debouncedSetpoints; spX.onchange = applySetpointsNow; }
@@ -1196,7 +1231,28 @@
   if(sl_z && spZ){ sl_z.oninput = ()=>{ spZ.value = sl_z.value; spZ.oninput && spZ.oninput(); }; }
   if(sl_vol && spV){ sl_vol.oninput = ()=>{ spV.value = sl_vol.value; spV.oninput && spV.oninput(); }; }
   const inc = (el, delta, min, max)=>{ if(!el) return; const v = Math.max(min, Math.min(max, Number(el.value||0) + delta)); el.value = String(v); el.oninput && el.oninput(); };
-  const bind = (btnId, el, delta, min, max)=>{ const b=byId(btnId); if(b&&el){ b.onclick = ()=> inc(el, delta, min, max); } };
+  // Bind click + hold-to-repeat for step buttons
+  const HOLD_DELAY_BTN = 650;   // start repeating after this ms
+  const HOLD_INTERVAL_BTN = 300; // repeat every this ms
+  const bindStep = (btnId, handler)=>{
+    const b = byId(btnId); if(!b) return;
+    // click once
+    b.addEventListener('click', handler);
+    // hold
+    let holdTimer = null; let repeatTimer = null;
+    const clear = ()=>{ if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; } if(repeatTimer){ clearInterval(repeatTimer); repeatTimer=null; } };
+    b.addEventListener('pointerdown', ev=>{
+      ev.preventDefault();
+      try{ b.setPointerCapture(ev.pointerId); }catch{}
+      holdTimer = setTimeout(()=>{ repeatTimer = setInterval(handler, HOLD_INTERVAL_BTN); }, HOLD_DELAY_BTN);
+    });
+    const release = (ev)=>{ clear(); if(ev && ev.pointerId!=null){ try{ b.releasePointerCapture(ev.pointerId); }catch{} } };
+    b.addEventListener('pointerup', release);
+    b.addEventListener('pointercancel', release);
+    b.addEventListener('pointerleave', clear);
+    b.addEventListener('lostpointercapture', clear);
+  };
+  const bind = (btnId, el, delta, min, max)=>{ if(!el) return; bindStep(btnId, ()=> inc(el, delta, min, max)); };
   bind('btn_x_dec10', spX, -10, 0, 400); bind('btn_x_dec1', spX, -1, 0, 400); bind('btn_x_inc1', spX, +1, 0, 400); bind('btn_x_inc10', spX, +10, 0, 400);
   bind('btn_a_dec10', spA, -10, 0, 300); bind('btn_a_dec1', spA, -1, 0, 300); bind('btn_a_inc1', spA, +1, 0, 300); bind('btn_a_inc10', spA, +10, 0, 300);
   bind('btn_z_dec10', spZ, -10, 0, 200); bind('btn_z_dec1', spZ, -1, 0, 200); bind('btn_z_inc1', spZ, +1, 0, 200); bind('btn_z_inc10', spZ, +10, 0, 200);
@@ -1290,7 +1346,10 @@
     if(e.target && ["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName)) return;
     const k=e.key.toLowerCase();
     if(k==="m"){
-      chkX.checked=!chkX.checked; chkA.checked=!chkA.checked;
+      const mx=document.getElementById('wg_x_manual'); const ma=document.getElementById('wg_a_manual');
+      if(mx) mx.checked=!mx.checked; if(ma) ma.checked=!ma.checked;
+      if(chkX) chkX.checked = !!(mx && mx.checked);
+      if(chkA) chkA.checked = !!(ma && ma.checked);
       await sendControl({modo:recomputeModoBits()}); toast("Toggle manual/auto");
     }else if(k==="h"){
       await sendControl({reset_x:1, reset_a:1}); toast("Homing X/A");

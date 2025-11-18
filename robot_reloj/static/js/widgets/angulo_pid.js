@@ -52,7 +52,17 @@
       const out = document.getElementById('wg_en_a_o');
       const recomputeModo = ()=> (manual && manual.checked ? 2 : 0); // bit A
       if(manual){ manual.addEventListener('change', async ()=>{ try{ await ctx.sendControl({ modo: recomputeModo() }); }catch{} }); }
-      if(en){ en.addEventListener('input', async ()=>{ if(out) out.textContent = en.value; try{ await ctx.sendControl({ energies: { a: Number(en.value||0) }, modo: recomputeModo() }); }catch{} }); }
+      if(en){
+        en.addEventListener('input', async ()=>{
+          if(out) out.textContent = en.value;
+          try{
+            const v = Number(en.value||0) || 0;
+            if(manual){ manual.checked = Math.abs(v) > 0; }
+            const ga = document.getElementById('chk_manual_a'); if(ga){ ga.checked = !!(manual && manual.checked); }
+            await ctx.sendControl({ energies: { a: v }, modo: recomputeModo() });
+          }catch{}
+        });
+      }
     }
     function attachGear(){
       const gear = document.getElementById('gear_a');

@@ -66,7 +66,13 @@
       if(en){
         en.addEventListener('input', async ()=>{
           if(out) out.textContent = en.value;
-          try{ await ctx.sendControl({ energies: { x: Number(en.value||0) }, modo: recomputeModo() }); }catch{}
+          // Si el usuario usa energía, activar manual automáticamente cuando |value|>0
+          try{
+            const v = Number(en.value||0) || 0;
+            if(manual){ manual.checked = Math.abs(v) > 0; }
+            const gx = document.getElementById('chk_manual_x'); if(gx){ gx.checked = !!(manual && manual.checked); }
+            await ctx.sendControl({ energies: { x: v }, modo: recomputeModo() });
+          }catch{}
         });
       }
     }

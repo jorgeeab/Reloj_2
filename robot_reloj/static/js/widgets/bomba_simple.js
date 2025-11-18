@@ -67,21 +67,48 @@
         lastVolumeActual: null,
         lastFlowActual: null,
         userOverrideVolume: false,
-        userOverrideFlow: false
+        userOverrideFlow: false,
+        estActive: false,
+        estVol: 0,
+        lastTs: 0
       };
 
-      const buttons = refs.wrap.querySelectorAll('.fw-btn');
+      // Stepper buttons: click + hold-to-repeat support
+      const buttons = refs.wrap.querySelectorAll('[data-fw-step]');
+      const applyStep = (btn)=>{
+        const isFlow = (btn.dataset.target === 'flow');
+        const b = isFlow ? limits.flow : limits.volume;
+        const input = isFlow ? refs.flow : refs.volume;
+        const step = Number(btn.dataset.fwStep || 0);
+        if(!Number.isFinite(step) || step === 0) return;
+        const next = clamp(getInputNumber(input) + step, b.min, b.max);
+        input.value = fmt(next, b.precision);
+        input.dispatchEvent(new Event('change'));
+      };
+      // Hold behavior: start repeating only after a longer press
+      const HOLD_DELAY = 650;      // ms to start repeating
+      const HOLD_INTERVAL = 300;   // ms between repeats (slower)
       buttons.forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const isFlow = (btn.dataset.target === 'flow');
-          const b = isFlow ? limits.flow : limits.volume;
-          const input = isFlow ? refs.flow : refs.volume;
-          const step = Number(btn.dataset.step || (isFlow?0.5:1));
-          const delta = btn.dataset.dir === 'inc' ? +step : -step;
-          const next = clamp(getInputNumber(input) + delta, b.min, b.max);
-          input.value = fmt(next, b.precision);
-          input.dispatchEvent(new Event('change'));
+        // Simple click
+        btn.addEventListener('click', ()=> applyStep(btn));
+        // Hold repeat
+        let holdTimer = null;
+        let repeatTimer = null;
+        const clearTimers = ()=>{ if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; } if(repeatTimer){ clearInterval(repeatTimer); repeatTimer=null; } };
+        btn.addEventListener('pointerdown', ev=>{
+          ev.preventDefault();
+          try{ btn.setPointerCapture(ev.pointerId); }catch{}
+          // Do not apply immediately on press; only start after HOLD_DELAY
+          holdTimer = setTimeout(()=>{ repeatTimer = setInterval(()=> applyStep(btn), HOLD_INTERVAL); }, HOLD_DELAY);
         });
+        const release = (ev)=>{
+          clearTimers();
+          if(ev && ev.pointerId!=null){ try{ btn.releasePointerCapture(ev.pointerId); }catch{} }
+        };
+        btn.addEventListener('pointerup', release);
+        btn.addEventListener('pointercancel', release);
+        btn.addEventListener('pointerleave', clearTimers);
+        btn.addEventListener('lostpointercapture', clearTimers);
       });
 
       // Bind inputs
@@ -105,15 +132,47 @@
       bind(refs.volume, 'volume');
 
       refs.start.addEventListener('click', async ()=>{
-        const v = clamp(getInputNumber(refs.volume), limits.volume.min, limits.volume.max);
+        // Leer valores objetivo desde inputs
+        const vIn = clamp(getInputNumber(refs.volume), limits.volume.min, limits.volume.max);
         const f = clamp(getInputNumber(refs.flow), limits.flow.min, limits.flow.max);
-        setTarget('volume', v);
+
+        // Objetivo ABSOLUTO (volumen total requerido)
+        const vTargetAbs = vIn;
+
+        // Reflejar en UI el objetivo absoluto que usaremos
+        setTarget('volume', vTargetAbs);
         setTarget('flow', f);
-        try{ await ctx.ControlChannel.send({ setpoints: { volumen_ml: v }, flow: { caudal_bomba_mls: f } }); ctx.toast && ctx.toast('Ejecución iniciada'); }catch{ ctx.toast && ctx.toast('Error'); }
+
+        // Preparar bandera de sensor de flujo según snapshot para no forzar configuración inesperada
+        let usarSensor = 0;
+        try{
+          const s = (ctx.getStatus && ctx.getStatus()) || null;
+          if(s && typeof s.usarSensorFlujo !== 'undefined') usarSensor = Number(!!s.usarSensorFlujo);
+        }catch{}
+
+        // Evitar doble envío accidental
+        refs.start.disabled = true;
+        try{
+          await ctx.ControlChannel.send({
+            setpoints: { volumen_ml: vTargetAbs },
+            flow: { caudal_bomba_mls: f, usar_sensor_flujo: usarSensor },
+            energies: { bomba: 200 }
+          });
+          try{ ctx.debug && ctx.debug({ bomba:'ejecutar', volumen_ml:vTargetAbs, caudal_mls:f, usar_sensor:usarSensor }); }catch{}
+          ctx.toast && ctx.toast('Ejecución iniciada');
+        }catch{
+          ctx.toast && ctx.toast('Error');
+        }finally{
+          refs.start.disabled = false;
+        }
       });
       refs.stop.addEventListener('click', async ()=>{
         setTarget('flow', 0);
-        try{ await ctx.ControlChannel.send({ flow: { caudal_bomba_mls: 0 } }); ctx.toast && ctx.toast('Detenido'); }catch{ ctx.toast && ctx.toast('Error'); }
+        try{
+          await ctx.ControlChannel.send({ flow: { caudal_bomba_mls: 0 }, energies: { bomba: 0 } });
+          try{ ctx.debug && ctx.debug({ bomba:'detener' }); }catch{}
+          ctx.toast && ctx.toast('Detenido');
+        }catch{ ctx.toast && ctx.toast('Error'); }
       });
       if(refs.reset){
         refs.reset.addEventListener('click', async ()=>{
@@ -162,7 +221,33 @@
       onTelemetry(data){
         if(!state || !data) return;
         if(Number.isFinite(data.flowActual)) state.lastFlowActual = Number(data.flowActual);
-        if(Number.isFinite(data.volumeActual)) state.lastVolumeActual = Number(data.volumeActual);
+        const s = data.snapshot || {};
+        const now = Number(data.nowMs || Date.now());
+        const usarSensor = !!(s && s.usarSensorFlujo);
+        const energiaBomba = (s && s.energies && typeof s.energies.bomba==='number') ? Number(s.energies.bomba) : 0;
+        const caudalCfg = Number((s && s.caudalBombaMLs!=null)?s.caudalBombaMLs:(state.targetFlow||0));
+          if(!usarSensor && energiaBomba>0 && caudalCfg>0){
+            if(!state.estActive){
+              state.estActive = true;
+              state.estVol = Number(s && s.volumen_ml!=null ? s.volumen_ml : (data.volumeActual!=null? data.volumeActual : 0));
+              state.lastTs = now;
+              try{ ctx.debug && ctx.debug({ bomba:'estimacion_local_on', base: state.estVol, caudal: caudalCfg }); }catch{}
+            }else{
+              const dt = Math.max(0, (now - (state.lastTs||now))/1000);
+              state.lastTs = now;
+              state.estVol += caudalCfg * dt;
+              if(Number.isFinite(state.targetVolume)) state.estVol = Math.min(state.estVol, state.targetVolume);
+            }
+            state.lastVolumeActual = state.estVol;
+            try{ window._ui_est_vol = state.estVol; }catch{}
+          }else{
+            if(state.estActive){ try{ ctx.debug && ctx.debug({ bomba:'estimacion_local_off' }); }catch{} }
+            state.estActive = false;
+            state.lastTs = now;
+            if(Number.isFinite(data.volumeActual)) state.lastVolumeActual = Number(data.volumeActual);
+            else if(s && s.volumen_ml!=null) state.lastVolumeActual = Number(s.volumen_ml);
+            try{ window._ui_est_vol = null; }catch{}
+          }
         if(Number.isFinite(data.flowTarget)) adoptTelemetry('flow', data.flowTarget);
         if(Number.isFinite(data.volumeTarget)) adoptTelemetry('volume', data.volumeTarget);
         try{
