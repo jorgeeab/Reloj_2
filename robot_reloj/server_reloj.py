@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from contextlib import nullcontext
 
-from flask import Flask, request, jsonify, make_response, render_template
+from flask import Flask, request, jsonify, make_response, render_template, Response, stream_with_context
 import logging
 from logging.handlers import RotatingFileHandler
 from flask_sock import Sock
@@ -759,21 +759,42 @@ def get_robot_status(force_fresh=False) -> RobotStatus:
                     dt = now_ts - prev_ts
                     deriv = dvol / dt if dt > 0 else 0.0
                     if status.usarSensorFlujo:
-                        # Con sensor: derivada real del volumen
                         status.caudal_est_mls = float(deriv)
                     else:
-                        # Sin sensor: fallback por configuración de caudal cuando la bomba está activa
                         status.caudal_est_mls = float(status.energies.get("bomba", 0) != 0 and status.caudalBombaMLs or 0.0)
-                # Guardar referencias para el próximo ciclo
                 setattr(get_robot_status, "_last_vol_ts", now_ts)
                 setattr(get_robot_status, "_last_vol_ml", status.volumen_ml)
             except Exception:
                 pass
 
-            # Refuerzo: si NO hay sensor, fija caudal_est_mls al caudal configurado siempre que la bomba esté activa
+            # Estimador local cuando no hay sensor de flujo (para telemetría/UI)
             try:
-                if not status.usarSensorFlujo:
-                    status.caudal_est_mls = float(status.energies.get("bomba", 0) != 0 and status.caudalBombaMLs or 0.0)
+                if not hasattr(get_robot_status, "_est_vol"):
+                    setattr(get_robot_status, "_est_vol", {
+                        "ts": 0.0,
+                        "vol": 0.0,
+                    })
+                est = getattr(get_robot_status, "_est_vol")
+                now_est = time.time()
+                bomba_activa = bool(status.energies.get("bomba", 0))
+                if status.usarSensorFlujo:
+                    est["vol"] = status.volumen_ml
+                    est["ts"] = now_est
+                else:
+                    if bomba_activa and status.caudalBombaMLs > 0:
+                        if est["ts"] == 0:
+                            est["vol"] = status.volumen_ml
+                            est["ts"] = now_est
+                        else:
+                            dt = max(0.0, now_est - est["ts"])
+                            est["ts"] = now_est
+                            est["vol"] = max(status.volumen_ml, est["vol"] + status.caudalBombaMLs * dt)
+                        status.caudal_est_mls = float(status.caudalBombaMLs)
+                        status.flow_est = status.caudal_est_mls
+                        status.volumen_ml = est["vol"]
+                    else:
+                        est["vol"] = status.volumen_ml
+                        est["ts"] = now_est
             except Exception:
                 pass
 
@@ -883,6 +904,9 @@ def stop_all_actuators():
 ALLOWED_ENDPOINTS = {
     "/",               # página principal
     "/api",
+    "/api/control",
+    "/api/status",
+    "/api/status/stream",
     "/api/config",
     "/api/settings",
     "/api/robots",
@@ -978,6 +1002,74 @@ def api_index():
             }
         }
     })
+
+@app.route("/api/control", methods=["POST"])
+def api_control():
+    """REST endpoint compatible with hub_service to enviar comandos directos."""
+    if not _is_serial_connected():
+        return jsonify({
+            "error": "Serial desconectado. Conéctalo antes de enviar comandos.",
+            "robot_connection": "disconnected",
+        }), 409
+    try:
+        data = get_request_data() or {}
+        result = apply_control_payload(data)
+        snapshot = _status_payload(force_fresh=False)
+        return jsonify({
+            "status": "ok",
+            "result": result,
+            "status_snapshot": snapshot,
+        })
+    except Exception as exc:
+        logger.log(f"/api/control error: {exc}", "ERROR")
+        return jsonify({"error": str(exc)}), 500
+
+def _status_payload(force_fresh: bool = False) -> Dict[str, Any]:
+    """Helper to package the current robot status for REST/SSE consumers."""
+    status = get_robot_status(force_fresh=force_fresh)
+    payload = asdict(status)
+    payload["ts"] = datetime.now(timezone.utc).isoformat()
+    payload["robot"] = {
+        "id": status.robot_id,
+        "label": status.robot_label,
+        "kind": status.robot_kind,
+        "is_virtual": status.is_virtual,
+        "serial_port": status.serial_port,
+        "baudrate": status.baudrate,
+    }
+    return payload
+
+
+@app.route("/api/status", methods=["GET"])
+def api_status():
+    """Instant snapshot for hub_service and other clients."""
+    fresh_flags = {"1", "true", "yes", "on"}
+    force_fresh = str(request.args.get("fresh", "")).lower() in fresh_flags
+    return jsonify(_status_payload(force_fresh=force_fresh))
+
+
+@app.route("/api/status/stream")
+def api_status_stream():
+    """Server-Sent Events stream mirroring the /ws/telemetry feed."""
+    interval = max(0.1, TELEMETRY_INTERVAL)
+
+    def _event_stream():
+        while True:
+            try:
+                payload = _status_payload(force_fresh=False)
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            except GeneratorExit:
+                break
+            except Exception as exc:
+                logger.log(f"[SSE/status] error: {exc}", "ERROR")
+                time.sleep(1.0)
+            else:
+                time.sleep(interval)
+
+    resp = Response(stream_with_context(_event_stream()), mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
 
 ## Versión mínima: sin rutas de UI
 
@@ -1181,11 +1273,13 @@ def ws_control(ws):
                 continue
             try:
                 result = apply_control_payload(body)
+                snapshot = _status_payload(force_fresh=False)
                 ws.send(json.dumps({
                     "type": "control_ack",
                     "status": "ok",
                     "ts": datetime.now(timezone.utc).isoformat(),
                     "body": result,
+                    "status_snapshot": snapshot,
                 }, ensure_ascii=False))
             except Exception as exc:
                 logger.log(f"[ws/control] error: {exc}", "ERROR")
@@ -1219,12 +1313,12 @@ def ws_telemetry(ws):
             "ts": datetime.now(timezone.utc).isoformat(),
         }, ensure_ascii=False))
         while True:
-            status = get_robot_status()
+            status_payload = _status_payload(force_fresh=False)
             payload = {
                 "type": "telemetry",
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "robot_id": active_robot_id,
-                "status": asdict(status),
+                "status": status_payload,
             }
             ws.send(json.dumps(payload, ensure_ascii=False))
             time.sleep(max(0.05, TELEMETRY_INTERVAL))

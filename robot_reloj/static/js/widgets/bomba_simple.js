@@ -158,6 +158,15 @@
             flow: { caudal_bomba_mls: f, usar_sensor_flujo: usarSensor },
             energies: { bomba: 200 }
           });
+          // Activar estimación inmediata (por si la telemetría tarda)
+          try{
+            const s = (ctx.getStatus && ctx.getStatus()) || null;
+            state.estActive = true;
+            state.lastTs = Date.now();
+            const base = s && s.volumen_ml!=null ? Number(s.volumen_ml) : (state.lastVolumeActual!=null?Number(state.lastVolumeActual):0);
+            state.estVol = Number.isFinite(base) ? base : 0;
+            state.lastVolumeActual = state.estVol;
+          }catch{}
           try{ ctx.debug && ctx.debug({ bomba:'ejecutar', volumen_ml:vTargetAbs, caudal_mls:f, usar_sensor:usarSensor }); }catch{}
           ctx.toast && ctx.toast('Ejecución iniciada');
         }catch{

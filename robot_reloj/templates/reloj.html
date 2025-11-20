@@ -164,7 +164,18 @@
 
   </main>
 
-
+  <!-- Debug UI (barra inferior) -->
+  <section class="wrap" style="margin-top:8px">
+    <div class="card" id="ui_debug_wrap" style="margin-bottom:8px">
+      <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px">
+        <h3 style="margin:0">Debug</h3>
+        <div class="row" style="gap:6px">
+          <button id="dbg_clear" type="button">Limpiar</button>
+        </div>
+      </div>
+      <pre id="ui_debug_console" class="log small" style="height:140px"></pre>
+    </div>
+  </section>
 
   <footer class="foot">
     <span>Atajos: (M) manual/auto • (H) homing X/A • (V) reset volumen</span>

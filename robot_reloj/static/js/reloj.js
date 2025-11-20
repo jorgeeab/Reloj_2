@@ -46,6 +46,17 @@
     }catch(e){}
   }
   if(typeof window !== 'undefined'){ window.uiDebug = uiDebug; }
+  // Botón limpiar debug
+  try{
+    const btnClr = document.getElementById('dbg_clear');
+    if(btnClr){
+      btnClr.addEventListener('click', ()=>{
+        __uiDbgLines.splice(0, __uiDbgLines.length);
+        const el = document.getElementById('ui_debug_console');
+        if(el){ el.textContent = ''; }
+      });
+    }
+  }catch{}
 
   const WS_BASE = (location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host;
   const connectionFlags = { control: false, telemetry: false };

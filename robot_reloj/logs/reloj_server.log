@@ -1,0 +1,304 @@
+[11:52:51] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[11:52:51] [INFO] Planificador iniciado.
+[11:52:51] [INFO] [Scheduler] OFF
+[11:52:51] [INFO] [Scheduler] Desactivado por defecto
+[11:52:51] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[11:52:51] [INFO] [Policy] command_policy = stop_only
+[11:52:51] [INFO] [Scheduler] OFF
+[11:52:51] [INFO] Settings aplicados al iniciar
+[11:52:51] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[11:52:51] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[11:52:51] [INFO] [Scheduler] OFF
+[11:52:51] [INFO] [Scheduler] Desactivado por defecto
+[11:52:51] [INFO] OK: Robot conectado en VIRTUAL
+[11:52:51] [INFO] Hilo de actualización de estado iniciado
+[11:52:51] [INFO] [TaskScheduler] Loop de programación iniciado
+[11:52:51] [INFO] [TaskScheduler] Programador iniciado
+[11:52:51] [INFO] [Policy] command_policy = stop_only
+[11:52:51] [INFO] [Scheduler] OFF
+[11:52:51] [INFO] Settings aplicados al iniciar
+[11:52:51] [INFO] Sistema iniciado correctamente
+[11:52:51] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (720x480)
+[11:52:51] [INFO] Servidor iniciando en puerto 5005
+[11:52:51] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj
+[11:52:51] [INFO] Puerto serial: VIRTUAL
+[11:52:51] [INFO] Usando sistema de tareas existente de reloj_env.py
+[11:52:52] [INFO] [ws/control] sesión abierta (ctrl-1763488372687)
+[11:52:52] [INFO] [ws/control] sesión abierta (ctrl-1763488372701)
+[11:52:52] [INFO] [ws/telemetry] sesión abierta (tele-1763488372793)
+[11:52:52] [INFO] [ws/telemetry] sesión abierta (tele-1763488372828)
+[11:52:53] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[11:52:55] [INFO] [ws/control] sesión abierta (ctrl-1763488375401)
+[11:52:55] [INFO] [ws/telemetry] sesión abierta (tele-1763488375999)
+[11:57:04] [INFO] [ws/control] sesión cerrada (ctrl-1763488372701)
+[11:57:06] [INFO] [ws/telemetry] sesión cerrada (tele-1763488372793)
+[11:57:19] [INFO] [ws/control] sesión cerrada (ctrl-1763488372687)
+[11:57:19] [INFO] [ws/telemetry] sesión cerrada (tele-1763488372828)
+[11:57:23] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[11:57:28] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[13:42:12] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[13:42:12] [INFO] Planificador iniciado.
+[13:42:12] [INFO] [Scheduler] OFF
+[13:42:12] [INFO] [Scheduler] Desactivado por defecto
+[13:42:12] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[13:42:12] [INFO] [Policy] command_policy = stop_only
+[13:42:12] [INFO] [Scheduler] OFF
+[13:42:12] [INFO] Settings aplicados al iniciar
+[13:42:12] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[13:42:12] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[13:42:12] [INFO] [Scheduler] OFF
+[13:42:12] [INFO] [Scheduler] Desactivado por defecto
+[13:42:12] [INFO] OK: Robot conectado en VIRTUAL
+[13:42:12] [INFO] Hilo de actualización de estado iniciado
+[13:42:12] [INFO] [TaskScheduler] Loop de programación iniciado
+[13:42:12] [INFO] [TaskScheduler] Programador iniciado
+[13:42:12] [INFO] [Policy] command_policy = stop_only
+[13:42:12] [INFO] [Scheduler] OFF
+[13:42:12] [INFO] Settings aplicados al iniciar
+[13:42:12] [INFO] Sistema iniciado correctamente
+[13:42:12] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (720x480)
+[13:42:12] [INFO] Servidor iniciando en puerto 5005
+[13:42:12] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj
+[13:42:12] [INFO] Puerto serial: VIRTUAL
+[13:42:12] [INFO] Usando sistema de tareas existente de reloj_env.py
+[13:42:13] [INFO] [ws/telemetry] sesión abierta (tele-1763494933019)
+[13:42:13] [INFO] [ws/control] sesión abierta (ctrl-1763494933969)
+[13:42:14] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[13:42:15] [INFO] [ws/control] sesión abierta (ctrl-1763494935817)
+[13:42:16] [INFO] [ws/telemetry] sesión abierta (tele-1763494936401)
+[13:43:27] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[13:43:39] [INFO] [control] payload: {'setpoints': {'x_mm': 0, 'a_deg': 0, 'z_mm': 55.5}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[13:43:41] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[13:43:48] [INFO] [ws/control] sesión cerrada (ctrl-1763494933969)
+[13:43:48] [INFO] [ws/telemetry] sesión cerrada (tele-1763494933019)
+[13:54:30] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[13:54:30] [INFO] Planificador iniciado.
+[13:54:30] [INFO] [Scheduler] OFF
+[13:54:30] [INFO] [Scheduler] Desactivado por defecto
+[13:54:30] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[13:54:30] [INFO] [Policy] command_policy = stop_only
+[13:54:30] [INFO] [Scheduler] OFF
+[13:54:30] [INFO] Settings aplicados al iniciar
+[13:54:30] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[13:54:30] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[13:54:30] [INFO] [Scheduler] OFF
+[13:54:30] [INFO] [Scheduler] Desactivado por defecto
+[13:54:30] [INFO] OK: Robot conectado en VIRTUAL
+[13:54:30] [INFO] Hilo de actualización de estado iniciado
+[13:54:30] [INFO] [TaskScheduler] Loop de programación iniciado
+[13:54:30] [INFO] [TaskScheduler] Programador iniciado
+[13:54:30] [INFO] [Policy] command_policy = stop_only
+[13:54:30] [INFO] [Scheduler] OFF
+[13:54:30] [INFO] Settings aplicados al iniciar
+[13:54:30] [INFO] Sistema iniciado correctamente
+[13:54:30] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (720x480)
+[13:54:30] [INFO] Servidor iniciando en puerto 5005
+[13:54:30] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj
+[13:54:30] [INFO] Puerto serial: VIRTUAL
+[13:54:30] [INFO] Usando sistema de tareas existente de reloj_env.py
+[13:54:31] [INFO] [ws/control] sesión abierta (ctrl-1763495671490)
+[13:54:31] [INFO] [ws/telemetry] sesión abierta (tele-1763495671507)
+[13:54:32] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[13:54:33] [INFO] [ws/control] sesión abierta (ctrl-1763495673904)
+[13:54:34] [INFO] [ws/telemetry] sesión abierta (tele-1763495674471)
+[14:09:55] [INFO] [control] payload: {'setpoints': {'volumen_ml': 160}}
+[14:09:58] [INFO] [control] payload: {'setpoints': {'volumen_ml': 160}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:10:08] [INFO] [ws/control] sesión cerrada (ctrl-1763495673904)
+[14:10:08] [INFO] [ws/telemetry] sesión cerrada (tele-1763495674471)
+[14:10:10] [INFO] [ws/control] sesión cerrada (ctrl-1763495671490)
+[14:10:10] [INFO] [ws/telemetry] sesión cerrada (tele-1763495671507)
+[14:10:24] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[14:10:24] [INFO] Planificador iniciado.
+[14:10:24] [INFO] [Scheduler] OFF
+[14:10:24] [INFO] [Scheduler] Desactivado por defecto
+[14:10:24] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[14:10:24] [INFO] [Policy] command_policy = stop_only
+[14:10:24] [INFO] [Scheduler] OFF
+[14:10:24] [INFO] Settings aplicados al iniciar
+[14:10:24] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[14:10:24] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[14:10:24] [INFO] [Scheduler] OFF
+[14:10:24] [INFO] [Scheduler] Desactivado por defecto
+[14:10:24] [INFO] OK: Robot conectado en VIRTUAL
+[14:10:24] [INFO] Hilo de actualización de estado iniciado
+[14:10:24] [INFO] [TaskScheduler] Loop de programación iniciado
+[14:10:24] [INFO] [TaskScheduler] Programador iniciado
+[14:10:24] [INFO] [Policy] command_policy = stop_only
+[14:10:24] [INFO] [Scheduler] OFF
+[14:10:24] [INFO] Settings aplicados al iniciar
+[14:10:24] [INFO] Sistema iniciado correctamente
+[14:10:25] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (720x480)
+[14:10:25] [INFO] Servidor iniciando en puerto 5005
+[14:10:25] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj
+[14:10:25] [INFO] Puerto serial: VIRTUAL
+[14:10:25] [INFO] Usando sistema de tareas existente de reloj_env.py
+[14:10:26] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[14:10:28] [INFO] [ws/control] sesión abierta (ctrl-1763496628027)
+[14:10:28] [INFO] [ws/telemetry] sesión abierta (tele-1763496628070)
+[14:10:34] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:12:18] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 6}}
+[14:12:27] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 7}}
+[14:12:28] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 8}}
+[14:12:30] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 9}}
+[14:12:30] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 10}}
+[14:12:31] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 11}}
+[14:12:31] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 12}}
+[14:12:32] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 13}}
+[14:12:32] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 14}}
+[14:12:33] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 15}}
+[14:12:35] [INFO] [control] payload: {'flow': {'caudal_bomba_mls': 16}}
+[14:12:37] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 16, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:34:04] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[14:34:04] [INFO] Planificador iniciado.
+[14:34:04] [INFO] [Scheduler] OFF
+[14:34:04] [INFO] [Scheduler] Desactivado por defecto
+[14:34:04] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[14:34:04] [INFO] [Policy] command_policy = stop_only
+[14:34:04] [INFO] [Scheduler] OFF
+[14:34:04] [INFO] Settings aplicados al iniciar
+[14:34:04] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:35:31] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[14:35:31] [INFO] Planificador iniciado.
+[14:35:31] [INFO] [Scheduler] OFF
+[14:35:31] [INFO] [Scheduler] Desactivado por defecto
+[14:35:31] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[14:35:31] [INFO] [Policy] command_policy = stop_only
+[14:35:31] [INFO] [Scheduler] OFF
+[14:35:31] [INFO] Settings aplicados al iniciar
+[14:48:36] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[14:48:36] [INFO] Planificador iniciado.
+[14:48:36] [INFO] [Scheduler] OFF
+[14:48:36] [INFO] [Scheduler] Desactivado por defecto
+[14:48:36] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[14:48:36] [INFO] [Policy] command_policy = stop_only
+[14:48:36] [INFO] [Scheduler] OFF
+[14:48:36] [INFO] Settings aplicados al iniciar
+[14:48:36] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[14:48:36] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[14:48:36] [INFO] [Scheduler] OFF
+[14:48:36] [INFO] [Scheduler] Desactivado por defecto
+[14:48:36] [INFO] OK: Robot conectado en VIRTUAL
+[14:48:36] [INFO] Hilo de actualización de estado iniciado
+[14:48:36] [INFO] [TaskScheduler] Loop de programación iniciado
+[14:48:36] [INFO] [TaskScheduler] Programador iniciado
+[14:48:36] [INFO] [Policy] command_policy = stop_only
+[14:48:36] [INFO] [Scheduler] OFF
+[14:48:36] [INFO] Settings aplicados al iniciar
+[14:48:36] [INFO] Sistema iniciado correctamente
+[14:48:36] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (720x480)
+[14:48:36] [INFO] Servidor iniciando en puerto 5005
+[14:48:36] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj
+[14:48:36] [INFO] Puerto serial: VIRTUAL
+[14:48:36] [INFO] Usando sistema de tareas existente de reloj_env.py
+[14:48:36] [INFO] [ws/telemetry] sesión abierta (tele-1763498916806)
+[14:48:38] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[14:48:39] [INFO] [ws/control] sesión abierta (ctrl-1763498919198)
+[14:48:39] [INFO] [ws/telemetry] sesión abierta (tele-1763498919743)
+[14:48:40] [INFO] [ws/control] sesión abierta (ctrl-1763498920188)
+[14:48:46] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:48:54] [INFO] [control] payload: {'setpoints': {'x_mm': 0, 'a_deg': 0, 'z_mm': 24.5}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[14:53:00] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[14:53:00] [INFO] Planificador iniciado.
+[14:53:00] [INFO] [Scheduler] OFF
+[14:53:00] [INFO] [Scheduler] Desactivado por defecto
+[14:53:00] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[14:53:00] [INFO] [Policy] command_policy = stop_only
+[14:53:00] [INFO] [Scheduler] OFF
+[14:53:00] [INFO] Settings aplicados al iniciar
+[14:53:00] [INFO] [control] payload: {'energies': {'bomba': 200}, 'flow': {'caudal_bomba_mls': 5}, 'setpoints': {'volumen_ml': 100}}
+[14:53:35] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[14:53:35] [INFO] Planificador iniciado.
+[14:53:35] [INFO] [Scheduler] OFF
+[14:53:35] [INFO] [Scheduler] Desactivado por defecto
+[14:53:35] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[14:53:35] [INFO] [Policy] command_policy = stop_only
+[14:53:35] [INFO] [Scheduler] OFF
+[14:53:35] [INFO] Settings aplicados al iniciar
+[14:53:35] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[14:53:35] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[14:53:35] [INFO] [Scheduler] OFF
+[14:53:35] [INFO] [Scheduler] Desactivado por defecto
+[14:53:35] [INFO] OK: Robot conectado en VIRTUAL
+[14:53:35] [INFO] Hilo de actualización de estado iniciado
+[14:53:35] [INFO] [TaskScheduler] Loop de programación iniciado
+[14:53:35] [INFO] [TaskScheduler] Programador iniciado
+[14:53:35] [INFO] [Policy] command_policy = stop_only
+[14:53:35] [INFO] [Scheduler] OFF
+[14:53:35] [INFO] Settings aplicados al iniciar
+[14:53:35] [INFO] Sistema iniciado correctamente
+[14:53:35] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (720x480)
+[14:53:35] [INFO] Servidor iniciando en puerto 5005
+[14:53:35] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj
+[14:53:35] [INFO] Puerto serial: VIRTUAL
+[14:53:35] [INFO] Usando sistema de tareas existente de reloj_env.py
+[14:53:35] [INFO] [ws/control] sesión abierta (ctrl-1763499215487)
+[14:53:35] [INFO] [ws/control] sesión abierta (ctrl-1763499215505)
+[14:53:35] [INFO] [ws/telemetry] sesión abierta (tele-1763499215518)
+[14:53:35] [INFO] [ws/telemetry] sesión abierta (tele-1763499215533)
+[14:53:36] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[14:53:38] [INFO] [ws/control] sesión abierta (ctrl-1763499218085)
+[14:53:38] [INFO] [ws/telemetry] sesión abierta (tele-1763499218634)
+[14:54:52] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:54:59] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:01] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:02] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:05] [INFO] [control] payload: {'setpoints': {'x_mm': 0, 'a_deg': 0, 'z_mm': 20.5}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[14:55:11] [INFO] [control] payload: {'setpoints': {'x_mm': 81, 'a_deg': 0, 'z_mm': 20.5}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[14:55:19] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:26] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:29] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:30] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:31] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:32] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:32] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:33] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:34] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:34] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:35] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:36] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:37] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:38] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:38] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[14:55:39] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[23:27:00] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[23:27:00] [INFO] Planificador iniciado.
+[23:27:00] [INFO] [Scheduler] OFF
+[23:27:00] [INFO] [Scheduler] Desactivado por defecto
+[23:27:00] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[23:27:00] [INFO] [Policy] command_policy = stop_only
+[23:27:00] [INFO] [Scheduler] OFF
+[23:27:00] [INFO] Settings aplicados al iniciar
+[23:27:00] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[23:27:00] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[23:27:00] [INFO] [Scheduler] OFF
+[23:27:00] [INFO] [Scheduler] Desactivado por defecto
+[23:27:00] [INFO] OK: Robot conectado en VIRTUAL
+[23:27:00] [INFO] Hilo de actualización de estado iniciado
+[23:27:00] [INFO] [TaskScheduler] Loop de programación iniciado
+[23:27:00] [INFO] [TaskScheduler] Programador iniciado
+[23:27:00] [INFO] [Policy] command_policy = stop_only
+[23:27:00] [INFO] [Scheduler] OFF
+[23:27:00] [INFO] Settings aplicados al iniciar
+[23:27:00] [INFO] Sistema iniciado correctamente
+[23:27:00] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (720x480)
+[23:27:00] [INFO] Servidor iniciando en puerto 5005
+[23:27:00] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_reloj
+[23:27:00] [INFO] Puerto serial: VIRTUAL
+[23:27:00] [INFO] Usando sistema de tareas existente de reloj_env.py
+[23:27:00] [INFO] [ws/telemetry] sesión abierta (tele-1763530020720)
+[23:27:00] [INFO] [ws/telemetry] sesión abierta (tele-1763530020736)
+[23:27:00] [INFO] [ws/telemetry] sesión abierta (tele-1763530020751)
+[23:27:00] [INFO] [ws/control] sesión abierta (ctrl-1763530020767)
+[23:27:00] [INFO] [ws/control] sesión abierta (ctrl-1763530020800)
+[23:27:02] [INFO] [ws/control] sesión abierta (ctrl-1763530022030)
+[23:27:02] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[23:27:03] [INFO] [ws/control] sesión abierta (ctrl-1763530023401)
+[23:27:03] [INFO] [ws/telemetry] sesión abierta (tele-1763530023955)
+[00:22:35] [INFO] [ws/control] sesión cerrada (ctrl-1763530023401)
+[00:22:35] [INFO] [ws/telemetry] sesión cerrada (tele-1763530023955)
+[00:22:36] [INFO] [ws/control] sesión cerrada (ctrl-1763530020800)
+[00:22:36] [INFO] [ws/telemetry] sesión cerrada (tele-1763530020736)
+[00:22:37] [INFO] [ws/control] sesión cerrada (ctrl-1763530022030)
+[00:22:37] [INFO] [ws/telemetry] sesión cerrada (tele-1763530020751)
+[00:22:49] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 16, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[21:14:00] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 16, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
