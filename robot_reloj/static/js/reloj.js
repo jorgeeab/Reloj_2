@@ -32,17 +32,36 @@
   async function jpost(url, body){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); if(!r.ok) throw new Error(`${r.status} ${url}`); return r.json(); }
   async function jdel(url){ const r=await fetch(url,{method:'DELETE'}); if(!r.ok) throw new Error(`${r.status} ${url}`); return r.json(); }
 
-  // UI Debug console (bottom panel). Keeps last 150 lines.
-  const __uiDbgLines = [];
-  function uiDebug(msg){
+  // UI Debug console (bottom panel). Mezcla logs locales + del servidor.
+  const __uiDbgLocal = [];
+  let __uiDbgRemote = [];
+  function renderUiDebug(){
     try{
       const el = document.getElementById('ui_debug_console');
+      if(!el) return;
+      const combined = __uiDbgRemote.concat(__uiDbgLocal);
+      el.textContent = combined.slice(-150).join('\n');
+      el.scrollTop = el.scrollHeight;
+    }catch(e){}
+  }
+  function uiDebug(msg){
+    try{
       const ts = new Date().toLocaleTimeString();
       const line = `[${ts}] ${typeof msg==='string'?msg:JSON.stringify(msg)}`;
-      __uiDbgLines.push(line);
-      if(__uiDbgLines.length > 150){ __uiDbgLines.splice(0, __uiDbgLines.length - 150); }
-      if(el){ el.textContent = __uiDbgLines.join('\n'); el.scrollTop = el.scrollHeight; }
+      __uiDbgLocal.push(line);
+      if(__uiDbgLocal.length > 150){ __uiDbgLocal.splice(0, __uiDbgLocal.length - 150); }
+      renderUiDebug();
       if(window && window.console){ console.log('[ui]', line); }
+    }catch(e){}
+  }
+  function syncRemoteDebug(lines){
+    try{
+      if(Array.isArray(lines)){
+        __uiDbgRemote = lines.map(line => typeof line === 'string' ? line : JSON.stringify(line));
+      }else{
+        __uiDbgRemote = [];
+      }
+      renderUiDebug();
     }catch(e){}
   }
   if(typeof window !== 'undefined'){ window.uiDebug = uiDebug; }
@@ -50,10 +69,15 @@
   try{
     const btnClr = document.getElementById('dbg_clear');
     if(btnClr){
-      btnClr.addEventListener('click', ()=>{
-        __uiDbgLines.splice(0, __uiDbgLines.length);
-        const el = document.getElementById('ui_debug_console');
-        if(el){ el.textContent = ''; }
+      btnClr.addEventListener('click', async ()=>{
+        try{
+          __uiDbgLocal.splice(0, __uiDbgLocal.length);
+          __uiDbgRemote = [];
+          renderUiDebug();
+          await fetch('/api/debug/logs', { method:'DELETE' });
+        }catch(e){
+          console.warn('[debug] clear failed', e);
+        }
       });
     }
   }catch{}
@@ -647,15 +671,42 @@
     const rdX=document.getElementById('rd_x_mm'); if(rdX){ rdX.textContent = fmt(s.x_mm||0); }
     const rdA=document.getElementById('rd_a_deg'); if(rdA){ rdA.textContent = fmt(s.a_deg||0); }
     updateSVG(s.x_mm, s.a_deg);
-    $("#t_vol").textContent = fmt(s.volumen_ml||0);
-    $("#t_flow").textContent = fmt(flowActual);
+    // Campos opcionales (no presentes en todas las vistas)
+    try{
+      const tvol = document.getElementById('t_vol');
+      if(tvol){
+        if('value' in tvol) tvol.value = fmt(s.volumen_ml||0); else tvol.textContent = fmt(s.volumen_ml||0);
+      }
+      const tflow = document.getElementById('t_flow');
+      if(tflow){ tflow.textContent = fmt(flowActual); }
+    }catch{}
+    // Telemetría al panel de depuración (muestreo cada ~10 ticks)
+    try{
+      applyStatusSnapshot.__dbgN = (applyStatusSnapshot.__dbgN||0) + 1;
+      if((applyStatusSnapshot.__dbgN % 10) === 0 && typeof window.uiDebug === 'function'){
+        window.uiDebug({ ws:'telemetry', vol: s.volumen_ml, vol_target: s.volumen_objetivo_ml, rem: s.volumen_restante_ml, flow: flowActual });
+      }
+    }catch{}
+    // Actualizar métricas del widget de bomba si está presente
+    try{
+      const fwFlowAct = document.getElementById('fw_flow_actual');
+      if(fwFlowAct){ fwFlowAct.textContent = `${fmt(flowActual,1)} ml/s`; }
+      // No sobrescribir el objetivo de flujo desde telemetría global;
+      // lo maneja el widget para evitar pisar valores editados por el usuario.
+      const fwVolAct = document.getElementById('fw_volume_actual');
+      if(fwVolAct){ fwVolAct.textContent = `${fmt(Number(s.volumen_ml||0),0)} ml`; }
+      // No sobrescribir el objetivo de volumen desde telemetría global;
+      // lo maneja el widget (con userOverride) para no revertir cambios locales.
+      // El restante lo dibuja el widget para ser consistente con su estado.
+    }catch{}
     // Broadcast telemetry to modular widgets
     try{
       if(window.RelojWidgets){
         window.RelojWidgets.broadcast('telemetry', {
           snapshot: s,
           flowActual,
-          flowTarget: (s.caudalBombaMLs!=null)?Number(s.caudalBombaMLs):null,
+          // No enviar flowTarget derivado de cmax; el widget mantiene el objetivo localmente
+          flowTarget: null,
           volumeActual: (s.volumen_ml!=null)?Number(s.volumen_ml):null,
           volumeTarget: (s.volumen_objetivo_ml!=null)?Number(s.volumen_objetivo_ml):null,
           nowMs: Date.now()
@@ -803,13 +854,24 @@
   function createTelemetryChannel(onSnapshot){
     let socket = null;
     let reconnectTimer = null;
+    let fallbackTimer = null;
+    const startFallback = ()=>{
+      if(fallbackTimer) return;
+      fallbackTimer = setInterval(async ()=>{
+        try{
+          const s = await jget('/api/status');
+          if(onSnapshot) onSnapshot(s);
+        }catch{}
+      }, 1000);
+    };
+    const stopFallback = ()=>{ if(fallbackTimer){ clearInterval(fallbackTimer); fallbackTimer=null; } };
     const connect = ()=>{
       if(socket){
         try{ socket.close(); }catch{}
       }
       console.info('[ws/telemetry] connecting...');
       socket = new WebSocket(`${WS_BASE}/ws/telemetry`);
-      socket.addEventListener('open', ()=> setConnectionState('telemetry', true));
+      socket.addEventListener('open', ()=>{ setConnectionState('telemetry', true); stopFallback(); });
       socket.addEventListener('message', (event)=>{
         let data = null;
         try{ data = JSON.parse(event.data || "{}"); }catch{ return; }
@@ -818,13 +880,11 @@
           if(onSnapshot) onSnapshot(status);
         }
       });
-      socket.addEventListener('close', ()=>{
-        setConnectionState('telemetry', false);
-        scheduleReconnect();
-      });
+      socket.addEventListener('close', ()=>{ setConnectionState('telemetry', false); startFallback(); scheduleReconnect(); });
       socket.addEventListener('error', (err)=>{
         console.error('[ws/telemetry] error', err);
         socket && socket.close();
+        startFallback();
       });
     };
     const scheduleReconnect = ()=>{
@@ -832,7 +892,7 @@
       reconnectTimer = setTimeout(()=>{ reconnectTimer=null; connect(); }, 1500);
     };
     connect();
-    return { restart: ()=> connect() };
+    return { restart: ()=> connect(), stopFallback };
   }
 
   const TelemetryChannel = createTelemetryChannel(applyStatusSnapshot);
@@ -840,19 +900,56 @@
     window.TelemetryChannel = TelemetryChannel;
   }
 
-  function pollDebug(){
-    const status = window._statusCache;
-    const dbg = document.getElementById('dbg_serial');
-    if(dbg){
-      dbg.textContent = status ? JSON.stringify(status, null, 2) : 'Sin telemetría disponible.';
+  // Refresco de interfaz forzado: si por cualquier motivo el WS/broadcast
+  // no disparó el flujo del widget, reutiliza el último snapshot cacheado.
+  setInterval(()=>{
+    try{
+      if(window._statusCache){ applyStatusSnapshot(window._statusCache); }
+    }catch{}
+  }, 1200);
+
+  async function pollDebug(auto=false){
+    try{
+      const [rx, tx, logs] = await Promise.all([
+        jget('/debug/serial'),
+        jget('/debug/serial_tx'),
+        jget('/api/debug/logs?limit=150')
+      ]);
+      const dbg = document.getElementById('dbg_serial');
+      if(dbg){
+        const blocks = [];
+        if(rx && rx.last_rx){
+          const ageTxt = (rx.age_ms!=null) ? `${Math.round(rx.age_ms)} ms` : '—';
+          blocks.push(`[RX · ${ageTxt}]\n${rx.last_rx}`);
+        }
+        if(tx && tx.last_tx){
+          const ageTxt = (tx.age_ms!=null) ? `${Math.round(tx.age_ms)} ms` : '—';
+          blocks.push(`[TX · ${ageTxt}]\n${tx.last_tx}`);
+        }
+        dbg.textContent = blocks.length ? blocks.join('\n\n') : 'Sin actividad registrada.';
+      }
+      rxAgeMs = (rx && rx.age_ms!=null) ? Number(rx.age_ms) : rxAgeMs;
+      const rxEl = document.getElementById('rx_age_ms'); if(rxEl) rxEl.textContent = (rx && rx.age_ms!=null) ? String(Math.round(rx.age_ms)) : '—';
+      const txEl = document.getElementById('tx_age_ms'); if(txEl){
+        txEl.textContent = (tx && tx.age_ms!=null) ? String(Math.round(tx.age_ms)) : (connectionFlags.control ? 'WS' : '—');
+      }
+      updateRxPillLabel();
+      if(logs && Array.isArray(logs.logs)){
+        syncRemoteDebug(logs.logs);
+      }else{
+        syncRemoteDebug([]);
+      }
+      return true;
+    }catch(err){
+      if(!auto){
+        console.warn('[debug] poll failed', err);
+      }
+      return false;
     }
-    const rxEl = document.getElementById('rx_age_ms'); if(rxEl) rxEl.textContent = String(Math.round(rxAgeMs||0));
-    const txEl = document.getElementById('tx_age_ms'); if(txEl) txEl.textContent = connectionFlags.control ? 'WS' : '—';
-    updateRxPillLabel();
   }
 
   // Botones depuración
-  const bRef = document.getElementById('btn_refresh_dbg'); if(bRef){ bRef.onclick = ()=>{ pollDebug(); toast('Refrescado'); }; }
+  const bRef = document.getElementById('btn_refresh_dbg'); if(bRef){ bRef.onclick = async ()=>{ const ok = await pollDebug(false); toast(ok ? 'Refrescado' : 'Sin datos de debug'); }; }
   const bCopy = document.getElementById('btn_copy_tx'); if(bCopy){ bCopy.onclick = async ()=>{
     try{
       const payload = ControlChannel.getLastPayload();
@@ -862,6 +959,9 @@
     }catch{ toast('No se pudo copiar'); }
   }; }
   const bClr = document.getElementById('btn_clear_dbg'); if(bClr){ bClr.onclick = ()=>{ const el=document.getElementById('dbg_serial'); if(el) el.textContent=''; }; }
+
+  pollDebug(true);
+  setInterval(()=> pollDebug(true), 4000);
 
   // ------------- PyBullet frame polling + start/stop -------------
   (function initPyBulletFeed(){
@@ -1172,6 +1272,7 @@
           getStatus: ()=> window._statusCache,
           sendControl,
           ControlChannel,
+          debug: uiDebug,
           openSettings: (id)=> openSettingsAndScrollTo(id),
           hosts: {
             settings: {
@@ -1242,26 +1343,10 @@
   if(sl_z && spZ){ sl_z.oninput = ()=>{ spZ.value = sl_z.value; spZ.oninput && spZ.oninput(); }; }
   if(sl_vol && spV){ sl_vol.oninput = ()=>{ spV.value = sl_vol.value; spV.oninput && spV.oninput(); }; }
   const inc = (el, delta, min, max)=>{ if(!el) return; const v = Math.max(min, Math.min(max, Number(el.value||0) + delta)); el.value = String(v); el.oninput && el.oninput(); };
-  // Bind click + hold-to-repeat for step buttons
-  const HOLD_DELAY_BTN = 650;   // start repeating after this ms
-  const HOLD_INTERVAL_BTN = 300; // repeat every this ms
+  // Bind step buttons con click simple (sin mantener presionado)
   const bindStep = (btnId, handler)=>{
     const b = byId(btnId); if(!b) return;
-    // click once
     b.addEventListener('click', handler);
-    // hold
-    let holdTimer = null; let repeatTimer = null;
-    const clear = ()=>{ if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; } if(repeatTimer){ clearInterval(repeatTimer); repeatTimer=null; } };
-    b.addEventListener('pointerdown', ev=>{
-      ev.preventDefault();
-      try{ b.setPointerCapture(ev.pointerId); }catch{}
-      holdTimer = setTimeout(()=>{ repeatTimer = setInterval(handler, HOLD_INTERVAL_BTN); }, HOLD_DELAY_BTN);
-    });
-    const release = (ev)=>{ clear(); if(ev && ev.pointerId!=null){ try{ b.releasePointerCapture(ev.pointerId); }catch{} } };
-    b.addEventListener('pointerup', release);
-    b.addEventListener('pointercancel', release);
-    b.addEventListener('pointerleave', clear);
-    b.addEventListener('lostpointercapture', clear);
   };
   const bind = (btnId, el, delta, min, max)=>{ if(!el) return; bindStep(btnId, ()=> inc(el, delta, min, max)); };
   bind('btn_x_dec10', spX, -10, 0, 400); bind('btn_x_dec1', spX, -1, 0, 400); bind('btn_x_inc1', spX, +1, 0, 400); bind('btn_x_inc10', spX, +10, 0, 400);

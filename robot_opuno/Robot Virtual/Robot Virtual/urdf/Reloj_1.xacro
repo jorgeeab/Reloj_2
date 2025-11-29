@@ -1,0 +1,226 @@
+<?xml version="1.0" ?>
+<robot name="Reloj_1" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="$(find Reloj_1_description)/urdf/materials.xacro" />
+<xacro:include filename="$(find Reloj_1_description)/urdf/Reloj_1.trans" />
+<xacro:include filename="$(find Reloj_1_description)/urdf/Reloj_1.gazebo" />
+<link name="base_link">
+  <inertial>
+    <origin xyz="-0.0019282739004614815 -0.0007815002605884609 0.04930724165023757" rpy="0 0 0"/>
+    <mass value="9.144836597480051"/>
+    <inertia ixx="0.071327" iyy="0.071327" izz="0.104476" ixy="-0.0" iyz="-1e-05" ixz="-2.5e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Brazo_mediano_A_1">
+  <inertial>
+    <origin xyz="-0.1371292194627678 0.020280544185755044 0.1661889856563904" rpy="0 0 0"/>
+    <mass value="0.37971955994157486"/>
+    <inertia ixx="0.003125" iyy="0.001085" izz="0.004063" ixy="0.001754" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.115292 0.015924 0.002018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_mediano_A_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.115292 0.015924 0.002018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_mediano_A_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Brazo_pequeñoA_1">
+  <inertial>
+    <origin xyz="-0.01643623042523377 0.03921515340834518 0.1630389856563904" rpy="0 0 0"/>
+    <mass value="0.1795912583483475"/>
+    <inertia ixx="0.001401" iyy="0.000461" izz="0.001839" ixy="0.000789" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.014556 0.026762 -0.001132" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_pequeñoA_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.014556 0.026762 -0.001132" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_pequeñoA_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Brazo_grande_B__1__1">
+  <inertial>
+    <origin xyz="-0.1319811749543714 0.014439897064268563 0.16340198565638966" rpy="0 0 0"/>
+    <mass value="0.2714795738013649"/>
+    <inertia ixx="0.00222" iyy="0.000794" izz="0.002856" ixy="0.001235" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.112601 0.033238 -0.000769" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_grande_B__1__1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.112601 0.033238 -0.000769" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_grande_B__1__1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Brazo_mediano_B_1">
+  <inertial>
+    <origin xyz="-0.12870945034706013 0.034171556000484354 0.16408898565639027" rpy="0 0 0"/>
+    <mass value="0.37971955994157486"/>
+    <inertia ixx="0.003125" iyy="0.001085" izz="0.004063" ixy="0.001754" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.099552 0.043186 -0.000232" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_mediano_B_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.099552 0.043186 -0.000232" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_mediano_B_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Brazo_pequeño_B__2__1">
+  <inertial>
+    <origin xyz="-0.006516461309526097 0.04877606360793664 0.1631889856563904" rpy="0 0 0"/>
+    <mass value="0.1795912583483475"/>
+    <inertia ixx="0.001401" iyy="0.000461" izz="0.001839" ixy="0.000789" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.029796 0.053158 -0.001132" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_pequeño_B__2__1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.029796 0.053158 -0.001132" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_pequeño_B__2__1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Caja_Motor_1">
+  <inertial>
+    <origin xyz="-0.024198840976677016 -0.05569371094560832 0.1881291110244722" rpy="0 0 0"/>
+    <mass value="1.675136155177014"/>
+    <inertia ixx="0.003499" iyy="0.003578" izz="0.001739" ixy="-1e-05" iyz="-9.3e-05" ixz="0.000352"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.089492 0.0144 -0.000632" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Caja_Motor_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.089492 0.0144 -0.000632" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Caja_Motor_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Brazo_grande_A_1">
+  <inertial>
+    <origin xyz="-0.007061363010442574 -0.0023561209033258887 0.0024401058702684386" rpy="0 0 0"/>
+    <mass value="0.3077353372099779"/>
+    <inertia ixx="0.002222" iyy="0.0008" izz="0.002865" ixy="0.001234" iyz="1e-06" ixz="3e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.003947 0.0016 -0.159949" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_grande_A_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.003947 0.0016 -0.159949" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://Reloj_1_description/meshes/Brazo_grande_A_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="Corredera 2" type="prismatic">
+  <origin xyz="0.119239 -0.014324 -0.161967" rpy="0 0 0"/>
+  <parent link="Brazo_grande_A_1"/>
+  <child link="Brazo_mediano_A_1"/>
+  <axis xyz="-0.5 0.866025 -0.0"/>
+  <limit upper="-0.0" lower="-0.2" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Corredera 3" type="prismatic">
+  <origin xyz="-0.129848 -0.010838 0.00315" rpy="0 0 0"/>
+  <parent link="Brazo_mediano_A_1"/>
+  <child link="Brazo_pequeñoA_1"/>
+  <axis xyz="-0.5 0.866025 -0.0"/>
+  <limit upper="0.0" lower="-0.2" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Rígida 4" type="fixed">
+  <origin xyz="0.127157 -0.006476 -0.000363" rpy="0 0 0"/>
+  <parent link="Brazo_pequeñoA_1"/>
+  <child link="Brazo_grande_B__1__1"/>
+</joint>
+
+<joint name="Corredera 5" type="prismatic">
+  <origin xyz="-0.013049 -0.009948 -0.000537" rpy="0 0 0"/>
+  <parent link="Brazo_grande_B__1__1"/>
+  <child link="Brazo_mediano_B_1"/>
+  <axis xyz="-0.5 0.866025 -0.0"/>
+  <limit upper="-0.0" lower="-0.2" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Corredera 6" type="prismatic">
+  <origin xyz="-0.129348 -0.009972 0.0009" rpy="0 0 0"/>
+  <parent link="Brazo_mediano_B_1"/>
+  <child link="Brazo_pequeño_B__2__1"/>
+  <axis xyz="-0.5 0.866025 -0.0"/>
+  <limit upper="0.0" lower="-0.2" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Rígida 7" type="fixed">
+  <origin xyz="0.093439 -0.0128 -0.159317" rpy="0 0 0"/>
+  <parent link="Brazo_grande_A_1"/>
+  <child link="Caja_Motor_1"/>
+</joint>
+
+<joint name="Revolución 8" type="continuous">
+  <origin xyz="-0.003947 -0.0016 0.159949" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="Brazo_grande_A_1"/>
+  <axis xyz="-0.0 0.0 1.0"/>
+</joint>
+
+</robot>

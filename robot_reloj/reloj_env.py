@@ -287,6 +287,16 @@ class RelojEnv(gym.Env):
             if ma is not None: ba=1 if ma else 0
             cod=(ba<<1)|bx
         self.patch({'codigoModo':int(cod)})
+
+    # Ejecutar: bit 3 de codigoModo (valor 8). Permite enviar setpoints primero y
+    # luego disparar el inicio de riego con un trigger inequívoco.
+    def set_execute_trigger(self, on: bool):
+        cur = int(self.act[0])
+        if on:
+            cur = cur | 0b1000
+        else:
+            cur = cur & (~0b1000)
+        self.patch({'codigoModo': int(cur)})
     def set_energia_corredera(self,e:int): self.patch({'energiaX':int(np.clip(e,-255,255))})
     def set_energia_angulo(self,e:int):    self.patch({'energiaA':int(np.clip(e,-255,255))})
     def set_energia_bomba(self,e:int):     self.patch({'energiaBomba':int(np.clip(e,-255,255))})

@@ -59,9 +59,12 @@ class VirtualRobotState:
     usar_sensor_flujo: int = 0
     caudal_bomba_ml_s: float = 1.0
     factor_calibracion_flujo: float = 1.0
+    flow_sensor_ml_s: float = 0.0
     servo_z_deg: float = 180.0
     servo_z_speed: float = 0.0
     z_mm_per_deg: float = 1.0
+    volumen_objetivo_ml: float = 0.0
+    deadband_energy: float = 0.0
 
 
 class VirtualRobotController:
@@ -83,8 +86,10 @@ class VirtualRobotController:
         self._target_a = 0.0
         self._target_z = 0.0
         self._target_volume = 0.0
+        self._pump_margin_ml = 0.05
         self._manual_x = False
         self._manual_a = False
+        self._exec_trigger = False
         self._last_command = np.zeros(24, dtype=np.float32)
         self._robot_id: Optional[int] = None
         self._client_id: Optional[int] = None
@@ -158,6 +163,10 @@ class VirtualRobotController:
         # Map the 0-400 mm slide range into the URDF travel used by the sim
         return float(max(-0.2, min(0.0, -(mm / 1000.0) * 0.2)))
 
+    def set_deadband_energy(self, db: float) -> None:
+        with self._lock:
+            self.state.deadband_energy = max(0.0, min(255.0, float(db)))
+
     def reset(self) -> str:
         with self._lock:
             self.state = VirtualRobotState()
@@ -188,6 +197,7 @@ class VirtualRobotController:
             # Limitar A a 355° máx para el robot virtual
             self._target_a = float(np.clip(data[5], 0.0, 355.0))
             self._target_volume = max(0.0, float(data[6]))
+            self.state.volumen_objetivo_ml = self._target_volume
             self.state.kpX = float(data[7])
             self.state.kiX = float(data[8])
             self.state.kdX = float(data[9])
@@ -217,6 +227,8 @@ class VirtualRobotController:
             modo = int(self.state.codigo_modo)
             self._manual_x = bool(modo & 0x01)
             self._manual_a = bool((modo >> 1) & 0x01)
+            # Bit 3 (8) como trigger de ejecutar
+            self._exec_trigger = bool((modo >> 3) & 0x01)
 
     def advance(self, dt: float) -> str:
         if dt <= 0:
@@ -238,31 +250,65 @@ class VirtualRobotController:
                 self.state.a_deg = 0.0
             elif self.state.a_deg > 355.0:
                 self.state.a_deg = 355.0
-            # --- Bomba (modo virtual armonizado con firmware) ---
-            # Si hay objetivo pendiente, la bomba virtual se enciende automáticamente
-            # a energía equivalente 255 y se detiene al alcanzar el objetivo.
-            # Si no hay objetivo, respeta la energía manual (cmd_bomba).
-            margin = 0.05
-            objective_pending = (self._target_volume - self.state.volumen_ml) > margin
+            # --- Bomba / Flujo (simulación detallada) ---
+            usar_sensor = bool(self.state.usar_sensor_flujo)
             manual_cmd = float(self.state.cmd_bomba)
-            energy_eff = 255.0 if objective_pending else manual_cmd
-            flow = abs(energy_eff) / 255.0 * (self.state.caudal_bomba_ml_s or 0.0)
-            if energy_eff >= 0:
-                # Evitar sobrepasar el objetivo cuando hay meta
-                if objective_pending and self._target_volume > 0:
-                    max_add = max(0.0, self._target_volume - self.state.volumen_ml)
-                    self.state.volumen_ml += min(max_add, flow * dt)
+            objetivo_pendiente = (self._target_volume - self.state.volumen_ml) > self._pump_margin_ml
+            hay_manual = abs(manual_cmd) > 1.0
+            energia_aplicada = 0.0
+            # Solo ejecutar si hay trigger activo
+            if objetivo_pendiente and self._exec_trigger:
+                if usar_sensor:
+                    energia_aplicada = 255.0  # con sensor: máxima para cumplir objetivo
                 else:
-                    self.state.volumen_ml += flow * dt
+                    # sin sensor: usar energía mapeada desde el servidor (manual_cmd)
+                    energia_aplicada = np.clip(manual_cmd, -255.0, 255.0)
+            elif hay_manual and not usar_sensor:
+                energia_aplicada = np.clip(manual_cmd, -255.0, 255.0)
+            flow_nominal = max(0.0, self.state.caudal_bomba_ml_s)
+            # Aplicar deadband lineal
+            db = max(0.0, min(255.0, float(self.state.deadband_energy)))
+            eabs = abs(energia_aplicada)
+            frac = 0.0 if eabs <= db else (eabs - db) / max(1.0, 255.0 - db)
+            frac = max(0.0, min(1.0, frac))
+            flow_actual = frac * flow_nominal
+            delta_ml = flow_actual * dt
+            completed_now = False
+            if energia_aplicada > 0:
+                if usar_sensor:
+                    self.state.volumen_ml += delta_ml
+                else:
+                    if objetivo_pendiente:
+                        restante = max(0.0, self._target_volume - self.state.volumen_ml)
+                        incr = min(restante, delta_ml)
+                        self.state.volumen_ml += incr
+                        if restante - incr <= self._pump_margin_ml:
+                            self._target_volume = self.state.volumen_ml
+                            energia_aplicada = 0.0
+                            flow_actual = 0.0
+                            completed_now = True
+                    else:
+                        self.state.volumen_ml += delta_ml
+            elif energia_aplicada < 0:
+                self.state.volumen_ml = max(0.0, self.state.volumen_ml - delta_ml)
             else:
-                self.state.volumen_ml = max(0.0, self.state.volumen_ml - flow * dt)
-
-            # Clamp final por seguridad
-            if self._target_volume > 0:
-                self.state.volumen_ml = min(self.state.volumen_ml, self._target_volume)
-
-            # Reportar el valor aplicado de bomba
-            self.state.valor_bomba = float(energy_eff)
+                flow_actual = 0.0
+            if usar_sensor and objetivo_pendiente:
+                restante = max(0.0, self._target_volume - self.state.volumen_ml)
+                if restante <= self._pump_margin_ml:
+                    self._target_volume = self.state.volumen_ml
+                    energia_aplicada = 0.0
+                    flow_actual = 0.0
+                    completed_now = True
+            self.state.volumen_ml = max(0.0, self.state.volumen_ml)
+            self.state.valor_bomba = float(energia_aplicada)
+            self.state.flow_sensor_ml_s = flow_actual if energia_aplicada >= 0 else -flow_actual
+            # Auto-reset tras completar objetivo: dejar listo para siguiente ciclo
+            if completed_now:
+                self.state.volumen_objetivo_ml = 0.0
+                self._target_volume = 0.0
+                # Reiniciar contador de volumen a cero (semántica de reset de firmware)
+                self.state.volumen_ml = 0.0
             self.state.z_mm = self._approach(self.state.z_mm, self._target_z, self._max_speed_z * dt)
             self._update_pybullet_locked()
             frame = self._format_observation_locked()
@@ -532,6 +578,13 @@ class VirtualRelojEnv(RelojEnv):
         super().close()
         self._virtual_serial.close()
         self._virtual_controller.shutdown()
+
+    # Configuración del modelo lineal de flujo
+    def set_deadband_energy(self, val: float) -> None:  # type: ignore[override]
+        try:
+            self._virtual_controller.set_deadband_energy(val)
+        except Exception:
+            pass
 
 
 __all__ = ["VirtualRobotController", "VirtualSerial", "VirtualRelojEnv", "VirtualRobotState"]

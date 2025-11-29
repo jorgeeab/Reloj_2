@@ -113,7 +113,7 @@ const int ENERGIA_MINIMA = 75;
 const int ENERGIA_MAXIMA = 255;
 
 // ======================= Modos por eje =======================
-// codigoModo: bit0 = X manual, bit1 = A manual
+// codigoModo: bit0 = X manual, bit1 = A manual, bit3 = EXECUTE (trigger)
 uint8_t codigoModo = 0;
 
 // ----------------------- Prototipos -----------------------
@@ -196,21 +196,27 @@ void iniciarMedidorFlujo() {
 
 // ======================= Sensores =======================
 void leerSensorFlujo() {
-  if (!usarSensorFlujo) return;
-
   unsigned long ahora = millis();
   if (ahora - instanteFlujoAnterior >= TIEMPO_ACTUALIZACION_FLUJO_MS) {
     unsigned long delta = ahora - instanteFlujoAnterior;
     instanteFlujoAnterior = ahora;
 
-    medidorFlujo->tick(delta);
+    if (usarSensorFlujo) {
+      medidorFlujo->tick(delta);
 
-    // Nota: depende de la lib; escalamos con factorCalibracionFlujo a ml/s y ml
-    float caudalBruto = medidorFlujo->getCurrentFlowrate();
-    float volumenBruto = medidorFlujo->getTotalVolume();
+      // Nota: depende de la lib; escalamos con factorCalibracionFlujo a ml/s y ml
+      float caudalBruto = medidorFlujo->getCurrentFlowrate();
+      float volumenBruto = medidorFlujo->getTotalVolume();
 
-    caudalMLs  = caudalBruto  * factorCalibracionFlujo; // ml/s
-    volumenML  = volumenBruto * factorCalibracionFlujo; // ml
+      caudalMLs  = caudalBruto  * factorCalibracionFlujo; // ml/s
+      volumenML  = volumenBruto * factorCalibracionFlujo; // ml
+    } else {
+      // Sin sensor: estimar caudal por energía y cmax; integrar volumen
+      float frac = fabs(energiaBomba) / 255.0f;
+      if (frac < 0.0f) frac = 0.0f; if (frac > 1.0f) frac = 1.0f;
+      caudalMLs = caudalBombaMLs * frac;
+      volumenML += caudalMLs * (delta / 1000.0f);
+    }
   }
 }
 
@@ -279,34 +285,29 @@ void actualizarControlMotores() {
   const float margenObjetivo = 0.05f;
   const bool objetivoPendiente = (volumenObjetivoML - volumenML) > margenObjetivo;
   const bool hayManual = (fabs(energiaBomba) > 1.0f);
+  const bool execOn = (codigoModo & 0x08) != 0; // bit 3 como trigger de ejecutar
 
-  if (objetivoPendiente) {
+  if (objetivoPendiente && execOn) {
     if (usarSensorFlujo) {
       cmdBomba = remapearEnergia(BOMBA_MAX);
       motorBomba.setSpeed(abs(cmdBomba));
       motorBomba.run(FORWARD);
     } else {
-      const float restante = max(0.0f, volumenObjetivoML - volumenML);
-      if (restante <= margenObjetivo) {
+      // Control proporcional por energía enviada desde el host
+      cmdBomba = remapearEnergia((int)energiaBomba);
+      if (cmdBomba != 0) {
+        motorBomba.setSpeed(abs(cmdBomba));
+        motorBomba.run(cmdBomba > 0 ? FORWARD : BACKWARD);
+      } else {
+        motorBomba.setSpeed(0);
+        motorBomba.run(RELEASE);
+      }
+      // Detener si ya cumplimos objetivo (volumen integrado en leerSensorFlujo)
+      if (!((volumenObjetivoML - volumenML) > margenObjetivo)) {
         cmdBomba = 0;
         motorBomba.setSpeed(0);
         motorBomba.run(RELEASE);
-        tiempoInicioBombeo = 0;
         volumenObjetivoML = volumenML;
-      } else {
-        if (tiempoInicioBombeo == 0) tiempoInicioBombeo = millis();
-        const unsigned long duracion_ms = (unsigned long)((restante / max(0.001f, caudalBombaMLs)) * 1000.0f);
-        if (millis() - tiempoInicioBombeo < duracion_ms) {
-          cmdBomba = remapearEnergia(BOMBA_MAX);
-          motorBomba.setSpeed(abs(cmdBomba));
-          motorBomba.run(FORWARD);
-        } else {
-          cmdBomba = 0;
-          motorBomba.setSpeed(0);
-          motorBomba.run(RELEASE);
-          tiempoInicioBombeo = 0;
-          volumenObjetivoML = volumenML;
-        }
       }
     }
   } else if (hayManual) {

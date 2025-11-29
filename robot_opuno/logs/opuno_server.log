@@ -1,0 +1,122 @@
+[02:17:33] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[02:17:33] [INFO] Planificador iniciado.
+[02:17:33] [INFO] [Scheduler] OFF
+[02:17:33] [INFO] [Scheduler] Desactivado por defecto
+[02:17:33] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[02:17:33] [INFO] [Policy] command_policy = stop_only
+[02:17:33] [INFO] [Scheduler] OFF
+[02:17:33] [INFO] Settings aplicados al iniciar
+[02:17:33] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[02:17:33] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[02:17:33] [INFO] [Scheduler] OFF
+[02:17:33] [INFO] [Scheduler] Desactivado por defecto
+[02:17:33] [INFO] OK: Robot conectado en VIRTUAL
+[02:17:33] [INFO] Hilo de actualización de estado iniciado
+[02:17:33] [INFO] [TaskScheduler] Loop de programación iniciado
+[02:17:33] [INFO] [TaskScheduler] Programador iniciado
+[02:17:33] [INFO] [Policy] command_policy = stop_only
+[02:17:33] [INFO] [Scheduler] OFF
+[02:17:33] [INFO] Settings aplicados al iniciar
+[02:17:33] [INFO] Sistema iniciado correctamente
+[02:17:33] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[02:17:33] [INFO] Servidor iniciando en puerto 5007
+[02:17:33] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_opuno
+[02:17:33] [INFO] Puerto serial: VIRTUAL
+[02:17:33] [INFO] Usando sistema de tareas existente de reloj_env.py
+[02:17:35] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[02:17:36] [INFO] [ws/control] sesión abierta (ctrl-1763885856328)
+[02:17:36] [INFO] [ws/telemetry] sesión abierta (tele-1763885856743)
+[02:17:43] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[02:41:43] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[02:41:43] [INFO] Planificador iniciado.
+[02:41:43] [INFO] [Scheduler] OFF
+[02:41:43] [INFO] [Scheduler] Desactivado por defecto
+[02:41:43] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[02:41:43] [INFO] [Policy] command_policy = stop_only
+[02:41:43] [INFO] [Scheduler] OFF
+[02:41:43] [INFO] Settings aplicados al iniciar
+[02:41:43] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[02:41:43] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[02:41:43] [INFO] [Scheduler] OFF
+[02:41:43] [INFO] [Scheduler] Desactivado por defecto
+[02:41:43] [INFO] OK: Robot conectado en VIRTUAL
+[02:41:43] [INFO] Hilo de actualización de estado iniciado
+[02:41:43] [INFO] [TaskScheduler] Loop de programación iniciado
+[02:41:43] [INFO] [TaskScheduler] Programador iniciado
+[02:41:43] [INFO] [Policy] command_policy = stop_only
+[02:41:43] [INFO] [Scheduler] OFF
+[02:41:43] [INFO] Settings aplicados al iniciar
+[02:41:43] [INFO] Sistema iniciado correctamente
+[02:41:43] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[02:41:43] [INFO] Servidor iniciando en puerto 5007
+[02:41:43] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_opuno
+[02:41:43] [INFO] Puerto serial: VIRTUAL
+[02:41:43] [INFO] Usando sistema de tareas existente de reloj_env.py
+[02:41:45] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[02:41:46] [INFO] [ws/control] sesión abierta (ctrl-1763887306421)
+[02:41:46] [INFO] [ws/control] sesión abierta (ctrl-1763887306455)
+[02:41:46] [INFO] [ws/telemetry] sesión abierta (tele-1763887306893)
+[02:41:46] [INFO] [ws/telemetry] sesión abierta (tele-1763887306915)
+[02:42:03] [INFO] [control] payload: {'setpoints': {'x_mm': 49.5, 'a_deg': 0, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[02:42:09] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[09:56:26] [INFO] [ws/control] sesión cerrada (ctrl-1763887306455)
+[09:56:26] [INFO] [ws/telemetry] sesión cerrada (tele-1763887306893)
+[09:56:46] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[09:56:46] [INFO] Planificador iniciado.
+[09:56:46] [INFO] [Scheduler] OFF
+[09:56:46] [INFO] [Scheduler] Desactivado por defecto
+[09:56:46] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[09:56:46] [INFO] [Policy] command_policy = stop_only
+[09:56:46] [INFO] [Scheduler] OFF
+[09:56:46] [INFO] Settings aplicados al iniciar
+[09:56:46] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[09:56:46] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[09:56:46] [INFO] [Scheduler] OFF
+[09:56:46] [INFO] [Scheduler] Desactivado por defecto
+[09:56:46] [INFO] OK: Robot conectado en VIRTUAL
+[09:56:46] [INFO] Hilo de actualización de estado iniciado
+[09:56:46] [INFO] [TaskScheduler] Loop de programación iniciado
+[09:56:46] [INFO] [TaskScheduler] Programador iniciado
+[09:56:46] [INFO] [Policy] command_policy = stop_only
+[09:56:46] [INFO] [Scheduler] OFF
+[09:56:46] [INFO] Settings aplicados al iniciar
+[09:56:46] [INFO] Sistema iniciado correctamente
+[09:56:46] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[09:56:46] [INFO] Servidor iniciando en puerto 5007
+[09:56:46] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_opuno
+[09:56:46] [INFO] Puerto serial: VIRTUAL
+[09:56:46] [INFO] Usando sistema de tareas existente de reloj_env.py
+[09:56:46] [INFO] [ws/telemetry] sesión abierta (tele-1763913406916)
+[09:56:46] [INFO] [ws/control] sesión abierta (ctrl-1763913406950)
+[09:56:47] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[09:56:49] [INFO] [ws/control] sesión abierta (ctrl-1763913409581)
+[09:56:50] [INFO] [ws/telemetry] sesión abierta (tele-1763913410099)
+[14:01:59] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[14:01:59] [INFO] Planificador iniciado.
+[14:01:59] [INFO] [Scheduler] OFF
+[14:01:59] [INFO] [Scheduler] Desactivado por defecto
+[14:01:59] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[14:01:59] [INFO] [Policy] command_policy = stop_only
+[14:01:59] [INFO] [Scheduler] OFF
+[14:01:59] [INFO] Settings aplicados al iniciar
+[14:01:59] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[14:01:59] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[14:01:59] [INFO] [Scheduler] OFF
+[14:01:59] [INFO] [Scheduler] Desactivado por defecto
+[14:01:59] [INFO] OK: Robot conectado en VIRTUAL
+[14:01:59] [INFO] Hilo de actualización de estado iniciado
+[14:01:59] [INFO] [TaskScheduler] Loop de programación iniciado
+[14:01:59] [INFO] [TaskScheduler] Programador iniciado
+[14:01:59] [INFO] [Policy] command_policy = stop_only
+[14:01:59] [INFO] [Scheduler] OFF
+[14:01:59] [INFO] Settings aplicados al iniciar
+[14:01:59] [INFO] Sistema iniciado correctamente
+[14:01:59] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[14:01:59] [INFO] Servidor iniciando en puerto 5007
+[14:01:59] [INFO] Directorio base: C:\Users\jorge\Desktop\Proyectos- Visual Studio\Reloj_2\robot_opuno
+[14:01:59] [INFO] Puerto serial: VIRTUAL
+[14:01:59] [INFO] Usando sistema de tareas existente de reloj_env.py
+[14:02:01] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[14:02:02] [INFO] [ws/control] sesión abierta (ctrl-1763928122888)
+[14:02:03] [INFO] [ws/telemetry] sesión abierta (tele-1763928123375)
+[14:02:12] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}

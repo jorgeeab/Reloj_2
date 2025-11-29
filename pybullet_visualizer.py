@@ -61,6 +61,14 @@ class PyBulletVisualizer:
         self.robot_id: Optional[int] = None
         self.angle_joint = 0
         self.slide_joints = [1, 2, 4, 5]
+        self._num_joints = 0
+        self.volume_joint = None
+        self.volume_joint_limits = (0.0, 0.25)
+        self.volume_ml_capacity = 1000.0
+        self._vol_marker = None
+        self._flow_marker = None
+        self._vol_ml_to_m = 0.0002
+        self._flow_max_ml_s = 10.0
         self._have_fallback = False
         self._fallback_ids: dict[str, Optional[int]] = {"base": None, "pointer": None, "slider": None}
         self._debug_urdf_path: Optional[str] = None
@@ -89,6 +97,7 @@ class PyBulletVisualizer:
                     physicsClientId=self.client_id,
                 )
                 self.robot_id = int(rid)
+                self._inspect_robot()
         except Exception as exc:
             self.last_error = f"loadURDF failed: {exc}"
             self.robot_id = None
@@ -107,6 +116,41 @@ class PyBulletVisualizer:
             slider_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.01, 0.01, 0.01], physicsClientId=self.client_id)
             slider_vis = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.01, 0.01, 0.01], rgbaColor=[0.48, 0.72, 1.0, 1], physicsClientId=self.client_id)
             self._fallback_ids["slider"] = p.createMultiBody(baseMass=0, baseCollisionShapeIndex=slider_col, baseVisualShapeIndex=slider_vis, basePosition=[-0.2, 0, 0.02], physicsClientId=self.client_id)
+        else:
+            self._have_fallback = False
+
+    def _inspect_robot(self) -> None:
+        if self.robot_id is None:
+            self._num_joints = 0
+            self.volume_joint = None
+            return
+        try:
+            self._num_joints = p.getNumJoints(self.robot_id, physicsClientId=self.client_id)
+        except Exception:
+            self._num_joints = 0
+            self.volume_joint = None
+            return
+        self.volume_joint = None
+        for idx in range(self._num_joints):
+            try:
+                info = p.getJointInfo(self.robot_id, idx, physicsClientId=self.client_id)
+            except Exception:
+                continue
+            name_bytes = info[1]
+            try:
+                name = name_bytes.decode("utf-8").strip()
+            except Exception:
+                name = ""
+            if name in ("fluid_slide", "volume_slide", "volume_joint", "opuno_volume"):
+                lower = float(info[8]) if len(info) > 8 else 0.0
+                upper = float(info[9]) if len(info) > 9 else 0.25
+                if not math.isfinite(lower):
+                    lower = 0.0
+                if not math.isfinite(upper) or upper == lower:
+                    upper = lower + 0.25
+                self.volume_joint = idx
+                self.volume_joint_limits = (lower, upper)
+                break
 
         # Simple camera setup looking at the robot from the side
         self.camera_target = [0, 0, 0.03]
@@ -246,12 +290,39 @@ class PyBulletVisualizer:
             a_deg = 355.0
         angle_rad = math.radians(a_deg)
         slide_pos = self._mm_to_joint(getattr(status, "x_mm", 0.0) or 0.0)
+        vol_ml = float(getattr(status, "volumen_ml", 0.0) or 0.0)
+        target_ml = self.volume_ml_capacity
+        try:
+            target_candidate = float(getattr(status, "volumen_objetivo_ml", 0.0) or 0.0)
+        except Exception:
+            target_candidate = 0.0
+        if math.isfinite(target_candidate) and target_candidate > 0:
+            self.volume_ml_capacity = target_candidate
+            target_ml = target_candidate
 
         with self.lock:
             if self.robot_id is not None:
-                p.resetJointState(self.robot_id, self.angle_joint, angle_rad, physicsClientId=self.client_id)
+                if self._num_joints > 0 and self.angle_joint is not None and 0 <= self.angle_joint < self._num_joints:
+                    try:
+                        p.resetJointState(self.robot_id, self.angle_joint, angle_rad, physicsClientId=self.client_id)
+                    except Exception:
+                        pass
                 for idx in self.slide_joints:
-                    p.resetJointState(self.robot_id, idx, slide_pos, physicsClientId=self.client_id)
+                    if 0 <= idx < self._num_joints:
+                        try:
+                            p.resetJointState(self.robot_id, idx, slide_pos, physicsClientId=self.client_id)
+                        except Exception:
+                            continue
+                if self.volume_joint is not None and 0 <= self.volume_joint < self._num_joints:
+                    lower, upper = self.volume_joint_limits
+                    span = max(1e-6, upper - lower)
+                    cap = max(target_ml, 1.0)
+                    ratio = max(0.0, min(1.0, vol_ml / cap))
+                    joint_val = lower + ratio * span
+                    try:
+                        p.resetJointState(self.robot_id, self.volume_joint, joint_val, physicsClientId=self.client_id)
+                    except Exception:
+                        pass
             elif self._have_fallback:
                 # Rotate pointer around Z at origin
                 quat = p.getQuaternionFromEuler([0, 0, angle_rad])
@@ -267,7 +338,7 @@ class PyBulletVisualizer:
 
             # Update extra markers for volume and flow
             try:
-                vol_ml = float(getattr(status, "volumen_ml", 0.0) or 0.0)
+                vol_ml = float(vol_ml)
                 flow = float(getattr(status, "caudal_est_mls", getattr(status, "flow_est", 0.0)) or 0.0)
                 if hasattr(status, "caudalBombaMLs") and status.caudalBombaMLs:
                     self._flow_max_ml_s = max(1.0, float(status.caudalBombaMLs))

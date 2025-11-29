@@ -5,6 +5,12 @@
       "name": "Reloj Local",
       "base_url": "http://localhost:5005",
       "kind": "reloj"
+    },
+    {
+      "id": "opuno-local",
+      "name": "Opuno Local",
+      "base_url": "http://localhost:5007",
+      "kind": "opuno"
     }
   ]
 }

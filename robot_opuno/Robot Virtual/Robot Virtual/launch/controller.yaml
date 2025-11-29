@@ -1,0 +1,27 @@
+Reloj_1_controller:
+  # Publish all joint states -----------------------------------
+  joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 50
+
+  # Position Controllers --------------------------------------
+  Corredera 2_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: Corredera 2
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  Corredera 3_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: Corredera 3
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  Corredera 5_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: Corredera 5
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  Corredera 6_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: Corredera 6
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  Revolución 8_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: Revolución 8
+    pid: {p: 100.0, i: 0.01, d: 10.0}

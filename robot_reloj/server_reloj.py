@@ -168,11 +168,17 @@ class RobotStatus:
     caudalBombaMLs: float = 0.0
     rx_age_ms: int = 0
     volumen_objetivo_ml: float = 0.0
+    volumen_restante_ml: float = 0.0
     reward: float = 0.0
     robot_id: str = "real"
     robot_label: str = ""
     robot_kind: str = "hardware"
     is_virtual: bool = False
+    # Campos de conveniencia para UI/telemetría unificada
+    running: bool = False
+    objective_pending: bool = False
+    objective_margin_ml: float = 0.05
+    flow_target_est_mls: float = 0.0
 
 
 
@@ -256,6 +262,9 @@ sock = Sock(app)
 
 # Verbose flags (pueden habilitarse temporalmente para depurar)
 STATUS_DEBUG = False
+# Modelo lineal open-loop (sin sensor): parámetros configurables
+FLOW_DEADBAND_ENERGY = 0  # 0..255
+FLOW_CMAX_MLS = 50.0      # ml/s @ 255 por defecto
 
 # Lock global para operaciones sobre el entorno
 env_lock = threading.Lock()
@@ -417,6 +426,31 @@ def apply_persisted_settings(lock_held: bool = False) -> None:
             try:
                 if s.get("z_mm_por_grado") is not None:
                     robot_env.set_z_mm_por_grado(float(s["z_mm_por_grado"]))
+            except Exception:
+                pass
+            # Modelo de flujo (deadband energía)
+            try:
+                db = s.get("deadband_energy")
+                if db is not None:
+                    val = int(float(db))
+                    globals()["FLOW_DEADBAND_ENERGY"] = max(0, min(255, val))
+                    try:
+                        if hasattr(robot_env, 'set_deadband_energy'):
+                            robot_env.set_deadband_energy(globals()["FLOW_DEADBAND_ENERGY"])  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            # Modelo de flujo (cmax ml/s @255). Si no hay settings, usar default
+            try:
+                cm = s.get("caudal_bomba_mls")
+                if cm is None:
+                    cm = globals().get("FLOW_CMAX_MLS", 50.0)
+                globals()["FLOW_CMAX_MLS"] = max(0.0, float(cm))
+                try:
+                    robot_env.set_caudal_bomba_ml_s(globals()["FLOW_CMAX_MLS"])  # act[19]
+                except Exception:
+                    pass
             except Exception:
                 pass
             # Aplicar calibraciones persistidas de pasos
@@ -618,6 +652,37 @@ def _set_last_tx(txt: str):
     global last_tx_text, last_tx_ts
     last_tx_text = txt.strip(); last_tx_ts = time.time()
 
+
+def _serial_debug_payload(kind: str) -> Dict[str, Any]:
+    """Construye el payload de depuración RX/TX."""
+    if kind == "rx":
+        text = last_rx_text
+        ts = last_rx_ts
+        field = "last_rx"
+    else:
+        text = last_tx_text
+        ts = last_tx_ts
+        field = "last_tx"
+    age_ms = int(max(0.0, time.time() - ts) * 1000) if ts else None
+    payload: Dict[str, Any] = {
+        field: text,
+        "age_ms": age_ms,
+        "ts": ts or None,
+    }
+    if ts:
+        try:
+            payload["ts_iso"] = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+        except Exception:
+            payload["ts_iso"] = datetime.utcfromtimestamp(ts).isoformat()  # type: ignore[attr-defined]
+    if text:
+        payload["lines"] = text.splitlines()
+        payload["chars"] = len(text)
+    else:
+        payload["lines"] = []
+        payload["chars"] = 0
+    payload["kind"] = kind
+    return payload
+
 # --------------------------------
 
 # =============================================================================
@@ -634,6 +699,7 @@ def get_robot_status(force_fresh=False) -> RobotStatus:
     """Obtiene el estado actual del robot de forma segura y sin evaluar arrays como booleanos."""
 
     status = RobotStatus()  # instancia nueva cada llamada
+    obs_list: Optional[List[float]] = None
     try:
         with env_lock:
             # Obtener observación cruda
@@ -653,31 +719,31 @@ def get_robot_status(force_fresh=False) -> RobotStatus:
 
             if data_fresh or force_fresh:
                 if obs_arr is not None:
-                    obs = obs_arr.tolist()
-                    _set_last_rx(" ".join(f"{v:.2f}" for v in obs))
+                    obs_list = obs_arr.tolist()
+                    _set_last_rx(" ".join(f"{v:.2f}" for v in obs_list))
                     if STATUS_DEBUG:
-                        print(f"[DEBUG] get_robot_status: Datos frescos - X={obs[0]}, A={obs[1]}, Z={obs[21] if len(obs) > 21 else 'N/A'}")
+                        print(f"[DEBUG] get_robot_status: Datos frescos - X={obs_list[0]}, A={obs_list[1]}, Z={obs_list[21] if len(obs_list) > 21 else 'N/A'}")
                 else:
                     if STATUS_DEBUG:
                         print("[DEBUG] get_robot_status: No hay datos frescos disponibles")
-                    obs = [0.0]*21
+                    obs_list = [0.0]*21
             else:
-                # Sin RX reciente: usar caché si existe
+                # Sin RX reciente: usar caché si existe para mantener valores previos
                 if last_status_cache is not None:
                     cached_dict = asdict(last_status_cache)
                     cached_dict["stale"] = True
-                    # Actualizar edad de RX
                     try:
                         cached_dict["rx_age_ms"] = int(max(0.0, time.time() - last_rx_ts) * 1000)
                     except Exception:
                         cached_dict["rx_age_ms"] = 0
+                    status = RobotStatus(**cached_dict)
                     if STATUS_DEBUG:
-                        print(f"[DEBUG] get_robot_status: Usando caché - X={cached_dict.get('x_mm', 0)}, A={cached_dict.get('a_deg', 0)}")
-                    return RobotStatus(**cached_dict)
-                # Sin caché disponible: caerá a valores por defecto (ceros)
-                obs = [0.0]*21
-                if STATUS_DEBUG:
-                    print("[DEBUG] get_robot_status: Usando valores por defecto (ceros)")
+                        print(f"[DEBUG] get_robot_status: Usando caché - X={status.x_mm}, A={status.a_deg}")
+                else:
+                    # Sin caché disponible: caerá a valores por defecto (ceros)
+                    obs_list = [0.0]*21
+                    if STATUS_DEBUG:
+                        print("[DEBUG] get_robot_status: Usando valores por defecto (ceros)")
 
             # Conexión serial actual
             ser = getattr(robot_env, "ser", None)
@@ -688,44 +754,54 @@ def get_robot_status(force_fresh=False) -> RobotStatus:
             except Exception:
                 status.baudrate = DEFAULT_BAUDRATE
 
-            if len(obs) >= 21:
-                status.x_mm       = float(obs[0])
-                status.a_deg      = float(obs[1])
-                status.volumen_ml = float(obs[3])
-                status.lim_x      = int(obs[4])
-                status.lim_a      = int(obs[5])
-                status.homing_x   = int(obs[6])
-                status.homing_a   = int(obs[7])
-                status.modo       = int(obs[11])
+            valor_bomba_rx: Optional[float] = None
+            if obs_list is not None and len(obs_list) >= 21:
+                status.x_mm       = float(obs_list[0])
+                status.a_deg      = float(obs_list[1])
+                try:
+                    valor_bomba_rx = float(obs_list[2])
+                except Exception:
+                    valor_bomba_rx = None
+                status.volumen_ml = float(obs_list[3])
+                status.lim_x      = int(obs_list[4])
+                status.lim_a      = int(obs_list[5])
+                status.homing_x   = int(obs_list[6])
+                status.homing_a   = int(obs_list[7])
+                status.modo       = int(obs_list[11])
                 # PID gains desde RX (indices 12..17)
-                status.kpX        = float(obs[12])
-                status.kiX        = float(obs[13])
-                status.kdX        = float(obs[14])
-                status.kpA        = float(obs[15])
-                status.kiA        = float(obs[16])
-                status.kdA        = float(obs[17])
+                status.kpX        = float(obs_list[12])
+                status.kiX        = float(obs_list[13])
+                status.kdX        = float(obs_list[14])
+                status.kpA        = float(obs_list[15])
+                status.kiA        = float(obs_list[16])
+                status.kdA        = float(obs_list[17])
                 # Calibraciones desde RX (si el firmware las reporta)
-                status.pasosPorMM    = float(obs[18])
-                status.pasosPorGrado = float(obs[19])
-
-            # Z desde RX si está presente (índice 21): ahora en mm
+                status.pasosPorMM    = float(obs_list[18])
+                status.pasosPorGrado = float(obs_list[19])
             had_z_from_rx = False
-            try:
-                if len(obs) >= 22:
-                    status.z_mm = float(obs[21])
-                    had_z_from_rx = True
-            except Exception:
-                pass
+            if obs_list is not None:
+                try:
+                    if len(obs_list) >= 22:
+                        status.z_mm = float(obs_list[21])
+                        had_z_from_rx = True
+                except Exception:
+                    pass
 
             # Energías y Z desde el último comando TX (vector de acción actual)
             try:
                 act = getattr(robot_env, 'act', None)
                 if act is not None and len(act) >= 4:
                     # ALIAS: energiaA=1, energiaX=2, energiaBomba=3
+                    bomba_eff = int(act[3])
+                    try:
+                        if valor_bomba_rx is not None:
+                            bomba_eff = int(round(valor_bomba_rx))
+                    except Exception:
+                        pass
                     status.energies = {
                         "x": int(act[2]),
                         "a": int(act[1]),
-                        "bomba": int(act[3])
+                        "bomba": bomba_eff,
                     }
                     # Volumen objetivo (índice 6)
                     try:
@@ -754,51 +830,101 @@ def get_robot_status(force_fresh=False) -> RobotStatus:
                 now_ts = time.time()
                 prev_ts = getattr(get_robot_status, "_last_vol_ts")
                 prev_vol = getattr(get_robot_status, "_last_vol_ml")
-                if prev_ts and now_ts > prev_ts:
+                allow_deriv = prev_ts and now_ts > prev_ts
+                if allow_deriv:
                     dvol = max(0.0, status.volumen_ml - prev_vol)
                     dt = now_ts - prev_ts
                     deriv = dvol / dt if dt > 0 else 0.0
-                    if status.usarSensorFlujo:
+                    if status.usarSensorFlujo or getattr(robot_env, "is_virtual", False):
                         status.caudal_est_mls = float(deriv)
                     else:
-                        status.caudal_est_mls = float(status.energies.get("bomba", 0) != 0 and status.caudalBombaMLs or 0.0)
+                        # Sin sensor: estimar desde energía proporcional (no asumir cmax completa)
+                        try:
+                            e = abs(int(status.energies.get("bomba", 0)))
+                            db = int(globals().get("FLOW_DEADBAND_ENERGY", 0))
+                            cmax = float(status.caudalBombaMLs or 0.0) or float(globals().get("FLOW_CMAX_MLS", 50.0))
+                            alpha = 0.0 if e <= db else float(e - db) / float(max(1, 255 - db))
+                            status.caudal_est_mls = float(max(0.0, min(cmax, alpha * cmax)))
+                        except Exception:
+                            status.caudal_est_mls = 0.0
                 setattr(get_robot_status, "_last_vol_ts", now_ts)
                 setattr(get_robot_status, "_last_vol_ml", status.volumen_ml)
             except Exception:
                 pass
 
             # Estimador local cuando no hay sensor de flujo (para telemetría/UI)
-            try:
-                if not hasattr(get_robot_status, "_est_vol"):
-                    setattr(get_robot_status, "_est_vol", {
-                        "ts": 0.0,
-                        "vol": 0.0,
-                    })
-                est = getattr(get_robot_status, "_est_vol")
-                now_est = time.time()
-                bomba_activa = bool(status.energies.get("bomba", 0))
-                if status.usarSensorFlujo:
-                    est["vol"] = status.volumen_ml
-                    est["ts"] = now_est
-                else:
-                    if bomba_activa and status.caudalBombaMLs > 0:
-                        if est["ts"] == 0:
-                            est["vol"] = status.volumen_ml
-                            est["ts"] = now_est
-                        else:
-                            dt = max(0.0, now_est - est["ts"])
-                            est["ts"] = now_est
-                            est["vol"] = max(status.volumen_ml, est["vol"] + status.caudalBombaMLs * dt)
-                        status.caudal_est_mls = float(status.caudalBombaMLs)
-                        status.flow_est = status.caudal_est_mls
-                        status.volumen_ml = est["vol"]
-                    else:
+            if not getattr(robot_env, "is_virtual", False):
+                try:
+                    if not hasattr(get_robot_status, "_est_vol"):
+                        setattr(get_robot_status, "_est_vol", {
+                            "ts": 0.0,
+                            "vol": 0.0,
+                        })
+                    est = getattr(get_robot_status, "_est_vol")
+                    now_est = time.time()
+                    bomba_activa = bool(status.energies.get("bomba", 0))
+                    if status.usarSensorFlujo:
                         est["vol"] = status.volumen_ml
                         est["ts"] = now_est
-            except Exception:
-                pass
+                    else:
+                        if bomba_activa and status.caudalBombaMLs > 0:
+                            if est["ts"] == 0:
+                                est["vol"] = status.volumen_ml
+                                est["ts"] = now_est
+                            else:
+                                dt = max(0.0, now_est - est["ts"])
+                                est["ts"] = now_est
+                                est["vol"] = max(status.volumen_ml, est["vol"] + status.caudalBombaMLs * dt)
+                            status.caudal_est_mls = float(status.caudalBombaMLs)
+                            status.flow_est = status.caudal_est_mls
+                            status.volumen_ml = est["vol"]
+                        else:
+                            est["vol"] = status.volumen_ml
+                            est["ts"] = now_est
+                except Exception:
+                    pass
 
             status.flow_est = float(status.caudal_est_mls or 0.0)
+            try:
+                status.volumen_restante_ml = max(0.0, float(status.volumen_objetivo_ml) - float(status.volumen_ml))
+            except Exception:
+                status.volumen_restante_ml = 0.0
+            # Campos de conveniencia (uniformes entre robots)
+            try:
+                # Ejecutándose si hay flujo o si EXECUTE está ON y hay objetivo pendiente
+                exec_on = bool(int(status.modo) & 0x08)
+            except Exception:
+                exec_on = False
+            try:
+                margin = float(getattr(status, 'objective_margin_ml', 0.05) or 0.05)
+            except Exception:
+                margin = 0.05
+            try:
+                status.objective_pending = bool(status.volumen_restante_ml > margin)
+            except Exception:
+                status.objective_pending = False
+            try:
+                status.running = bool((status.caudal_est_mls or 0.0) > 0.01 or (exec_on and status.objective_pending))
+            except Exception:
+                status.running = False
+            # Estimar objetivo de flujo desde energía (modo sin sensor)
+            try:
+                usar_sens = bool(status.usarSensorFlujo)
+            except Exception:
+                usar_sens = False
+            try:
+                db = globals().get('FLOW_DEADBAND_ENERGY', 0)
+                cmax = 0.0
+                act = getattr(robot_env, 'act', None)
+                if act is not None and len(act) > 19:
+                    cmax = float(act[19])
+                if not cmax or cmax <= 0:
+                    cmax = float(globals().get('FLOW_CMAX_MLS', 50.0))
+                e = abs(int(status.energies.get('bomba', 0)))
+                alpha = 0.0 if e <= db else (float(e - db) / float(max(1, 255 - db)))
+                status.flow_target_est_mls = 0.0 if usar_sens else max(0.0, min(cmax, alpha * cmax))
+            except Exception:
+                status.flow_target_est_mls = 0.0
             profile = ROBOT_PROFILES.get(active_robot_id or "real", {})
             status.robot_id = active_robot_id or "real"
             status.robot_label = profile.get("label", status.robot_id)
@@ -895,6 +1021,10 @@ def stop_all_actuators():
             robot_env.set_energia_bomba(0)
             robot_env.set_volumen_objetivo_ml(0)
             robot_env.set_modo(cod=3)
+            try:
+                robot_env.set_execute_trigger(False)
+            except Exception:
+                pass
             robot_env.step()
         except Exception as e:
             logger.log(f"[stop_all_actuators] Error apagando actuadores: {e}", "ERROR")
@@ -1071,6 +1201,44 @@ def api_status_stream():
     resp.headers["X-Accel-Buffering"] = "no"
     return resp
 
+
+@app.route("/debug/serial", methods=["GET"])
+def debug_serial_rx():
+    """Devuelve el último RX recibido por el firmware y su edad."""
+    return jsonify(_serial_debug_payload("rx"))
+
+
+@app.route("/debug/serial_tx", methods=["GET"])
+def debug_serial_tx():
+    """Devuelve el último comando TX enviado al firmware y su edad."""
+    return jsonify(_serial_debug_payload("tx"))
+
+
+@app.route("/api/debug/logs", methods=["GET"])
+def api_debug_logs():
+    """Entrega los logs circulares del servidor (para la consola UI)."""
+    try:
+        limit = int(request.args.get("limit", 150))
+    except Exception:
+        limit = 150
+    limit = max(1, min(limit, 500))
+    logs = logger.get_logs()
+    total = len(logs)
+    if total > limit:
+        logs = logs[-limit:]
+    return jsonify({
+        "logs": logs,
+        "count": len(logs),
+        "total": total,
+    })
+
+
+@app.route("/api/debug/logs", methods=["DELETE"])
+def api_debug_logs_clear():
+    """Limpia el buffer circular de logs."""
+    logger.clear()
+    return jsonify({"status": "cleared"})
+
 ## Versión mínima: sin rutas de UI
 
 
@@ -1191,14 +1359,40 @@ def apply_control_payload(data: Dict[str, Any]) -> Dict[str, Any]:
                 u = bool(int(val)) if isinstance(val, (int, str)) else bool(val)
                 robot_env.set_usar_sensor_flujo(u)
                 logger.log(f"[FLOW] usar_sensor_flujo={int(u)}", "DEBUG")
+            # cmax (calibración)
             if "caudal_bomba_mls" in fl:
-                c = float(fl["caudal_bomba_mls"])
-                robot_env.set_caudal_bomba_ml_s(c)
-                logger.log(f"[FLOW] caudal_bomba_mls={c}", "DEBUG")
+                try:
+                    c = float(fl["caudal_bomba_mls"])
+                    globals()["FLOW_CMAX_MLS"] = max(0.0, c)
+                    robot_env.set_caudal_bomba_ml_s(globals()["FLOW_CMAX_MLS"])  # act[19]
+                    logger.log(f"[FLOW] cmax (caudal_bomba_mls)={globals()['FLOW_CMAX_MLS']}", "DEBUG")
+                except Exception as exc:
+                    logger.log(f"[FLOW] cmax inválido: {exc}", "WARNING")
+            if "deadband_energy" in fl:
+                try:
+                    db = int(float(fl["deadband_energy"]))
+                    globals()["FLOW_DEADBAND_ENERGY"] = max(0, min(255, db))
+                    if hasattr(robot_env, 'set_deadband_energy'):
+                        try:
+                            robot_env.set_deadband_energy(globals()["FLOW_DEADBAND_ENERGY"])  # type: ignore[attr-defined]
+                        except Exception:
+                            pass
+                    logger.log(f"[FLOW] deadband_energy={globals()['FLOW_DEADBAND_ENERGY']}", "DEBUG")
+                except Exception as exc:
+                    logger.log(f"[FLOW] deadband_energy inválido: {exc}", "WARNING")
 
         if "modo" in data:
             modo = int(data["modo"])
             robot_env.set_modo(mx=bool(modo & 1), ma=bool(modo & 2))
+        # Trigger de ejecutar (bit 3 de codigoModo)
+        if "execute" in data:
+            try:
+                robot_env.set_execute_trigger(bool(int(data.get("execute"))))
+            except Exception:
+                try:
+                    robot_env.set_execute_trigger(bool(data.get("execute")))
+                except Exception:
+                    pass
 
         if data.get("reset_volumen"):
             robot_env.reset_volumen()
@@ -1206,6 +1400,61 @@ def apply_control_payload(data: Dict[str, Any]) -> Dict[str, Any]:
             robot_env.reset_x()
         if data.get("reset_a"):
             robot_env.reset_a()
+
+        # Si no hay sensor, mapear flujo objetivo → energía (modelo lineal)
+        try:
+            fl = data.get("flow") or {}
+            en = data.get("energies") or {}
+            set_has_bomba = ("bomba" in en)
+            if isinstance(fl, dict):
+                # Config actual (cmax)
+                cmax = None
+                try:
+                    act = getattr(robot_env, 'act', None)
+                    if act is not None and len(act) > 19:
+                        cmax = float(act[19])
+                except Exception:
+                    cmax = None
+                if not cmax or cmax <= 0:
+                    cmax = float(globals().get("FLOW_CMAX_MLS", 50.0) or 50.0)
+                # ¿Sin sensor? entonces mapear flujo objetivo → energía
+                usar_sens = None
+                try:
+                    usar_sens = bool(int(fl.get("usar_sensor_flujo")))
+                except Exception:
+                    usar_sens = None
+                if usar_sens is None:
+                    try:
+                        act = getattr(robot_env, 'act', None)
+                        if act is not None and len(act) > 18:
+                            usar_sens = bool(int(act[18]))
+                    except Exception:
+                        usar_sens = False
+                # Extraer flujo objetivo (nuevo campo); mantener compat compat si venía con el nombre viejo
+                f_tgt = 0.0
+                try:
+                    if "flow_target_mls" in fl:
+                        f_tgt = float(fl.get("flow_target_mls") or 0.0)
+                    elif ("caudal_target_mls" in fl):
+                        f_tgt = float(fl.get("caudal_target_mls") or 0.0)
+                except Exception:
+                    f_tgt = 0.0
+                if not usar_sens:
+                    try:
+                        db = globals()["FLOW_DEADBAND_ENERGY"]
+                        if f_tgt <= 0 or cmax <= 0:
+                            e = 0
+                        else:
+                            alpha = max(0.0, min(1.0, f_tgt / float(cmax)))
+                            e = int(round(db + alpha * (255 - db)))
+                        # Solo si no vino energia explícita
+                        if not set_has_bomba:
+                            robot_env.set_energia_bomba(e)
+                        logger.log(f"[FLOW] map f={f_tgt} ml/s @cmax={cmax} db={db} → energia={e}", "DEBUG")
+                    except Exception as exc:
+                        logger.log(f"[FLOW] mapeo flujo→energía falló: {exc}", "WARNING")
+        except Exception:
+            pass
 
         # Paso de control → envía TX al firmware / virtual
         robot_env.step()

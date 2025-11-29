@@ -1,0 +1,664 @@
+openapi: 3.1.0
+info:
+  title: Control del Robot Reloj - Arquitectura V2
+  version: 2.0.0
+  description: |
+    Especificación optimizada para controlar el Robot Reloj con la nueva Arquitectura V2.
+    
+    NUEVA ARQUITECTURA V2:
+    - PROTOCOLOS: Mantienen capacidad de ejecutar continuamente su función asignada
+    - TAREAS: Son indicadores de CUÁNDO ejecutar un protocolo y HASTA CUÁNTO TIEMPO
+    
+    Características principales:
+    - Ejecución síncrona (servidor espera hasta completar o timeout de 25s)
+    - Ejecución asíncrona (respuesta inmediata con execution_id)
+    - Programación avanzada de tareas
+    - Control de tiempo y timeout automático
+    - Monitoreo en tiempo real
+servers:
+  - url: https://9bb419a88892.ngrok-free.app
+    description: Túnel remoto para pruebas
+
+paths:
+  # =============================================================================
+  # ENDPOINTS BÁSICOS
+  # =============================================================================
+  
+  /api/status:
+    get:
+      summary: Obtener estado del robot
+      operationId: getStatus
+      x-isConsequential: false
+      x-openai-isConsequential: false
+      responses:
+        '200':
+          description: Estado actual del robot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RobotStatus'
+                
+  /api/health:
+    get:
+      summary: Chequeo de salud del sistema
+      operationId: getHealth
+      x-isConsequential: false
+      x-openai-isConsequential: false
+      responses:
+        '200':
+          description: Información de salud
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  timestamp: { type: string }
+                  uptime: { type: number }
+                  version: { type: string }
+
+  # =============================================================================
+  # CONEXIÓN SERIAL
+  # =============================================================================
+  
+  /api/serial/ports:
+    get:
+      summary: Listar puertos seriales disponibles
+      operationId: listSerialPorts
+      x-isConsequential: false
+      x-openai-isConsequential: false
+      responses:
+        '200':
+          description: Lista de puertos seriales
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ports: 
+                    type: array
+                    items: { type: string }
+
+  /api/serial/open:
+    post:
+      summary: Abrir conexión serial
+      operationId: openSerial
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                port: { type: string }
+                baudrate: { type: integer, default: 115200 }
+      responses:
+        '200':
+          description: Conexión abierta exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /api/serial/close:
+    post:
+      summary: Cerrar conexión serial
+      operationId: closeSerial
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      responses:
+        '200':
+          description: Conexión cerrada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  # =============================================================================
+  # CONTROL DIRECTO DEL ROBOT
+  # =============================================================================
+  
+  /api/control:
+    post:
+      summary: Control directo del robot
+      operationId: controlRobot
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RobotCommand'
+      responses:
+        '200':
+          description: Comando ejecutado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /api/move/direction:
+    post:
+      summary: Movimiento direccional
+      operationId: moveDirection
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                direction: { type: string, enum: [forward, backward, left, right] }
+                distance: { type: number, default: 10.0 }
+      responses:
+        '200':
+          description: Movimiento ejecutado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /api/move/to:
+    post:
+      summary: Movimiento a posición específica
+      operationId: moveTo
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                x_mm: { type: number }
+                a_deg: { type: number }
+                threshold: { type: number, default: 2.0 }
+      responses:
+        '200':
+          description: Movimiento ejecutado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /api/stop:
+    post:
+      summary: Detener todos los movimientos
+      operationId: stopAll
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      responses:
+        '200':
+          description: Movimientos detenidos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /api/home:
+    post:
+      summary: Ir a posición home
+      operationId: goHome
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      responses:
+        '200':
+          description: Movimiento a home ejecutado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /api/emergency:
+    post:
+      summary: Parada de emergencia
+      operationId: emergencyStop
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      responses:
+        '200':
+          description: Parada de emergencia ejecutada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  # =============================================================================
+  # CONTROL DE AGUA Y SUCCIÓN
+  # =============================================================================
+  
+  /api/water:
+    post:
+      summary: Activar sistema de agua
+      operationId: startWater
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                intensity: { type: integer, default: 100, minimum: 0, maximum: 255 }
+      responses:
+        '200':
+          description: Sistema de agua activado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /api/suck:
+    post:
+      summary: Activar sistema de succión
+      operationId: startSuck
+      x-isConsequential: true
+      x-openai-isConsequential: true
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                intensity: { type: integer, default: 100, minimum: 0, maximum: 255 }
+      responses:
+        '200':
+          description: Sistema de succión activado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  # =============================================================================
+  # NUEVOS ENDPOINTS V2 - ARQUITECTURA UNIFICADA
+  # =============================================================================
+  
+  /api/tasks/v2/execute:
+    post:
+      summary: Ejecutar tarea V2 (síncrona o asíncrona)
+      operationId: executeTaskV2
+      description: |
+        **V2**: PROTOCOLOS ejecutan continuamente, TAREAS indican cuándo y cuánto tiempo.
+        
+        **Modos**: `sync` (espera hasta completar/25s) | `async` (respuesta inmediata)
+        
+        **Protocolos**: `riego_basico` (volume_ml, intensity) | `movimiento_basico` (x_mm, a_deg, threshold) | `prueba_basica` (test_type)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskDefinitionV2'
+            examples:
+              riego_sincrono:
+                summary: Riego síncrono
+                value:
+                  name: "Riego de Prueba"
+                  protocol_name: "riego_basico"
+                  duration_seconds: 10.0
+                  timeout_seconds: 25.0
+                  params:
+                    volume_ml: 50.0
+                    intensity: 100
+                  mode: "sync"
+              movimiento_asincrono:
+                summary: Movimiento asíncrono
+                value:
+                  name: "Movimiento a Posición"
+                  protocol_name: "movimiento_basico"
+                  duration_seconds: 5.0
+                  timeout_seconds: 20.0
+                  params:
+                    x_mm: 150.0
+                    a_deg: 90.0
+                    threshold: 2.0
+                  mode: "async"
+      responses:
+        '200':
+          description: Tarea ejecutada exitosamente
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TaskExecutionResultV2'
+                  - $ref: '#/components/schemas/TaskExecutionIdV2'
+        '400':
+          description: Error en la solicitud
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/tasks/v2/status/{task_id}:
+    get:
+      summary: Consultar estado de tarea V2
+      operationId: getTaskStatusV2
+      description: |
+        Obtiene el estado actual de una tarea V2 en ejecución.
+        Retorna información detallada incluyendo progreso, duración y resultado.
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Estado de la tarea
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskExecutionResultV2' }
+        '404':
+          description: Tarea no encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/tasks/v2/stop/{task_id}:
+    post:
+      summary: Detener tarea V2
+      operationId: stopTaskV2
+      description: |
+        Detiene una tarea V2 en ejecución.
+        La tarea se marcará como detenida y se aplicará parada automática.
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Tarea detenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+        '404':
+          description: Tarea no encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/tasks/v2/active:
+    get:
+      summary: Listar tareas activas V2
+      operationId: listActiveTasksV2
+      description: |
+        Obtiene la lista de tareas V2 actualmente en ejecución.
+        Incluye información de progreso y tiempo transcurrido.
+      responses:
+        '200':
+          description: Lista de tareas activas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active_tasks:
+                    type: array
+                    items: { $ref: '#/components/schemas/TaskExecutionResultV2' }
+
+  /api/tasks/v2/recent:
+    get:
+      summary: Listar tareas recientes V2
+      operationId: listRecentTasksV2
+      description: |
+        Obtiene la lista de tareas V2 ejecutadas recientemente.
+        Incluye tareas completadas, con error o detenidas.
+      responses:
+        '200':
+          description: Lista de tareas recientes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recent_tasks:
+                    type: array
+                    items: { $ref: '#/components/schemas/TaskExecutionResultV2' }
+
+  # =============================================================================
+  # PROGRAMACIÓN DE TAREAS V2
+  # =============================================================================
+  
+  /api/schedules:
+    get:
+      summary: Listar programaciones
+      operationId: listSchedules
+      description: |
+        Obtiene la lista de programaciones de tareas V2 configuradas.
+        Incluye programaciones diarias, por intervalo y de una sola vez.
+      responses:
+        '200':
+          description: Lista de programaciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schedules:
+                    type: array
+                    items: { $ref: '#/components/schemas/TaskScheduleV2' }
+
+    post:
+      summary: Crear programación
+      operationId: createSchedule
+      description: |
+        Crea una nueva programación de tarea V2.
+        Soporta programación diaria, por intervalo o de una sola vez.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskScheduleV2'
+      responses:
+        '200':
+          description: Programación creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  schedule_id: { type: string }
+                  message: { type: string }
+
+  /api/schedules/{task_id}/execute:
+    post:
+      summary: Ejecutar programación ahora
+      operationId: executeScheduleNow
+      description: |
+        Ejecuta una programación de tarea V2 inmediatamente.
+        Soporta modo síncrono y asíncrono.
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: mode
+          in: query
+          required: false
+          schema: { type: string, enum: [sync, async], default: sync }
+      responses:
+        '200':
+          description: Programación ejecutada exitosamente
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TaskExecutionResultV2'
+                  - $ref: '#/components/schemas/TaskExecutionIdV2'
+
+  
+
+components:
+  schemas:
+    RobotStatus:
+      type: object
+      properties:
+        x_mm: { type: number, description: "Posición X en milímetros" }
+        a_deg: { type: number, description: "Ángulo A en grados" }
+        energies: { type: array, items: { type: number }, description: "Energías de los motores" }
+        timestamp: { type: string, description: "Timestamp de la medición" }
+
+    RobotCommand:
+      type: object
+      properties:
+        command: { type: string }
+        params: { type: object }
+
+    TaskDefinitionV2:
+      type: object
+      required: [name, protocol_name, duration_seconds, timeout_seconds]
+      properties:
+        name:
+          type: string
+          description: Nombre descriptivo de la tarea
+        protocol_name:
+          type: string
+          description: Nombre del protocolo a ejecutar
+          enum: [riego_basico, movimiento_basico, prueba_basica]
+          example: riego_basico
+        duration_seconds:
+          type: number
+          description: Duración de la tarea en segundos
+        timeout_seconds:
+          type: number
+          description: Timeout máximo en segundos
+        params:
+          type: object
+          description: Parámetros para el protocolo
+          additionalProperties: true
+        auto_stop:
+          type: boolean
+          default: true
+          description: Aplicar parada automática al finalizar
+        mode:
+          type: string
+          enum: [sync, async]
+          default: async
+          description: Modo de ejecución (síncrono o asíncrono)
+
+    TaskExecutionResultV2:
+      type: object
+      properties:
+        task_id:
+          type: string
+          description: ID único de la tarea
+        status:
+          type: string
+          enum: [queued, running, completed, error, stopped, timeout]
+          description: Estado actual de la tarea
+        started_at:
+          type: number
+          nullable: true
+          description: Timestamp de inicio
+        ended_at:
+          type: number
+          nullable: true
+          description: Timestamp de finalización
+        duration:
+          type: number
+          nullable: true
+          description: Duración real en segundos
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Progreso porcentual (0-100)
+        result:
+          type: object
+          nullable: true
+          description: Resultado de la ejecución
+        error:
+          type: string
+          nullable: true
+          description: Mensaje de error si aplica
+
+    TaskExecutionIdV2:
+      type: object
+      properties:
+        execution_id:
+          type: string
+          description: ID de ejecución para monitoreo
+        status:
+          type: string
+          enum: [queued, running]
+          description: Estado inicial de la tarea
+
+    TaskScheduleV2:
+      type: object
+      required: [name, protocol_name, schedule_type, duration_seconds]
+      properties:
+        name:
+          type: string
+          description: Nombre de la programación
+        protocol_name:
+          type: string
+          description: Nombre del protocolo a ejecutar
+          enum: [riego_basico, movimiento_basico, prueba_basica]
+        schedule_type:
+          type: string
+          enum: [una_vez, diario, cada_segundos]
+          description: Tipo de programación
+        duration_seconds:
+          type: number
+          description: Duración de la tarea en segundos
+        params:
+          type: object
+          description: Parámetros para el protocolo
+          additionalProperties: true
+        schedule_params:
+          type: object
+          description: Parámetros específicos de la programación
+          properties:
+            hour: { type: integer, minimum: 0, maximum: 23 }
+            minute: { type: integer, minimum: 0, maximum: 59 }
+            interval_seconds: { type: number, minimum: 1 }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+        details: { type: object }

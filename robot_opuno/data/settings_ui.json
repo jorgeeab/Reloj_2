@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "baudrate": 115200,
+  "steps_mm": 5,
+  "steps_deg": 3,
+  "caudal_bomba_mls": 50,
+  "usar_sensor_flujo": 0,
+  "kpX": 2,
+  "kiX": 1,
+  "kdX": 0.2,
+  "kpA": 2,
+  "kiA": 1,
+  "kdA": 0.2,
+  "command_policy": "stop_only",
+  "scheduler_enabled": false,
+  "z_mm_por_grado": 1.2121,
+  "last_sp_x_mm": 0,
+  "last_sp_a_deg": 0,
+  "last_sp_z_mm": 0,
+  "last_sp_vol_ml": 0,
+  "pidX_default": {
+    "kp": 1.0,
+    "ki": 1.0,
+    "kd": 0.2
+  },
+  "pidA_default": {
+    "kp": 1.0,
+    "ki": 1.0,
+    "kd": 0.2
+  },
+  "proto_preferences": {
+    "current": "ir_posicion",
+    "params": {
+      "ir_posicion": {
+        "a_deg": 89,
+        "threshold": 2,
+        "x_mm": 20
+      },
+      "riego_basico": {
+        "a_deg": 10,
+        "intensity": 100,
+        "volume_ml": 50,
+        "x_mm": 0
+      }
+    },
+    "sensor_config": {
+      "x_mm": true,
+      "a_deg": true,
+      "volumen_ml": false,
+      "flow_est": false,
+      "caudal_est_mls": false
+    },
+    "reward": {
+      "max_duration_seconds": 60,
+      "reward_cumulative": true
+    }
+  }
+}
