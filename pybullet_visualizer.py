@@ -441,6 +441,8 @@ class PyBulletVisualizer:
                 viewMatrix=view,
                 projectionMatrix=proj,
                 renderer=p.ER_TINY_RENDERER,
+                shadow=0,  # Desactivar sombras para velocidad
+                lightDirection=[1, 1, 1],
                 physicsClientId=self.client_id,
             )
             dur = time.time() - start_t
