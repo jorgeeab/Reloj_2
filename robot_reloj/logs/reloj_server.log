@@ -1381,3 +1381,422 @@
 [20:45:56] [INFO] [ws/telemetry] sesión cerrada (tele-1763950458114)
 [20:45:57] [INFO] [ws/control] sesión cerrada (ctrl-1763950455657)
 [20:45:57] [INFO] [ws/telemetry] sesión cerrada (tele-1763950455311)
+[14:20:29] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[14:20:29] [INFO] Planificador iniciado.
+[14:20:29] [INFO] [Scheduler] OFF
+[14:20:29] [INFO] [Scheduler] Desactivado por defecto
+[14:20:29] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[14:20:29] [INFO] [Policy] command_policy = stop_only
+[14:20:29] [INFO] [Scheduler] OFF
+[14:20:29] [INFO] Settings aplicados al iniciar
+[14:20:29] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[14:20:29] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[14:20:29] [INFO] [Scheduler] OFF
+[14:20:29] [INFO] [Scheduler] Desactivado por defecto
+[14:20:29] [INFO] OK: Robot conectado en VIRTUAL
+[14:20:29] [INFO] Hilo de actualización de estado iniciado
+[14:20:29] [INFO] [TaskScheduler] Loop de programación iniciado
+[14:20:29] [INFO] [TaskScheduler] Programador iniciado
+[14:20:29] [INFO] [Policy] command_policy = stop_only
+[14:20:29] [INFO] [Scheduler] OFF
+[14:20:29] [INFO] Settings aplicados al iniciar
+[14:20:29] [INFO] Sistema iniciado correctamente
+[14:20:29] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (720x480)
+[14:20:29] [INFO] Servidor iniciando en puerto 5005
+[14:20:29] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[14:20:29] [INFO] Puerto serial: VIRTUAL
+[14:20:29] [INFO] Usando sistema de tareas existente de reloj_env.py
+[14:20:31] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[14:20:34] [INFO] [ws/control] sesión abierta (ctrl-1764447634492)
+[14:20:35] [INFO] [ws/telemetry] sesión abierta (tele-1764447635307)
+[14:20:56] [INFO] [ws/control] sesión cerrada (ctrl-1764447634492)
+[14:20:56] [INFO] [ws/telemetry] sesión cerrada (tele-1764447635307)
+[14:23:07] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[14:23:07] [INFO] Planificador iniciado.
+[14:23:07] [INFO] [Scheduler] OFF
+[14:23:07] [INFO] [Scheduler] Desactivado por defecto
+[14:23:07] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[14:23:07] [INFO] [Policy] command_policy = stop_only
+[14:23:07] [INFO] [Scheduler] OFF
+[14:23:07] [INFO] Settings aplicados al iniciar
+[14:23:07] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[14:23:07] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[14:23:07] [INFO] [Scheduler] OFF
+[14:23:07] [INFO] [Scheduler] Desactivado por defecto
+[14:23:07] [INFO] OK: Robot conectado en VIRTUAL
+[14:23:07] [INFO] Hilo de actualización de estado iniciado
+[14:23:07] [INFO] [TaskScheduler] Loop de programación iniciado
+[14:23:07] [INFO] [TaskScheduler] Programador iniciado
+[14:23:07] [INFO] [Policy] command_policy = stop_only
+[14:23:07] [INFO] [Scheduler] OFF
+[14:23:07] [INFO] Settings aplicados al iniciar
+[14:23:07] [INFO] Sistema iniciado correctamente
+[14:23:07] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (720x480)
+[14:23:07] [INFO] Servidor iniciando en puerto 5005
+[14:23:07] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[14:23:07] [INFO] Puerto serial: VIRTUAL
+[14:23:07] [INFO] Usando sistema de tareas existente de reloj_env.py
+[14:23:08] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[14:23:10] [INFO] [ws/control] sesión abierta (ctrl-1764447790215)
+[14:23:11] [INFO] [ws/telemetry] sesión abierta (tele-1764447791233)
+[14:23:14] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'flow_target_mls': 5, 'usar_sensor_flujo': 0}, 'execute': 1}
+[14:23:26] [INFO] [control] payload: {'reset_volumen': 1, 'setpoints': {'volumen_ml': 0}, 'flow': {'caudal_bomba_mls': 0}, 'energies': {'bomba': 0}}
+[14:23:38] [INFO] [control] payload: {'setpoints': {'volumen_ml': 0}, 'flow': {'flow_target_mls': 5, 'usar_sensor_flujo': 0}, 'execute': 1}
+[14:23:40] [INFO] [control] payload: {'setpoints': {'volumen_ml': 100}}
+[14:23:41] [INFO] [control] payload: {'flow': {'flow_target_mls': 0}, 'energies': {'bomba': 0}, 'execute': 0}
+[14:23:48] [INFO] [control] payload: {'setpoints': {'volumen_ml': 100}, 'flow': {'flow_target_mls': 0, 'usar_sensor_flujo': 0}, 'execute': 1}
+[14:23:55] [INFO] [control] payload: {'flow': {'flow_target_mls': 5}}
+[14:24:07] [INFO] [control] payload: {'flow': {'flow_target_mls': 0}, 'energies': {'bomba': 0}, 'execute': 0}
+[14:24:09] [INFO] [control] payload: {'setpoints': {'volumen_ml': 100}, 'flow': {'flow_target_mls': 0, 'usar_sensor_flujo': 0}, 'execute': 1}
+[21:07:31] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[21:07:31] [INFO] Planificador iniciado.
+[21:07:31] [INFO] [Scheduler] OFF
+[21:07:31] [INFO] [Scheduler] Desactivado por defecto
+[21:07:31] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[21:07:31] [INFO] [Policy] command_policy = stop_only
+[21:07:31] [INFO] [Scheduler] OFF
+[21:07:31] [INFO] Settings aplicados al iniciar
+[21:07:31] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[21:07:31] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[21:07:31] [INFO] [Scheduler] OFF
+[21:07:31] [INFO] [Scheduler] Desactivado por defecto
+[21:07:31] [INFO] OK: Robot conectado en VIRTUAL
+[21:07:31] [INFO] Hilo de actualización de estado iniciado
+[21:07:31] [INFO] [TaskScheduler] Loop de programación iniciado
+[21:07:31] [INFO] [TaskScheduler] Programador iniciado
+[21:07:31] [INFO] [Policy] command_policy = stop_only
+[21:07:31] [INFO] [Scheduler] OFF
+[21:07:31] [INFO] Settings aplicados al iniciar
+[21:07:31] [INFO] Sistema iniciado correctamente
+[21:07:32] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (1280x720)
+[21:07:32] [INFO] Servidor iniciando en puerto 5005
+[21:07:32] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[21:07:32] [INFO] Puerto serial: VIRTUAL
+[21:07:32] [INFO] Usando sistema de tareas existente de reloj_env.py
+[21:07:33] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[21:07:36] [INFO] [ws/control] sesión abierta (ctrl-1764472056427)
+[21:07:37] [INFO] [ws/telemetry] sesión abierta (tele-1764472057980)
+[21:12:15] [INFO] [control] payload: {'setpoints': {'x_mm': 207, 'a_deg': 0, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[21:29:28] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[21:29:28] [INFO] Planificador iniciado.
+[21:29:28] [INFO] [Scheduler] OFF
+[21:29:28] [INFO] [Scheduler] Desactivado por defecto
+[21:29:28] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[21:29:28] [INFO] [Policy] command_policy = stop_only
+[21:29:28] [INFO] [Scheduler] OFF
+[21:29:28] [INFO] Settings aplicados al iniciar
+[21:29:28] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[21:29:28] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[21:29:28] [INFO] [Scheduler] OFF
+[21:29:28] [INFO] [Scheduler] Desactivado por defecto
+[21:29:28] [INFO] OK: Robot conectado en VIRTUAL
+[21:29:28] [INFO] Hilo de actualización de estado iniciado
+[21:29:28] [INFO] [TaskScheduler] Loop de programación iniciado
+[21:29:28] [INFO] [TaskScheduler] Programador iniciado
+[21:29:28] [INFO] [Policy] command_policy = stop_only
+[21:29:28] [INFO] [Scheduler] OFF
+[21:29:28] [INFO] Settings aplicados al iniciar
+[21:29:28] [INFO] Sistema iniciado correctamente
+[21:29:28] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (1280x720)
+[21:29:28] [INFO] Servidor iniciando en puerto 5005
+[21:29:28] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[21:29:28] [INFO] Puerto serial: VIRTUAL
+[21:29:28] [INFO] Usando sistema de tareas existente de reloj_env.py
+[21:29:29] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[21:29:31] [INFO] [ws/control] sesión abierta (ctrl-1764473371058)
+[21:29:32] [INFO] [ws/telemetry] sesión abierta (tele-1764473372262)
+[21:33:42] [INFO] [ws/control] sesión abierta (ctrl-1764473622053)
+[21:33:43] [INFO] [ws/telemetry] sesión abierta (tele-1764473623281)
+[21:33:44] [INFO] [ws/control] sesión cerrada (ctrl-1764473371058)
+[21:33:44] [INFO] [ws/telemetry] sesión cerrada (tele-1764473372262)
+[21:34:21] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 0.75, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}
+[21:34:28] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[21:34:28] [INFO] Planificador iniciado.
+[21:34:28] [INFO] [Scheduler] OFF
+[21:34:28] [INFO] [Scheduler] Desactivado por defecto
+[21:34:28] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[21:34:28] [INFO] [Policy] command_policy = stop_only
+[21:34:28] [INFO] [Scheduler] OFF
+[21:34:28] [INFO] Settings aplicados al iniciar
+[21:34:28] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[21:34:28] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[21:34:28] [INFO] [Scheduler] OFF
+[21:34:28] [INFO] [Scheduler] Desactivado por defecto
+[21:34:28] [INFO] OK: Robot conectado en VIRTUAL
+[21:34:28] [INFO] Hilo de actualización de estado iniciado
+[21:34:28] [INFO] [TaskScheduler] Loop de programación iniciado
+[21:34:28] [INFO] [TaskScheduler] Programador iniciado
+[21:34:28] [INFO] [Policy] command_policy = stop_only
+[21:34:28] [INFO] [Scheduler] OFF
+[21:34:28] [INFO] Settings aplicados al iniciar
+[21:34:28] [INFO] Sistema iniciado correctamente
+[21:34:28] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (1280x720)
+[21:34:28] [INFO] Servidor iniciando en puerto 5005
+[21:34:28] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[21:34:28] [INFO] Puerto serial: VIRTUAL
+[21:34:28] [INFO] Usando sistema de tareas existente de reloj_env.py
+[21:34:28] [INFO] [ws/control] sesión abierta (ctrl-1764473668482)
+[21:34:28] [INFO] [ws/telemetry] sesión abierta (tele-1764473668497)
+[21:34:30] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[21:34:53] [INFO] [ws/control] sesión cerrada (ctrl-1764473668482)
+[21:34:54] [INFO] [ws/telemetry] sesión cerrada (tele-1764473668497)
+[21:35:09] [INFO] [ws/control] sesión abierta (ctrl-1764473709024)
+[21:35:11] [INFO] [ws/telemetry] sesión abierta (tele-1764473711148)
+[21:35:13] [INFO] [ws/control] sesión abierta (ctrl-1764473713359)
+[21:35:19] [INFO] [ws/telemetry] sesión abierta (tele-1764473719249)
+[21:39:21] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[21:39:21] [INFO] Planificador iniciado.
+[21:39:21] [INFO] [Scheduler] OFF
+[21:39:21] [INFO] [Scheduler] Desactivado por defecto
+[21:39:21] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[21:39:21] [INFO] [Policy] command_policy = stop_only
+[21:39:21] [INFO] [Scheduler] OFF
+[21:39:21] [INFO] Settings aplicados al iniciar
+[22:39:16] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[22:39:16] [INFO] Planificador iniciado.
+[22:39:16] [INFO] [Scheduler] OFF
+[22:39:16] [INFO] [Scheduler] Desactivado por defecto
+[22:39:16] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[22:39:16] [INFO] [Policy] command_policy = stop_only
+[22:39:16] [INFO] [Scheduler] OFF
+[22:39:16] [INFO] Settings aplicados al iniciar
+[22:39:16] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[22:39:16] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[22:39:16] [INFO] [Scheduler] OFF
+[22:39:16] [INFO] [Scheduler] Desactivado por defecto
+[22:39:16] [INFO] OK: Robot conectado en VIRTUAL
+[22:39:16] [INFO] Hilo de actualización de estado iniciado
+[22:39:16] [INFO] [TaskScheduler] Loop de programación iniciado
+[22:39:16] [INFO] [TaskScheduler] Programador iniciado
+[22:39:16] [INFO] [Policy] command_policy = stop_only
+[22:39:16] [INFO] [Scheduler] OFF
+[22:39:16] [INFO] Settings aplicados al iniciar
+[22:39:16] [INFO] Sistema iniciado correctamente
+[22:39:16] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (1280x720)
+[22:39:16] [INFO] Servidor iniciando en puerto 5005
+[22:39:16] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[22:39:16] [INFO] Puerto serial: VIRTUAL
+[22:39:16] [INFO] Usando sistema de tareas existente de reloj_env.py
+[22:39:17] [INFO] [ws/control] sesión abierta (ctrl-1764477557218)
+[22:39:17] [INFO] [ws/telemetry] sesión abierta (tele-1764477557235)
+[22:39:17] [INFO] [ws/telemetry] sesión abierta (tele-1764477557368)
+[22:39:18] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[22:39:18] [INFO] [ws/control] sesión abierta (ctrl-1764477558470)
+[22:39:19] [INFO] [ws/control] sesión abierta (ctrl-1764477559461)
+[22:39:20] [INFO] [ws/telemetry] sesión abierta (tele-1764477560949)
+[22:40:27] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 0.85, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}
+[01:26:01] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[01:26:01] [INFO] Planificador iniciado.
+[01:26:01] [INFO] [Scheduler] OFF
+[01:26:01] [INFO] [Scheduler] Desactivado por defecto
+[01:26:01] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[01:26:01] [INFO] [Policy] command_policy = stop_only
+[01:26:01] [INFO] [Scheduler] OFF
+[01:26:01] [INFO] Settings aplicados al iniciar
+[01:26:01] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[01:26:01] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[01:26:01] [INFO] [Scheduler] OFF
+[01:26:01] [INFO] [Scheduler] Desactivado por defecto
+[01:26:01] [INFO] OK: Robot conectado en VIRTUAL
+[01:26:01] [INFO] Hilo de actualización de estado iniciado
+[01:26:01] [INFO] [TaskScheduler] Loop de programación iniciado
+[01:26:01] [INFO] [TaskScheduler] Programador iniciado
+[01:26:01] [INFO] [Policy] command_policy = stop_only
+[01:26:01] [INFO] [Scheduler] OFF
+[01:26:01] [INFO] Settings aplicados al iniciar
+[01:26:01] [INFO] Sistema iniciado correctamente
+[01:26:01] [INFO] [Visualizer] Intentando iniciar PyBulletVisualizer...
+[01:26:01] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (1280x720)
+[01:26:01] [INFO] Servidor iniciando en puerto 5005
+[01:26:01] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[01:26:01] [INFO] Puerto serial: VIRTUAL
+[01:26:01] [INFO] Usando sistema de tareas existente de reloj_env.py
+[01:26:01] [INFO] [ws/control] sesión abierta (ctrl-1764487561571)
+[01:26:01] [INFO] [ws/control] sesión abierta (ctrl-1764487561587)
+[01:26:01] [INFO] [ws/control] sesión abierta (ctrl-1764487561618)
+[01:26:01] [INFO] [ws/telemetry] sesión abierta (tele-1764487561632)
+[01:26:01] [INFO] [ws/telemetry] sesión abierta (tele-1764487561649)
+[01:26:01] [INFO] [ws/telemetry] sesión abierta (tele-1764487561666)
+[01:26:02] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[01:26:04] [INFO] [ws/control] sesión abierta (ctrl-1764487564198)
+[01:26:04] [INFO] [ws/telemetry] sesión abierta (tele-1764487564232)
+[01:26:58] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 0.5, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}
+[01:27:51] [INFO] [ws/control] sesión cerrada (ctrl-1764487564198)
+[01:27:52] [INFO] [ws/telemetry] sesión cerrada (tele-1764487564232)
+[01:27:57] [INFO] [ws/control] sesión cerrada (ctrl-1764487561618)
+[01:27:57] [INFO] [ws/telemetry] sesión cerrada (tele-1764487561666)
+[01:28:03] [INFO] [ws/control] sesión cerrada (ctrl-1764487561587)
+[01:28:03] [INFO] [ws/control] sesión cerrada (ctrl-1764487561571)
+[01:28:03] [ERROR] [ws/telemetry] error (tele-1764487561632): [WinError 10053] Se ha anulado una conexión establecida por el software en su equipo host
+[01:28:05] [INFO] [ws/telemetry] sesión cerrada (tele-1764487561649)
+[01:28:17] [INFO] [ws/control] sesión abierta (ctrl-1764487697638)
+[01:28:17] [INFO] [ws/telemetry] sesión abierta (tele-1764487697678)
+[01:28:27] [INFO] [control] payload: {'setpoints': {'x_mm': 54.5, 'a_deg': 0, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[01:28:47] [INFO] [control] payload: {'setpoints': {'x_mm': 99, 'a_deg': 0, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[01:29:06] [INFO] [control] payload: {'setpoints': {'x_mm': 108.5, 'a_deg': 0, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[01:30:16] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 2.0, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}
+[01:31:41] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[01:31:41] [INFO] Planificador iniciado.
+[01:31:41] [INFO] [Scheduler] OFF
+[01:31:41] [INFO] [Scheduler] Desactivado por defecto
+[01:31:41] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[01:31:41] [INFO] [Policy] command_policy = stop_only
+[01:31:41] [INFO] [Scheduler] OFF
+[01:31:41] [INFO] Settings aplicados al iniciar
+[01:31:41] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[01:31:41] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[01:31:41] [INFO] [Scheduler] OFF
+[01:31:41] [INFO] [Scheduler] Desactivado por defecto
+[01:31:41] [INFO] OK: Robot conectado en VIRTUAL
+[01:31:41] [INFO] Hilo de actualización de estado iniciado
+[01:31:41] [INFO] [TaskScheduler] Loop de programación iniciado
+[01:31:41] [INFO] [TaskScheduler] Programador iniciado
+[01:31:41] [INFO] [Policy] command_policy = stop_only
+[01:31:41] [INFO] [Scheduler] OFF
+[01:31:41] [INFO] Settings aplicados al iniciar
+[01:31:41] [INFO] Sistema iniciado correctamente
+[01:31:41] [INFO] [Visualizer] Intentando iniciar PyBulletVisualizer...
+[01:31:41] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (1280x720)
+[01:31:41] [INFO] Servidor iniciando en puerto 5005
+[01:31:41] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[01:31:41] [INFO] Puerto serial: VIRTUAL
+[01:31:41] [INFO] Usando sistema de tareas existente de reloj_env.py
+[01:31:41] [INFO] [ws/control] sesión abierta (ctrl-1764487901572)
+[01:31:41] [INFO] [ws/telemetry] sesión abierta (tele-1764487901588)
+[01:31:42] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[01:32:17] [INFO] [ws/telemetry] sesión cerrada (tele-1764487901588)
+[01:32:19] [INFO] [ws/control] sesión cerrada (ctrl-1764487901572)
+[01:33:01] [INFO] [ws/control] sesión abierta (ctrl-1764487981984)
+[01:33:02] [INFO] [ws/control] sesión abierta (ctrl-1764487982025)
+[01:33:02] [INFO] [ws/telemetry] sesión abierta (tele-1764487982060)
+[01:33:05] [INFO] [ws/telemetry] sesión abierta (tele-1764487985943)
+[01:33:30] [INFO] [control] payload: {'setpoints': {'x_mm': 0, 'a_deg': 150.5, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[01:34:54] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 1.3, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}
+[01:35:38] [INFO] [PyBullet/camera/save] Vista guardada
+[01:38:45] [INFO] [ws/control] sesión cerrada (ctrl-1764487982025)
+[01:38:46] [INFO] [ws/control] sesión cerrada (ctrl-1764487981984)
+[01:38:46] [INFO] [ws/telemetry] sesión cerrada (tele-1764487982060)
+[01:38:48] [INFO] [ws/telemetry] sesión cerrada (tele-1764487985943)
+[01:39:07] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[01:39:07] [INFO] Planificador iniciado.
+[01:39:07] [INFO] [Scheduler] OFF
+[01:39:07] [INFO] [Scheduler] Desactivado por defecto
+[01:39:07] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[01:39:07] [INFO] [Policy] command_policy = stop_only
+[01:39:07] [INFO] [Scheduler] OFF
+[01:39:07] [INFO] Settings aplicados al iniciar
+[01:39:07] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[01:39:07] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[01:39:07] [INFO] [Scheduler] OFF
+[01:39:07] [INFO] [Scheduler] Desactivado por defecto
+[01:39:07] [INFO] OK: Robot conectado en VIRTUAL
+[01:39:07] [INFO] Hilo de actualización de estado iniciado
+[01:39:07] [INFO] [TaskScheduler] Loop de programación iniciado
+[01:39:07] [INFO] [TaskScheduler] Programador iniciado
+[01:39:07] [INFO] [Policy] command_policy = stop_only
+[01:39:07] [INFO] [Scheduler] OFF
+[01:39:07] [INFO] Settings aplicados al iniciar
+[01:39:07] [INFO] Sistema iniciado correctamente
+[01:39:07] [INFO] [Visualizer] Intentando iniciar PyBulletVisualizer...
+[01:39:07] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (1280x720)
+[01:39:07] [INFO] Servidor iniciando en puerto 5005
+[01:39:07] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[01:39:07] [INFO] Puerto serial: VIRTUAL
+[01:39:07] [INFO] Usando sistema de tareas existente de reloj_env.py
+[01:39:09] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[01:39:11] [INFO] [ws/control] sesión abierta (ctrl-1764488351968)
+[01:39:12] [INFO] [ws/telemetry] sesión abierta (tele-1764488352032)
+[01:39:16] [INFO] [PyBullet/camera/load] Vista cargada
+[01:40:05] [INFO] [ws/control] sesión cerrada (ctrl-1764488351968)
+[01:40:06] [INFO] [ws/telemetry] sesión cerrada (tele-1764488352032)
+[01:40:11] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[01:40:11] [INFO] Planificador iniciado.
+[01:40:11] [INFO] [Scheduler] OFF
+[01:40:11] [INFO] [Scheduler] Desactivado por defecto
+[01:40:11] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[01:40:11] [INFO] [Policy] command_policy = stop_only
+[01:40:11] [INFO] [Scheduler] OFF
+[01:40:11] [INFO] Settings aplicados al iniciar
+[01:40:11] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[01:40:11] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[01:40:11] [INFO] [Scheduler] OFF
+[01:40:11] [INFO] [Scheduler] Desactivado por defecto
+[01:40:11] [INFO] OK: Robot conectado en VIRTUAL
+[01:40:11] [INFO] Hilo de actualización de estado iniciado
+[01:40:11] [INFO] [TaskScheduler] Loop de programación iniciado
+[01:40:11] [INFO] [TaskScheduler] Programador iniciado
+[01:40:11] [INFO] [Policy] command_policy = stop_only
+[01:40:11] [INFO] [Scheduler] OFF
+[01:40:11] [INFO] Settings aplicados al iniciar
+[01:40:11] [INFO] Sistema iniciado correctamente
+[01:40:11] [INFO] [Visualizer] Intentando iniciar PyBulletVisualizer...
+[01:40:11] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (1280x720)
+[01:40:11] [INFO] Servidor iniciando en puerto 5005
+[01:40:11] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[01:40:11] [INFO] Puerto serial: VIRTUAL
+[01:40:11] [INFO] Usando sistema de tareas existente de reloj_env.py
+[01:40:13] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[01:40:15] [INFO] [ws/control] sesión abierta (ctrl-1764488415244)
+[01:40:16] [INFO] [ws/telemetry] sesión abierta (tele-1764488416658)
+[01:40:17] [INFO] [PyBullet/camera/load] Vista cargada
+[01:40:26] [INFO] [control] payload: {'setpoints': {'x_mm': 111.5, 'a_deg': 0, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[01:40:51] [INFO] [ws/control] sesión cerrada (ctrl-1764488415244)
+[01:40:51] [INFO] [ws/telemetry] sesión cerrada (tele-1764488416658)
+[01:41:08] [INFO] [ws/control] sesión abierta (ctrl-1764488468592)
+[01:41:09] [INFO] [ws/telemetry] sesión abierta (tele-1764488469361)
+[01:41:10] [INFO] [PyBullet/camera/load] Vista cargada
+[01:42:19] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[01:42:19] [INFO] Planificador iniciado.
+[01:42:19] [INFO] [Scheduler] OFF
+[01:42:19] [INFO] [Scheduler] Desactivado por defecto
+[01:42:19] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[01:42:19] [INFO] [Policy] command_policy = stop_only
+[01:42:19] [INFO] [Scheduler] OFF
+[01:42:19] [INFO] Settings aplicados al iniciar
+[01:42:19] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[01:42:19] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[01:42:19] [INFO] [Scheduler] OFF
+[01:42:19] [INFO] [Scheduler] Desactivado por defecto
+[01:42:19] [INFO] OK: Robot conectado en VIRTUAL
+[01:42:19] [INFO] Hilo de actualización de estado iniciado
+[01:42:19] [INFO] [TaskScheduler] Loop de programación iniciado
+[01:42:19] [INFO] [TaskScheduler] Programador iniciado
+[01:42:19] [INFO] [Policy] command_policy = stop_only
+[01:42:19] [INFO] [Scheduler] OFF
+[01:42:19] [INFO] Settings aplicados al iniciar
+[01:42:19] [INFO] Sistema iniciado correctamente
+[01:42:19] [INFO] [Visualizer] Intentando iniciar PyBulletVisualizer...
+[01:42:19] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (640x360)
+[01:42:19] [INFO] Servidor iniciando en puerto 5005
+[01:42:19] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_reloj
+[01:42:19] [INFO] Puerto serial: VIRTUAL
+[01:42:19] [INFO] Usando sistema de tareas existente de reloj_env.py
+[01:42:21] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[01:42:21] [INFO] [ws/control] sesión abierta (ctrl-1764488541617)
+[01:42:22] [INFO] [ws/telemetry] sesión abierta (tele-1764488542381)
+[01:42:47] [INFO] [control] payload: {'setpoints': {'x_mm': 144, 'a_deg': 0, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[01:42:57] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 0.35, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}
+[01:44:20] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 1.6, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}
+[01:44:25] [INFO] [ws/control] sesión cerrada (ctrl-1764488541617)
+[01:44:25] [INFO] [ws/telemetry] sesión cerrada (tele-1764488542381)
+[01:44:28] [INFO] [ws/control] sesión abierta (ctrl-1764488668630)
+[01:44:29] [INFO] [ws/control] sesión abierta (ctrl-1764488669210)
+[01:44:29] [INFO] [ws/telemetry] sesión abierta (tele-1764488669593)
+[01:44:29] [INFO] [PyBullet/camera/load] Vista cargada
+[01:44:30] [INFO] [ws/telemetry] sesión abierta (tele-1764488670013)
+[01:44:32] [INFO] [PyBullet/camera/load] Vista cargada
+[01:44:37] [INFO] [ws/control] sesión cerrada (ctrl-1764488669210)
+[01:44:37] [INFO] [ws/telemetry] sesión cerrada (tele-1764488670013)
+[01:44:42] [INFO] [ws/telemetry] sesión cerrada (tele-1764488669593)
+[01:44:42] [INFO] [ws/control] sesión cerrada (ctrl-1764488668630)
+[01:44:42] [INFO] [ws/control] sesión abierta (ctrl-1764488682428)
+[01:44:43] [INFO] [PyBullet/camera/load] Vista cargada
+[01:44:43] [INFO] [ws/telemetry] sesión abierta (tele-1764488683065)
+[01:44:48] [INFO] [ws/control] sesión cerrada (ctrl-1764488682428)
+[01:44:49] [INFO] [ws/telemetry] sesión cerrada (tele-1764488683065)
+[01:44:52] [INFO] [ws/control] sesión abierta (ctrl-1764488692036)
+[01:44:52] [INFO] [ws/telemetry] sesión abierta (tele-1764488692313)
+[01:44:52] [INFO] [PyBullet/camera/load] Vista cargada
+[01:55:20] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 1.55, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}
+[01:55:27] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 1.75, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}
+[01:55:40] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 0.45, 'yaw': 45.0, 'pitch': -25.0, 'up_axis': 2}

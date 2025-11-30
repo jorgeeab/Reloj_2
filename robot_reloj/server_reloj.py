@@ -627,7 +627,7 @@ def _pb_gui_stop() -> bool:
 def api_pybullet_frame():
     """Devuelve la última imagen renderizada por PyBullet (si está disponible)."""
     if visualizer is None:
-        return jsonify({"error": "pybullet_unavailable"}), 404
+        return jsonify({"error": "pybullet_unavailable"}), 503
     try:
         frame = visualizer.render_frame()
     except Exception as exc:
@@ -641,6 +641,117 @@ def api_pybullet_frame():
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
     return resp
+
+
+@app.route("/api/pybullet/camera", methods=["GET", "POST"])
+def api_pybullet_camera():
+    """GET: Obtiene configuración actual de cámara. POST: Actualiza configuración de cámara."""
+    if visualizer is None:
+        return jsonify({"error": "pybullet_unavailable"}), 503
+    
+    if request.method == "GET":
+        try:
+            config = visualizer.get_camera_config()
+            return jsonify({"status": "ok", "camera": config})
+        except Exception as exc:
+            logger.log(f"[PyBullet/camera] Error obteniendo config: {exc}", "WARNING")
+            return jsonify({"error": str(exc)}), 500
+    
+    # POST: Actualizar cámara
+    try:
+        data = get_request_data() or {}
+        target = data.get("target")
+        distance = data.get("distance")
+        yaw = data.get("yaw")
+        pitch = data.get("pitch")
+        up_axis = data.get("up_axis")
+        
+        visualizer.set_camera(
+            target=target,
+            distance=distance,
+            yaw=yaw,
+            pitch=pitch,
+            up_axis=up_axis
+        )
+        
+        config = visualizer.get_camera_config()
+        logger.log(f"[PyBullet/camera] Actualizada: {config}")
+        return jsonify({"status": "ok", "camera": config})
+    except Exception as exc:
+        logger.log(f"[PyBullet/camera] Error actualizando: {exc}", "ERROR")
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/pybullet/resize", methods=["POST"])
+def api_pybullet_resize():
+    """Cambia el tamaño de renderizado de PyBullet."""
+    if visualizer is None:
+        return jsonify({"error": "pybullet_unavailable"}), 503
+    
+    try:
+        data = get_request_data() or {}
+        width = int(data.get("width", 1280))
+        height = int(data.get("height", 720))
+        
+        visualizer.set_render_size(width, height)
+        logger.log(f"[PyBullet/resize] Tamaño cambiado a {width}x{height}")
+        return jsonify({
+            "status": "ok",
+            "width": visualizer.width,
+            "height": visualizer.height
+        })
+    except Exception as exc:
+        logger.log(f"[PyBullet/resize] Error: {exc}", "ERROR")
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/pybullet/camera/save", methods=["POST"])
+def api_pybullet_camera_save():
+    """Guarda la configuración actual de cámara en settings."""
+    if visualizer is None:
+        return jsonify({"error": "pybullet_unavailable"}), 503
+    
+    try:
+        config = visualizer.get_camera_config()
+        settings = _load_settings_dict()
+        settings["pybullet_camera"] = config
+        _save_settings_dict(settings)
+        logger.log("[PyBullet/camera/save] Vista guardada")
+        return jsonify({"status": "ok", "camera": config})
+    except Exception as exc:
+        logger.log(f"[PyBullet/camera/save] Error: {exc}", "ERROR")
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/pybullet/camera/load", methods=["GET", "POST"])
+def api_pybullet_camera_load():
+    """Carga la configuración de cámara guardada desde settings."""
+    if visualizer is None:
+        return jsonify({"error": "pybullet_unavailable"}), 503
+    
+    try:
+        settings = _load_settings_dict()
+        saved_camera = settings.get("pybullet_camera")
+        
+        if not saved_camera:
+            return jsonify({"status": "not_found", "message": "No hay vista guardada"}), 404
+        
+        # Aplicar la configuración guardada
+        visualizer.set_camera(
+            target=saved_camera.get("target"),
+            distance=saved_camera.get("distance"),
+            yaw=saved_camera.get("yaw"),
+            pitch=saved_camera.get("pitch"),
+            up_axis=saved_camera.get("up_axis")
+        )
+        
+        config = visualizer.get_camera_config()
+        logger.log("[PyBullet/camera/load] Vista cargada")
+        return jsonify({"status": "ok", "camera": config})
+    except Exception as exc:
+        logger.log(f"[PyBullet/camera/load] Error: {exc}", "ERROR")
+        return jsonify({"error": str(exc)}), 500
+
 
 def _set_last_rx(txt: str):
     global last_rx_text
@@ -1056,6 +1167,7 @@ ALLOWED_PREFIXES = (
     "/ws/",
     "/static",
     "/hub",
+    "/api/pybullet/",
 )
 
 ENFORCE_ENDPOINT_FILTER = False
@@ -2099,9 +2211,10 @@ def _start_visualizer() -> bool:
     """Inicializa el visualizador PyBullet si es posible."""
     global visualizer
     if PyBulletVisualizer is None:
-        logger.log("[Visualizer] PyBulletVisualizer no disponible (import falló)", "WARNING")
+        logger.log("[Visualizer] PyBulletVisualizer es None (import falló previamente)", "ERROR")
         visualizer = None
         return False
+    logger.log("[Visualizer] Intentando iniciar PyBulletVisualizer...")
     try:
         # Preferimos el URDF incluido en el repo bajo 'Robot Virtual/Robot Virtual/urdf'
         candidates = [
@@ -2113,8 +2226,8 @@ def _start_visualizer() -> bool:
             if path.exists():
                 chosen = path
                 break
-        # Crear visualizador con mayor resolución para que se vea más grande en la UI
-        visualizer = PyBulletVisualizer(str(chosen) if chosen else "", width=720, height=480)
+        # Crear visualizador con resolución moderada para fluidez en CPU (TinyRenderer)
+        visualizer = PyBulletVisualizer(str(chosen) if chosen else "", width=640, height=360)
         if chosen:
             logger.log(f"Visualizador PyBullet iniciado con URDF: {chosen} ({visualizer.width}x{visualizer.height})")
         else:
@@ -2124,6 +2237,8 @@ def _start_visualizer() -> bool:
         visualizer = None
         logger.log(f"WARNING: Visualizador PyBullet deshabilitado: {e}")
         return False
+
+
 
 
 if __name__ == "__main__":

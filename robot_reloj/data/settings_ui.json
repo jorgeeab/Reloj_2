@@ -54,5 +54,16 @@
       "max_duration_seconds": 60,
       "reward_cumulative": true
     }
+  },
+  "pybullet_camera": {
+    "target": [
+      0,
+      0,
+      0.03
+    ],
+    "distance": 1.3,
+    "yaw": 45.0,
+    "pitch": -25.0,
+    "up_axis": 2
   }
 }

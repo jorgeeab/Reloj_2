@@ -1,33 +1,163 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8" />
   <title>Simple Pump – Modular UI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{ --bg:#0b1023; --panel:#121837; --panel2:#0e1430; --text:#e8eefc; --muted:#9db3ff; --border:#2b3568; --accent:#4ea1ff; }
-    body{ margin:0; background:linear-gradient(180deg,#091029,#0a0f25); color:var(--text); font:14px/1.45 system-ui,Segoe UI,Roboto,Arial }
-    .wrap{ max-width:1100px; margin:16px auto; padding:0 12px }
-    .card{ background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--border); border-radius:12px; padding:12px; margin:10px 0 }
-    .pill{ padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:rgba(255,255,255,0.03) }
-    .flow-widget{border:1px solid var(--border); border-radius:12px; padding:12px; background:rgba(0,0,0,0.18); margin-bottom:16px;}
-    .fw-header{display:flex; flex-direction:column; gap:12px; margin-bottom:12px}
-    @media(min-width:760px){ .fw-header{ flex-direction:row; justify-content:space-between; align-items:flex-start } }
-    .fw-stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px}
-    .fw-stat{background:rgba(0,0,0,0.15); border:1px solid var(--border); border-radius:10px; padding:8px 10px}
-    .fw-stat label{display:block; font-size:12px; color:var(--muted)}
-    .fw-stat span{font-weight:600; font-size:14px}
-    .fw-step-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-bottom:12px}
-    .fw-stepper{border:1px solid var(--border); border-radius:10px; padding:10px; background:rgba(0,0,0,0.12)}
-    .stepper-head{display:flex; justify-content:space-between; align-items:center; font-weight:600; margin-bottom:8px}
-    .stepper-head .unit{font-size:12px; color:var(--muted)}
-    .stepper-body{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
-    .stepper-body input{width:90px; text-align:center}
-    .fw-actions{display:flex; gap:10px; flex-wrap:wrap}
-    .fw-actions button{padding:8px 16px; border-radius:10px; border:1px solid var(--border); background:#101736; color:var(--text); cursor:pointer}
-    .toast{position:fixed; right:16px; bottom:16px; background:#0e1a40; border:1px solid var(--border); padding:10px 12px; border-radius:10px; display:none}
+    :root {
+      --bg: #0b1023;
+      --panel: #121837;
+      --panel2: #0e1430;
+      --text: #e8eefc;
+      --muted: #9db3ff;
+      --border: #2b3568;
+      --accent: #4ea1ff;
+    }
+
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #091029, #0a0f25);
+      color: var(--text);
+      font: 14px/1.45 system-ui, Segoe UI, Roboto, Arial
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 16px auto;
+      padding: 0 12px
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin: 10px 0
+    }
+
+    .pill {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03)
+    }
+
+    .flow-widget {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.18);
+      margin-bottom: 16px;
+    }
+
+    .fw-header {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 12px
+    }
+
+    @media(min-width:760px) {
+      .fw-header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start
+      }
+    }
+
+    .fw-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px
+    }
+
+    .fw-stat {
+      background: rgba(0, 0, 0, 0.15);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px
+    }
+
+    .fw-stat label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted)
+    }
+
+    .fw-stat span {
+      font-weight: 600;
+      font-size: 14px
+    }
+
+    .fw-step-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px
+    }
+
+    .fw-stepper {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.12)
+    }
+
+    .stepper-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      margin-bottom: 8px
+    }
+
+    .stepper-head .unit {
+      font-size: 12px;
+      color: var(--muted)
+    }
+
+    .stepper-body {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center
+    }
+
+    .stepper-body input {
+      width: 90px;
+      text-align: center
+    }
+
+    .fw-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap
+    }
+
+    .fw-actions button {
+      padding: 8px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #101736;
+      color: var(--text);
+      cursor: pointer
+    }
+
+    .toast {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      background: #0e1a40;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      border-radius: 10px;
+      display: none
+    }
   </style>
 </head>
+
 <body>
   <main class="wrap">
     <h2 style="margin:8px 0 14px 0">Simple Pump — Modular</h2>
@@ -37,7 +167,8 @@
         <div>
           <h3 style="margin:0 0 4px 0">Control de Flujo</h3>
           <label><input type="checkbox" id="fw_sensor_chk"> Usar sensor de flujo</label>
-          <p style="margin:4px 0 0 0; color:var(--muted); font-size:12px">Define volumen y caudal; la bomba inicia/termina automáticamente.</p>
+          <p style="margin:4px 0 0 0; color:var(--muted); font-size:12px">Define volumen y caudal; la bomba
+            inicia/termina automáticamente.</p>
         </div>
         <div class="fw-stats">
           <div class="fw-stat"><label>Flujo actual</label><span id="fw_flow_actual">0.0 ml/s</span></div>
@@ -76,6 +207,67 @@
       </div>
     </section>
 
+    <!-- PyBullet Visualization -->
+    <section class="card">
+      <h3 style="margin:0 0 12px 0">Visualización PyBullet</h3>
+
+      <!-- Canvas -->
+      <div style="margin-bottom: 12px;">
+        <img id="pybullet_view" alt="Visualización PyBullet"
+          src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+          style="width: 100%; height: auto; border-radius: 8px; background: #1a1a1a; min-height: 300px; object-fit: contain;" />
+        <span id="pybullet_status"
+          style="display: block; margin-top: 4px; text-align: center; color: var(--muted); font-size: 12px;">
+          Cargando visualización...
+        </span>
+      </div>
+
+      <!-- Camera Controls -->
+      <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+        <button id="pb_save_view" type="button" style="flex: 1;">💾 Guardar Vista</button>
+        <button id="pb_load_view" type="button" style="flex: 1;">📂 Cargar Vista</button>
+        <button id="pb_reset_view" type="button" style="flex: 1;">🔄 Reset Vista</button>
+      </div>
+
+      <!-- Expandable Camera Sliders -->
+      <details id="pb_camera_details" style="margin-top: 8px;">
+        <summary style="cursor: pointer; font-weight: 500; padding: 4px 0;">🎥 Controles de Cámara</summary>
+
+        <div style="display: grid; gap: 12px; padding: 12px 0;">
+          <div style="display: grid; grid-template-columns: 120px 1fr 60px; gap: 8px; align-items: center;">
+            <label for="pb_distance">Distancia</label>
+            <input type="range" id="pb_distance" min="0.1" max="2" step="0.05" value="0.35">
+            <output id="pb_distance_val">0.35</output>
+          </div>
+          <div style="display: grid; grid-template-columns: 120px 1fr 60px; gap: 8px; align-items: center;">
+            <label for="pb_yaw">Yaw (Rotación)</label>
+            <input type="range" id="pb_yaw" min="-180" max="180" step="5" value="45">
+            <output id="pb_yaw_val">45°</output>
+          </div>
+          <div style="display: grid; grid-template-columns: 120px 1fr 60px; gap: 8px; align-items: center;">
+            <label for="pb_pitch">Pitch</label>
+            <input type="range" id="pb_pitch" min="-89" max="89" step="5" value="-25">
+            <output id="pb_pitch_val">-25°</output>
+          </div>
+          <div style="display: grid; grid-template-columns: 120px 1fr 60px; gap: 8px; align-items: center;">
+            <label for="pb_target_x">Target X</label>
+            <input type="range" id="pb_target_x" min="-0.5" max="0.5" step="0.01" value="0">
+            <output id="pb_target_x_val">0.00</output>
+          </div>
+          <div style="display: grid; grid-template-columns: 120px 1fr 60px; gap: 8px; align-items: center;">
+            <label for="pb_target_y">Target Y</label>
+            <input type="range" id="pb_target_y" min="-0.5" max="0.5" step="0.01" value="0">
+            <output id="pb_target_y_val">0.00</output>
+          </div>
+          <div style="display: grid; grid-template-columns: 120px 1fr 60px; gap: 8px; align-items: center;">
+            <label for="pb_target_z">Target Z</label>
+            <input type="range" id="pb_target_z" min="-0.2" max="0.5" step="0.01" value="0.03">
+            <output id="pb_target_z_val">0.03</output>
+          </div>
+        </div>
+      </details>
+    </section>
+
     <section class="card">
       <div id="kv">—</div>
     </section>
@@ -83,12 +275,14 @@
 
   <div id="toast" class="toast"></div>
   <script src="./js/flow_widget_pump.js"></script>
+  <script src="./js/pybullet_viewer_pump.js?v=4"></script>
   <script>
     // Inicializa el widget Pump con SSE
-    window.addEventListener('DOMContentLoaded', ()=>{
+    window.addEventListener('DOMContentLoaded', () => {
       PumpUI.buildPumpWidget('flow_widget');
+      if (window.PyBulletViewer) { PyBulletViewer.init(); }
     });
   </script>
 </body>
-</html>
 
+</html>

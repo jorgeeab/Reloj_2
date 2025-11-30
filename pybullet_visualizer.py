@@ -11,6 +11,7 @@ import io
 import struct
 import math
 import os
+import time
 import threading
 import tempfile
 import re
@@ -38,13 +39,20 @@ class PyBulletVisualizer:
     falls back to a simple geometric mock so the web UI still shows frames.
     """
 
-    def __init__(self, robot_urdf: str, width: int = 640, height: int = 360) -> None:
+    def __init__(self, robot_urdf: str, width: int = 1280, height: int = 720) -> None:
         self.width = width
         self.height = height
         self.robot_urdf = os.path.abspath(robot_urdf) if robot_urdf else ""
         self.lock = threading.Lock()
         self._last_frame: Optional[bytes] = None
         self.mimetype: str = "image/jpeg"
+        
+        # Camera parameters (configurable)
+        self.camera_target = [0, 0, 0.03]
+        self.camera_distance = 0.35
+        self.camera_yaw = 45
+        self.camera_pitch = -25
+        self.camera_up = 2
 
         # Connect in DIRECT mode so we can render off-screen
         self.client_id = p.connect(p.DIRECT)
@@ -152,12 +160,7 @@ class PyBulletVisualizer:
                 self.volume_joint_limits = (lower, upper)
                 break
 
-        # Simple camera setup looking at the robot from the side
-        self.camera_target = [0, 0, 0.03]
-        self.camera_distance = 0.35
-        self.camera_yaw = 45
-        self.camera_pitch = -25
-        self.camera_up = 2
+        # Camera setup already initialized in __init__
 
     def _resolve_urdf_paths(self, path: str) -> tuple[str, Optional[str]]:
         """Return a URDF file path suitable for PyBullet and the package_dir.
@@ -277,6 +280,37 @@ class PyBulletVisualizer:
                 finally:
                     self.client_id = -1
 
+    def set_camera(self, target=None, distance=None, yaw=None, pitch=None, up_axis=None) -> None:
+        """Update camera parameters."""
+        with self.lock:
+            if target is not None:
+                self.camera_target = list(target) if isinstance(target, (list, tuple)) else self.camera_target
+            if distance is not None:
+                self.camera_distance = float(distance)
+            if yaw is not None:
+                self.camera_yaw = float(yaw)
+            if pitch is not None:
+                self.camera_pitch = float(pitch)
+            if up_axis is not None:
+                self.camera_up = int(up_axis)
+
+    def get_camera_config(self) -> dict:
+        """Get current camera configuration."""
+        with self.lock:
+            return {
+                "target": list(self.camera_target),
+                "distance": self.camera_distance,
+                "yaw": self.camera_yaw,
+                "pitch": self.camera_pitch,
+                "up_axis": self.camera_up
+            }
+
+    def set_render_size(self, width: int, height: int) -> None:
+        """Change render resolution."""
+        with self.lock:
+            self.width = max(320, min(3840, int(width)))
+            self.height = max(240, min(2160, int(height)))
+
     def _mm_to_joint(self, x_mm: float) -> float:
         # Mapping consistent with the manual slider used in the PyBullet demo
         return float(max(-0.2, min(0.0, -(x_mm / 1000.0) * 0.2)))
@@ -317,7 +351,9 @@ class PyBulletVisualizer:
                     lower, upper = self.volume_joint_limits
                     span = max(1e-6, upper - lower)
                     cap = max(target_ml, 1.0)
-                    ratio = max(0.0, min(1.0, vol_ml / cap))
+                    # Use REMAINING volume (volumen requerido) instead of accumulated
+                    vol_remaining = max(0.0, target_ml - vol_ml)
+                    ratio = max(0.0, min(1.0, vol_remaining / cap))
                     joint_val = lower + ratio * span
                     try:
                         p.resetJointState(self.robot_id, self.volume_joint, joint_val, physicsClientId=self.client_id)
@@ -377,7 +413,11 @@ class PyBulletVisualizer:
         return header + dib + b''.join(rows)
 
     def render_frame(self) -> Optional[bytes]:
-        with self.lock:
+        # Intentar adquirir lock sin bloquear para no saturar si hay updates de cámara pendientes
+        if not self.lock.acquire(blocking=False):
+            return self._last_frame
+        
+        try:
             view = p.computeViewMatrixFromYawPitchRoll(
                 cameraTargetPosition=self.camera_target,
                 distance=self.camera_distance,
@@ -394,6 +434,7 @@ class PyBulletVisualizer:
                 farVal=5.0,
                 physicsClientId=self.client_id,
             )
+            start_t = time.time()
             _, _, rgb, _, _ = p.getCameraImage(
                 self.width,
                 self.height,
@@ -402,29 +443,34 @@ class PyBulletVisualizer:
                 renderer=p.ER_TINY_RENDERER,
                 physicsClientId=self.client_id,
             )
+            dur = time.time() - start_t
+            if dur > 0.1:
+                print(f"[PyBullet] Render lento: {dur*1000:.1f}ms ({self.width}x{self.height})")
 
-        rgba = np.reshape(np.array(rgb, dtype=np.uint8), (self.height, self.width, 4))
-        rgb_img = rgba[:, :, :3]
-        frame: Optional[bytes] = None
-        if cv2 is not None:
-            bgr_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
-            success, buf = cv2.imencode(".jpg", bgr_img, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
-            if success:
-                frame = buf.tobytes()
+            rgba = np.reshape(np.array(rgb, dtype=np.uint8), (self.height, self.width, 4))
+            rgb_img = rgba[:, :, :3]
+            frame: Optional[bytes] = None
+            if cv2 is not None:
+                bgr_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+                success, buf = cv2.imencode(".jpg", bgr_img, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+                if success:
+                    frame = buf.tobytes()
+                    self.mimetype = "image/jpeg"
+            elif Image is not None:
+                buf = io.BytesIO()
+                Image.fromarray(rgb_img).save(buf, format="JPEG", quality=50)
+                frame = buf.getvalue()
                 self.mimetype = "image/jpeg"
-        elif Image is not None:
-            buf = io.BytesIO()
-            Image.fromarray(rgb_img).save(buf, format="JPEG", quality=85)
-            frame = buf.getvalue()
-            self.mimetype = "image/jpeg"
-        else:
-            # Fallback: simple BMP encoder (widely supported by browsers)
-            try:
-                frame = self._encode_bmp(rgb_img)
-                self.mimetype = "image/bmp"
-            except Exception:
-                frame = self._last_frame
-        if frame:
-            self._last_frame = frame
-            return frame
-        return self._last_frame
+            else:
+                # Fallback: simple BMP encoder (widely supported by browsers)
+                try:
+                    frame = self._encode_bmp(rgb_img)
+                    self.mimetype = "image/bmp"
+                except Exception:
+                    frame = self._last_frame
+            if frame:
+                self._last_frame = frame
+                return frame
+            return self._last_frame
+        finally:
+            self.lock.release()

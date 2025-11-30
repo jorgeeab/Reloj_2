@@ -18,24 +18,26 @@
           <svg class="tank-svg" viewBox="0 0 140 200" aria-label="Tank level">
             <defs>
               <linearGradient id="tankWaterGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#38bdf8"/>
-                <stop offset="60%" stop-color="#0ea5e9"/>
-                <stop offset="100%" stop-color="#0369a1"/>
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="60%" stop-color="#0ea5e9" />
+                <stop offset="100%" stop-color="#0369a1" />
               </linearGradient>
               <linearGradient id="tankGlassGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#1e293b" stop-opacity="0.35"/>
-                <stop offset="45%" stop-color="#38bdf8" stop-opacity="0.55"/>
-                <stop offset="100%" stop-color="#020617" stop-opacity="0.5"/>
+                <stop offset="0%" stop-color="#1e293b" stop-opacity="0.35" />
+                <stop offset="45%" stop-color="#38bdf8" stop-opacity="0.55" />
+                <stop offset="100%" stop-color="#020617" stop-opacity="0.5" />
               </linearGradient>
               <clipPath id="tankClipMini">
-                <rect x="30" y="25" width="80" height="140" rx="16" ry="16"/>
+                <rect x="30" y="25" width="80" height="140" rx="16" ry="16" />
               </clipPath>
             </defs>
-            <ellipse cx="70" cy="182" rx="42" ry="12" fill="#020617" opacity="0.7"/>
-            <rect x="30" y="25" width="80" height="140" rx="16" ry="16" fill="url(#tankGlassGradient)" stroke="#48d6ff" stroke-width="2"/>
+            <ellipse cx="70" cy="182" rx="42" ry="12" fill="#020617" opacity="0.7" />
+            <rect x="30" y="25" width="80" height="140" rx="16" ry="16" fill="url(#tankGlassGradient)" stroke="#48d6ff"
+              stroke-width="2" />
             <g clip-path="url(#tankClipMini)">
-              <rect id="tank_water" x="30" y="165" width="80" height="0" fill="url(#tankWaterGradient)" opacity="0.95"/>
-              <rect id="tank_highlight" x="36" y="165" width="14" height="0" fill="#ffffff" opacity="0.45"/>
+              <rect id="tank_water" x="30" y="165" width="80" height="0" fill="url(#tankWaterGradient)"
+                opacity="0.95" />
+              <rect id="tank_highlight" x="36" y="165" width="14" height="0" fill="#ffffff" opacity="0.45" />
             </g>
           </svg>
           <div class="tank-label">
@@ -48,7 +50,8 @@
       <div class="fw-header">
         <div>
           <h3 style="margin:0">Control de Flujo</h3>
-          <p class="muted small" style="margin:2px 0 0 0">Replica el panel de la bomba en el Hub para ajustar volumen y caudal.</p>
+          <p class="muted small" style="margin:2px 0 0 0">Replica el panel de la bomba en el Hub para ajustar volumen y
+            caudal.</p>
         </div>
         <div class="fw-stats">
           <div class="fw-stat">
@@ -68,7 +71,7 @@
             <span id="fw_volume_target">0 ml</span>
           </div>
           <div class="fw-stat">
-            <label>Restante</label>
+            <label>Volumen Requerido</label>
             <span id="fw_volume_remaining">0 ml</span>
           </div>
         </div>
@@ -108,8 +111,16 @@
     <button type="button" id="fw_reset" class="ghost">Reiniciar volumen</button>
   </div>
   <div class="gauges" style="margin-top:8px">
-    <div class="gauge"><label>Bomba</label><div class="bar"><div id="wg_g_eb"></div></div></div>
-    <div class="gauge"><label>Progreso Volumen</label><div class="bar"><div id="wg_g_vol"></div></div></div>
+    <div class="gauge"><label>Bomba</label>
+      <div class="bar">
+        <div id="wg_g_eb"></div>
+      </div>
+    </div>
+    <div class="gauge"><label>Progreso Volumen</label>
+      <div class="bar">
+        <div id="wg_g_vol"></div>
+      </div>
+    </div>
   </div>
 </div>
 
