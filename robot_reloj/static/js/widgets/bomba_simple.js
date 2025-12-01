@@ -341,7 +341,18 @@
         state.completeHold = completed ? Math.min(3, (state.completeHold || 0) + 1) : 0;
         // Auto-stop una sola vez cuando detectamos fin sostenido y aún hay flujo
         if (state.completeHold >= 2 && !state.autoStopDone && runningNow) {
-          try { ctx.ControlChannel.send({ flow: { flow_target_mls: 0 }, energies: { bomba: 0 }, execute: 0 }); } catch { }
+          try {
+            ctx.ControlChannel.send({ flow: { flow_target_mls: 0 }, energies: { bomba: 0 }, execute: 0 });
+            // Auto-reset después de 1 segundo para "devolverse al inicio"
+            setTimeout(async () => {
+              try {
+                await ctx.ControlChannel.send({ reset_volumen: 1 });
+                state.lastVolumeActual = 0;
+                refreshStats();
+                if (ctx.toast) ctx.toast('Ciclo completado - Reiniciando');
+              } catch { }
+            }, 1000);
+          } catch { }
           state.autoStopDone = true;
         }
         updateRunUI(!!runningNow && !completed, completed);

@@ -283,7 +283,7 @@ class VirtualRobotController:
                         incr = min(restante, delta_ml)
                         self.state.volumen_ml += incr
                         if restante - incr <= self._pump_margin_ml:
-                            self._target_volume = self.state.volumen_ml
+                            # self._target_volume = self.state.volumen_ml  <-- REMOVED
                             energia_aplicada = 0.0
                             flow_actual = 0.0
                             completed_now = True
@@ -296,7 +296,7 @@ class VirtualRobotController:
             if usar_sensor and objetivo_pendiente:
                 restante = max(0.0, self._target_volume - self.state.volumen_ml)
                 if restante <= self._pump_margin_ml:
-                    self._target_volume = self.state.volumen_ml
+                    # self._target_volume = self.state.volumen_ml  <-- REMOVED
                     energia_aplicada = 0.0
                     flow_actual = 0.0
                     completed_now = True
@@ -304,11 +304,11 @@ class VirtualRobotController:
             self.state.valor_bomba = float(energia_aplicada)
             self.state.flow_sensor_ml_s = flow_actual if energia_aplicada >= 0 else -flow_actual
             # Auto-reset tras completar objetivo: dejar listo para siguiente ciclo
-            if completed_now:
-                self.state.volumen_objetivo_ml = 0.0
-                self._target_volume = 0.0
-                # Reiniciar contador de volumen a cero (semántica de reset de firmware)
-                self.state.volumen_ml = 0.0
+            # Auto-reset tras completar objetivo: ELIMINADO para coincidir con firmware
+            # if completed_now:
+            #     self.state.volumen_objetivo_ml = 0.0
+            #     self._target_volume = 0.0
+            #     self.state.volumen_ml = 0.0
             self.state.z_mm = self._approach(self.state.z_mm, self._target_z, self._max_speed_z * dt)
             self._update_pybullet_locked()
             frame = self._format_observation_locked()

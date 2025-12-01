@@ -189,11 +189,86 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/ui", StaticFiles(directory=str(STATIC_DIR), html=True), name="ui")
 
+# Importar sistema de protocolos
+from protocolos import ProtocolRunner, Protocolo
+from task_executor import TaskExecutor, ExecutionMode
+from task_scheduler import TaskScheduler, TaskSchedule, ScheduleType, create_daily_schedule, create_interval_schedule
+
+# Adapter para que ProtocolRunner vea a PumpController como un robot_env estándar
+class RobotEnvAdapter:
+    def __init__(self, pump_controller: PumpController):
+        self.pump = pump_controller
+        self.act = [0] * 20 # Mock de estado
+        self.port = pump_controller.serial_port
+        self.baudrate = 115200
+        self.is_virtual = False # Asumimos hardware real si hay puerto
+        
+        # State tracking
+        self._pumping_start_time = None
+        self._accumulated_volume = 0.0
+        self._last_update_time = time.time()
+
+    def set_energia_bomba(self, val: int):
+        # Mapear energía 0-255 a start/stop
+        if val > 0:
+            if not self.pump.is_running:
+                self.pump.run_ms(3600000) # Run "forever"
+                self._pumping_start_time = time.time()
+        else:
+            if self.pump.is_running:
+                self.pump.stop()
+                self._update_volume()
+                self._pumping_start_time = None
+
+    def set_volumen_objetivo_ml(self, val: float):
+        # El protocolo maneja la lógica de parada, solo necesitamos tracking
+        pass
+
+    def set_corredera_mm(self, val: float): pass
+    def set_angulo_deg(self, val: float): pass
+    def set_z_mm(self, val: float): pass
+    def set_servo_z_deg(self, val: float): pass
+    def set_modo(self, mx=None, ma=None, cod=None): pass
+    
+    def step(self):
+        # Actualizar estado simulado
+        self._update_volume()
+        
+    def _update_volume(self):
+        now = time.time()
+        if self.pump.is_running and self._pumping_start_time:
+            dt = now - self._last_update_time
+            # ml/s * s = ml
+            self._accumulated_volume += self.pump.ml_per_sec * dt
+        self._last_update_time = now
+
+    def get_volumen_acumulado_ml(self) -> float:
+        self._update_volume()
+        return self._accumulated_volume
+        
+    def reset_volumen(self):
+        self._accumulated_volume = 0.0
+        self._pumping_start_time = None if not self.pump.is_running else time.time()
+
+    def reset_x(self): pass
+    def reset_a(self): pass
+
 PUMP_SERIAL = os.environ.get("PUMP_SERIAL")  # e.g., COM4 or /dev/ttyUSB0
 ML_PER_SEC = float(os.environ.get("PUMP_ML_PER_SEC", "10.0"))
 
 _pump = PumpController(PUMP_SERIAL, ML_PER_SEC)
-_runner = TaskRunner(_pump)
+_env_adapter = RobotEnvAdapter(_pump)
+
+# Inicializar sistema de protocolos
+PROTOCOLS_DIR = Path(__file__).resolve().parent / "protocolos"
+protocol_runner = ProtocolRunner(_env_adapter, str(PROTOCOLS_DIR))
+task_executor = TaskExecutor(protocol_runner, _env_adapter)
+task_scheduler = TaskScheduler(task_executor)
+
+# Iniciar hilos
+task_scheduler.start()
+
+# _runner = TaskRunner(_pump) # Deprecated
 
 # ---------- Simple PyBullet visual ----------
 try:
@@ -376,21 +451,53 @@ def _status_snapshot() -> Dict:
     return payload
 
 
+@app.get("/api/protocols/list")
+def api_list_protocols():
+    """Lista protocolos disponibles con sus PARAMETERS para UI dinámica"""
+    try:
+        protocols_list = []
+        # Listar protocolos en directorio
+        available = Protocolo.listar(str(PROTOCOLS_DIR))
+        
+        for protocol_name in available:
+            try:
+                # Cargar cada protocolo
+                proto = Protocolo(protocol_name, str(PROTOCOLS_DIR))
+                meta = proto.cargar()
+                
+                # Intentar obtener PARAMETERS del protocolo
+                parameters = {}
+                if meta.get("tipo") == "gym" and proto.clase_protocolo:
+                    # Clase Gym - buscar atributo PARAMETERS
+                    parameters = getattr(proto.clase_protocolo, 'PARAMETERS', {})
+                
+                protocols_list.append({
+                    "name": protocol_name,
+                    "type": meta.get("tipo", "unknown"),
+                    "parameters": parameters,
+                    "has_parameters": bool(parameters)
+                })
+            except Exception as e:
+                protocols_list.append({
+                    "name": protocol_name,
+                    "type": "error",
+                    "parameters": {},
+                    "has_parameters": False,
+                    "error": str(e)
+                })
+        
+        return {
+            "protocols": protocols_list,
+            "count": len(protocols_list)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+                
+
+# Alias legacy
 @app.get("/api/protocols")
-def api_protocols():
-    """Describe available protocols and their parameters for dynamic UIs."""
-    return {
-        "protocols": [
-            {
-                "id": "riego_basico",
-                "label": "Riego básico",
-                "params": [
-                    {"name": "volume_ml", "type": "number", "unit": "ml", "min": 0, "step": 1, "default": 50, "required": False},
-                    {"name": "duration_seconds", "type": "number", "unit": "s", "min": 0, "step": 1, "default": None, "required": False}
-                ]
-            }
-        ]
-    }
+def api_protocols_legacy():
+    return api_list_protocols()
 
 
 @app.get("/api/status/stream")
@@ -399,59 +506,177 @@ async def api_status_stream():
         while True:
             try:
                 payload = _status_snapshot()
-                # include a hint about current execution progress if any
-                # already included by _status_snapshot
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             except Exception:
-                # On error, still keep the stream alive with a heartbeat
                 yield f": keepalive\n\n"
             await asyncio.sleep(0.5)
     return StreamingResponse(_gen(), media_type="text/event-stream")
 
 
 class ExecuteIn(BaseModel):
-    name: str
+    name: str = "Tarea sin nombre"
     protocol_name: str
     mode: Optional[str] = "async"
-    params: Optional[Dict[str, float]] = None
+    params: Optional[Dict] = {}
     duration_seconds: Optional[float] = None
+    timeout_seconds: Optional[float] = 25.0
+    continuous: Optional[bool] = False
+    auto_stop: Optional[bool] = True
 
 
 @app.post("/api/tasks/execute")
 def api_tasks_execute(data: ExecuteIn):
-    prot = (data.protocol_name or "").lower()
-    p = data.params or {}
-    if prot not in ("riego_basico", "riego", "pump"):
-        # accept but no-op
-        info = ExecInfo(execution_id=str(uuid.uuid4())[:8], status="completed", started_at=datetime.utcnow().isoformat(), ended_at=datetime.utcnow().isoformat())
-        _runner.tasks[info.execution_id] = info
-        return info.dict()
-    vol = p.get("volume_ml")
-    dur = data.duration_seconds
-    info = _runner.start_riego(volume_ml=vol, duration_seconds=dur)
-    return info.dict()
+    try:
+        # Validar existencia del protocolo
+        if not Protocolo.existe(data.protocol_name, str(PROTOCOLS_DIR)):
+             raise HTTPException(status_code=404, detail=f"Protocolo '{data.protocol_name}' no encontrado")
+
+        # Preparar parámetros
+        params = data.params or {}
+        
+        # Mapeo simple de parámetros comunes
+        if data.duration_seconds:
+            params["task_controlled"] = True
+            params["task_duration"] = float(data.duration_seconds)
+        
+        if data.continuous:
+            params["continuous_mode"] = True
+            data.timeout_seconds = max(data.timeout_seconds or 25.0, 3600.0)
+
+        # Crear definición de tarea
+        task_def = task_executor.create_task_definition(
+            name=data.name,
+            protocol_name=data.protocol_name,
+            duration_seconds=data.duration_seconds,
+            timeout_seconds=data.timeout_seconds,
+            params=params,
+            auto_stop=data.auto_stop
+        )
+
+        if data.mode == "sync":
+            result = task_executor.execute_task(task_def, ExecutionMode.SYNC)
+            return {
+                "status": "completed",
+                "task_id": result.task_id,
+                "execution_status": result.status.value,
+                "duration": result.duration,
+                "result": None,
+                "error": result.error,
+                "log": result.log
+            }
+        else:
+            execution_id = task_executor.execute_task(task_def, ExecutionMode.ASYNC)
+            return {
+                "status": "executing",
+                "execution_id": execution_id,
+                "task_id": task_def.id,
+                "estimated_duration": data.duration_seconds,
+                "timeout_seconds": data.timeout_seconds
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/api/execution/{exec_id}")
 def api_execution(exec_id: str):
-    info = _runner.tasks.get(exec_id)
-    if not info:
+    st = task_executor.get_task_status(exec_id)
+    if not st:
         raise HTTPException(status_code=404, detail="not found")
-    return info.dict()
+    return {
+        "execution_id": exec_id,
+        "status": st.status.value,
+        "started_at": st.started_at,
+        "ended_at": st.ended_at,
+        "log": st.log,
+        "progress": st.progress,
+        "type": "task",
+        "target_id": st.result.get("protocol_name") if isinstance(st.result, dict) else None
+    }
 
 
 @app.get("/api/executions")
 def api_executions():
-    return {"executions": [t.dict() for t in _runner.tasks.values()]}
+    # Listar activas
+    active = task_executor.list_active_tasks()
+    return {"executions": [
+        {"execution_id": t.task_id, "status": t.status.value, "started_at": t.started_at} 
+        for t in active
+    ]}
 
 
 @app.post("/api/execution/{exec_id}/stop")
 def api_execution_stop(exec_id: str):
+    if task_executor.stop_task(exec_id):
+        return {"status": "stopped", "execution_id": exec_id}
+    raise HTTPException(status_code=404, detail="not found or could not stop")
+
+
+class ScheduleIn(BaseModel):
+    name: str
+    protocol_name: str
+    schedule_type: str # once, interval, daily
+    duration_seconds: float = 10.0
+    params: Optional[Dict] = {}
+    
+    # Interval params
+    interval_seconds: Optional[int] = 3600
+    
+    # Daily params
+    hour: Optional[int] = 8
+    minute: Optional[int] = 0
+
+@app.get("/api/schedules/list")
+def api_schedules_list():
+    schedules = task_scheduler.list_schedules()
+    return {
+        "schedules": [
+            {
+                "task_id": s.task_id,
+                "name": s.name,
+                "protocol": s.protocol_name,
+                "type": s.schedule_type.value,
+                "next_execution": s.next_execution.isoformat() if s.next_execution else None,
+                "last_execution": s.last_execution.isoformat() if s.last_execution else None,
+                "active": s.active
+            }
+            for s in schedules
+        ]
+    }
+
+@app.post("/api/schedules/create")
+def api_schedules_create(data: ScheduleIn):
     try:
-        info = _runner.stop(exec_id)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="not found")
-    return info.dict()
+        if data.schedule_type == "daily":
+            schedule = create_daily_schedule(
+                name=data.name,
+                protocol_name=data.protocol_name,
+                hour=data.hour,
+                minute=data.minute,
+                duration_seconds=data.duration_seconds,
+                params=data.params
+            )
+        elif data.schedule_type == "interval":
+            schedule = create_interval_schedule(
+                name=data.name,
+                protocol_name=data.protocol_name,
+                interval_seconds=data.interval_seconds,
+                duration_seconds=data.duration_seconds,
+                params=data.params
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported schedule type")
+            
+        task_id = task_scheduler.add_schedule(schedule)
+        return {"status": "created", "task_id": task_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/schedules/{task_id}/delete")
+def api_schedules_delete(task_id: str):
+    if task_scheduler.remove_schedule(task_id):
+        return {"status": "deleted", "task_id": task_id}
+    raise HTTPException(status_code=404, detail="Schedule not found")
 
 
 # --------- Config & Serial endpoints (unificados con reloj) ---------

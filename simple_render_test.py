@@ -1,7 +1,10 @@
 import time
 import os
 import sys
+import threading
+import math
 from flask import Flask, Response, render_template_string
+import pybullet as p
 
 # Importar la clase robusta del proyecto
 from pybullet_visualizer import PyBulletVisualizer
@@ -9,14 +12,12 @@ from pybullet_visualizer import PyBulletVisualizer
 # Configuración
 WIDTH = 640
 HEIGHT = 360
-# Ruta al URDF (la misma que usa server_reloj.py)
 URDF_PATH = r"c:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro"
 
 app = Flask(__name__)
 
 print(f"Iniciando PyBulletVisualizer con: {URDF_PATH}")
 try:
-    # Usar la clase del proyecto que maneja XACRO y rutas package://
     visualizer = PyBulletVisualizer(URDF_PATH, width=WIDTH, height=HEIGHT)
     print("Robot cargado correctamente.")
 except Exception as e:
@@ -26,33 +27,42 @@ except Exception as e:
 # Configurar cámara inicial
 visualizer.set_camera(target=[0, 0, 0.1], distance=0.4, yaw=45, pitch=-25)
 
-# Hilo de animación para mover el robot
-import threading
-import math
+# Detectar joints disponibles
+movable_joints = []
+if visualizer.robot_id is None:
+    print(f"ADVERTENCIA: No se pudo cargar el robot URDF.")
+    print(f"Detalle del error: {getattr(visualizer, 'last_error', 'No disponible')}")
+    print("Se usará la visualización de fallback (cubos/cilindros).")
+else:
+    num_joints = p.getNumJoints(visualizer.robot_id, physicsClientId=visualizer.client_id)
+    print(f"Robot tiene {num_joints} articulaciones.")
+    for i in range(num_joints):
+        info = p.getJointInfo(visualizer.robot_id, i, physicsClientId=visualizer.client_id)
+        name = info[1].decode('utf-8')
+        joint_type = info[2]
+        # Solo animar joints móviles (revolute=0, prismatic=1)
+        if joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
+            print(f"Joint móvil detectado: {name} (ID: {i}, Tipo: {joint_type})")
+            movable_joints.append((i, name))
+        else:
+            print(f"Joint estático/fijo: {name} (ID: {i})")
 
+# Hilo de animación
 def animate_robot():
     t = 0
     print("Iniciando animación del robot...")
     while True:
-        # Generar movimiento senoidal
-        val1 = math.sin(t) * 1.5  # +/- 1.5 radianes (~85 grados)
-        val2 = math.cos(t * 0.7) * 1.0
-        val3 = math.sin(t * 1.2) * 1.0
+        if visualizer.robot_id is not None:
+            for i, name in movable_joints:
+                # Generar movimiento oscilatorio seguro
+                val = math.sin(t + i) * 0.2
+                try:
+                    p.resetJointState(visualizer.robot_id, i, val, physicsClientId=visualizer.client_id)
+                except Exception:
+                    pass
         
-        # Actualizar articulaciones (nombres comunes, ajusta si tu URDF usa otros)
-        joints = {
-            "joint_1": val1,
-            "joint_2": val2,
-            "joint_3": val3,
-            "joint_4": val1 * 0.5,
-            "joint_5": val2 * 0.5,
-            "joint_6": val3 * 0.5
-        }
-        
-        visualizer.update_robot_state(joints)
-        
-        t += 0.05
-        time.sleep(0.05) # 20 Hz de actualización física
+        t += 0.1
+        time.sleep(0.04) # 25 Hz
 
 threading.Thread(target=animate_robot, daemon=True).start()
 
@@ -93,14 +103,10 @@ def cam_control():
 
 def generate_frames():
     while True:
-        # Renderizar usando la clase optimizada
         frame = visualizer.render_frame()
-        
         if frame:
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-        
-        # Intentar mantener 25 FPS (40ms)
         time.sleep(0.04)
 
 @app.route('/stream')

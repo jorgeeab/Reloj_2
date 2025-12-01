@@ -307,7 +307,7 @@ void actualizarControlMotores() {
         cmdBomba = 0;
         motorBomba.setSpeed(0);
         motorBomba.run(RELEASE);
-        volumenObjetivoML = volumenML;
+        // NO modificar volumenObjetivoML aquí - causa que JS detecte cambio y reinicie
       }
     }
   } else if (hayManual) {

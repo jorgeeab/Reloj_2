@@ -1,0 +1,297 @@
+<div class="card bg-dark text-white mb-3 shadow-lg border-0" id="protocol-runner-widget">
+    <div class="card-header d-flex justify-content-between align-items-center bg-gradient-primary-to-secondary">
+        <h5 class="mb-0"><i class="fas fa-robot me-2"></i>Ejecutor de Protocolos</h5>
+        <span class="badge bg-success" id="runner-status-badge">Listo</span>
+    </div>
+    <div class="card-body">
+        <!-- Selector de Protocolo -->
+        <div class="mb-3">
+            <label for="protocol-select" class="form-label text-muted small text-uppercase fw-bold">Protocolo</label>
+            <select class="form-select bg-dark text-white border-secondary" id="protocol-select">
+                <option value="" selected disabled>Cargando protocolos...</option>
+            </select>
+            <div class="form-text text-muted" id="protocol-description">Selecciona un protocolo para configurar.</div>
+        </div>
+
+        <!-- Formulario Dinámico -->
+        <div id="protocol-params-container" class="mb-3 p-3 border border-secondary rounded bg-black bg-opacity-25"
+            style="display: none;">
+            <h6 class="text-muted small text-uppercase fw-bold mb-3">Parámetros</h6>
+            <form id="protocol-params-form">
+                <!-- Los campos se generarán aquí dinámicamente -->
+            </form>
+        </div>
+
+        <!-- Controles de Ejecución -->
+        <div class="d-grid gap-2 mb-3">
+            <button class="btn btn-primary btn-lg" id="btn-run-protocol" disabled>
+                <i class="fas fa-play me-2"></i>Ejecutar Protocolo
+            </button>
+            <button class="btn btn-danger btn-lg" id="btn-stop-protocol" style="display: none;">
+                <i class="fas fa-stop me-2"></i>Detener
+            </button>
+        </div>
+
+        <!-- Consola de Estado -->
+        <div class="card bg-black border-secondary">
+            <div class="card-header py-1 px-2 border-secondary">
+                <small class="text-muted">Log de Ejecución</small>
+            </div>
+            <div class="card-body p-2"
+                style="height: 150px; overflow-y: auto; font-family: monospace; font-size: 0.85rem;" id="execution-log">
+                <div class="text-muted">Esperando ejecución...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const widget = document.getElementById('protocol-runner-widget');
+        const select = document.getElementById('protocol-select');
+        const description = document.getElementById('protocol-description');
+        const paramsContainer = document.getElementById('protocol-params-container');
+        const paramsForm = document.getElementById('protocol-params-form');
+        const btnRun = document.getElementById('btn-run-protocol');
+        const btnStop = document.getElementById('btn-stop-protocol');
+        const logContainer = document.getElementById('execution-log');
+        const statusBadge = document.getElementById('runner-status-badge');
+
+        let protocols = {};
+        let currentExecutionId = null;
+        let pollInterval = null;
+
+        // Cargar protocolos al iniciar
+        async function loadProtocols() {
+            try {
+                const response = await fetch('/api/protocols/list');
+                const data = await response.json();
+
+                select.innerHTML = '<option value="" selected disabled>Selecciona un protocolo...</option>';
+                protocols = {};
+
+                if (data.protocols && data.protocols.length > 0) {
+                    data.protocols.forEach(p => {
+                        protocols[p.name] = p;
+                        const option = document.createElement('option');
+                        option.value = p.name;
+                        option.textContent = p.name;
+                        select.appendChild(option);
+                    });
+                } else {
+                    select.innerHTML = '<option value="" disabled>No hay protocolos disponibles</option>';
+                }
+            } catch (error) {
+                console.error('Error cargando protocolos:', error);
+                select.innerHTML = '<option value="" disabled>Error de conexión</option>';
+            }
+        }
+
+        // Generar formulario dinámico
+        function renderParamsForm(protocolName) {
+            const protocol = protocols[protocolName];
+            if (!protocol) return;
+
+            paramsForm.innerHTML = '';
+            description.textContent = protocol.description || `Configuración para ${protocolName}`;
+
+            if (protocol.has_parameters && protocol.parameters) {
+                paramsContainer.style.display = 'block';
+
+                Object.entries(protocol.parameters).forEach(([key, schema]) => {
+                    const div = document.createElement('div');
+                    div.className = 'mb-2';
+
+                    const label = document.createElement('label');
+                    label.className = 'form-label small mb-1';
+                    label.textContent = schema.label || key;
+                    div.appendChild(label);
+
+                    let input;
+                    if (schema.type === 'select') {
+                        input = document.createElement('select');
+                        input.className = 'form-select form-select-sm bg-dark text-white border-secondary';
+                        schema.options.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            if (opt.value == schema.default) option.selected = true;
+                            input.appendChild(option);
+                        });
+                    } else if (schema.type === 'boolean') {
+                        div.className = 'form-check form-switch mb-2';
+                        input = document.createElement('input');
+                        input.className = 'form-check-input';
+                        input.type = 'checkbox';
+                        input.checked = schema.default;
+
+                        label.className = 'form-check-label small';
+                        div.appendChild(input); // Input first for switch
+                        div.appendChild(label);
+                    } else {
+                        input = document.createElement('input');
+                        input.className = 'form-control form-control-sm bg-dark text-white border-secondary';
+                        input.type = schema.type === 'number' ? 'number' : 'text';
+                        if (schema.default !== undefined) input.value = schema.default;
+                        if (schema.min !== undefined) input.min = schema.min;
+                        if (schema.max !== undefined) input.max = schema.max;
+                        if (schema.step !== undefined) input.step = schema.step;
+                    }
+
+                    input.name = key;
+                    input.id = `param-${key}`;
+
+                    if (schema.type !== 'boolean') div.appendChild(input);
+
+                    if (schema.description) {
+                        const help = document.createElement('div');
+                        help.className = 'form-text text-muted small fst-italic';
+                        help.style.fontSize = '0.7rem';
+                        help.textContent = schema.description;
+                        div.appendChild(help);
+                    }
+
+                    paramsForm.appendChild(div);
+                });
+            } else {
+                paramsContainer.style.display = 'none';
+            }
+
+            btnRun.disabled = false;
+        }
+
+        // Recolectar parámetros del formulario
+        function getParams() {
+            const formData = new FormData(paramsForm);
+            const params = {};
+
+            // Procesar inputs manuales porque FormData puede ser tricky con checkboxes no checkeados
+            const inputs = paramsForm.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                if (input.type === 'checkbox') {
+                    params[input.name] = input.checked;
+                } else if (input.type === 'number') {
+                    params[input.name] = parseFloat(input.value);
+                } else {
+                    params[input.name] = input.value;
+                }
+            });
+
+            return params;
+        }
+
+        // Ejecutar protocolo
+        async function runProtocol() {
+            const protocolName = select.value;
+            if (!protocolName) return;
+
+            const params = getParams();
+
+            // UI Update
+            btnRun.style.display = 'none';
+            btnStop.style.display = 'block';
+            statusBadge.className = 'badge bg-warning text-dark';
+            statusBadge.textContent = 'Ejecutando';
+            logContainer.innerHTML = '<div class="text-info">Iniciando protocolo...</div>';
+
+            try {
+                const response = await fetch('/api/tasks/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        protocol_name: protocolName,
+                        name: `Manual: ${protocolName}`,
+                        params: params,
+                        mode: 'async',
+                        duration_seconds: 600, // Default duration safe limit
+                        timeout_seconds: 600
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    currentExecutionId = result.execution_id;
+                    log(`Iniciado: ID ${currentExecutionId}`);
+                    startPolling(currentExecutionId);
+                } else {
+                    throw new Error(result.error || 'Error desconocido');
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'text-danger');
+                resetUI();
+            }
+        }
+
+        // Detener protocolo
+        async function stopProtocol() {
+            if (!currentExecutionId) return;
+
+            try {
+                await fetch(`/api/execution/${currentExecutionId}/stop`, { method: 'POST' });
+                log('Solicitud de parada enviada...', 'text-warning');
+            } catch (error) {
+                log(`Error al detener: ${error.message}`, 'text-danger');
+            }
+        }
+
+        // Polling de estado
+        function startPolling(executionId) {
+            if (pollInterval) clearInterval(pollInterval);
+
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/execution/${executionId}`);
+                    if (!response.ok) return; // Si falla, reintentar luego
+
+                    const status = await response.json();
+
+                    // Actualizar log
+                    if (status.log && status.log.length > 0) {
+                        // Mostrar solo el último log relevante
+                        const lastLog = status.log[status.log.length - 1];
+                        if (typeof lastLog === 'string') {
+                            log(lastLog);
+                        } else if (lastLog.message) {
+                            log(lastLog.message);
+                        }
+                    }
+
+                    // Verificar terminación
+                    if (['completed', 'failed', 'stopped', 'timeout'].includes(status.status)) {
+                        clearInterval(pollInterval);
+                        log(`Finalizado: ${status.status}`, status.status === 'completed' ? 'text-success' : 'text-danger');
+                        resetUI();
+                    }
+                } catch (e) {
+                    console.error("Polling error", e);
+                }
+            }, 500);
+        }
+
+        function log(msg, className = 'text-white') {
+            const div = document.createElement('div');
+            div.className = className;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function resetUI() {
+            btnRun.style.display = 'block';
+            btnStop.style.display = 'none';
+            statusBadge.className = 'badge bg-success';
+            statusBadge.textContent = 'Listo';
+            currentExecutionId = null;
+            if (pollInterval) clearInterval(pollInterval);
+        }
+
+        // Event Listeners
+        select.addEventListener('change', (e) => renderParamsForm(e.target.value));
+        btnRun.addEventListener('click', runProtocol);
+        btnStop.addEventListener('click', stopProtocol);
+
+        // Init
+        loadProtocols();
+    })();
+</script>

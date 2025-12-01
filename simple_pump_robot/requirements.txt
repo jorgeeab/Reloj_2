@@ -3,3 +3,5 @@ uvicorn[standard]==0.30.0
 pyserial==3.5
 pybullet
 Pillow
+gymnasium
+numpy

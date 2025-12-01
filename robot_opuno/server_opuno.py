@@ -1582,6 +1582,53 @@ def ws_telemetry(ws):
 # =============================================================================
 # ENDPOINTS HTTP PARA TAREAS
 # =============================================================================
+# Endpoint para listar protocolos disponibles con sus parámetros
+@app.route("/api/protocols/list", methods=["GET"])
+def api_list_protocols():
+    """Lista protocolos disponibles con sus PARAMETERS para UI dinámica"""
+    try:
+        protocols_list = []
+        
+        # Listar protocolos en directorio
+        available = Protocolo.listar(str(PROTOCOLS_DIR))
+        
+        for protocol_name in available:
+            try:
+                # Cargar cada protocolo
+                proto = Protocolo(protocol_name, str(PROTOCOLS_DIR))
+                meta = proto.cargar()
+                
+                # Intentar obtener PARAMETERS del protocolo
+                parameters = {}
+                if meta.get("tipo") == "gym" and proto.clase_protocolo:
+                    # Clase Gym - buscar atributo PARAMETERS
+                    parameters = getattr(proto.clase_protocolo, 'PARAMETERS', {})
+                
+                protocols_list.append({
+                    "name": protocol_name,
+                    "type": meta.get("tipo", "unknown"),
+                    "parameters": parameters,
+                    "has_parameters": bool(parameters)
+                })
+            except Exception as e:
+                logger.log(f"Error cargando protocolo {protocol_name}: {e}", "WARN")
+                protocols_list.append({
+                    "name": protocol_name,
+                    "type": "error",
+                    "parameters": {},
+                    "has_parameters": False,
+                    "error": str(e)
+                })
+        
+        return jsonify({
+            "protocols": protocols_list,
+            "count": len(protocols_list)
+        })
+        
+    except Exception as e:
+        logger.log(f"Error listando protocolos: {e}", "ERROR")
+        return jsonify({"error": str(e)}), 500
+
 # PROMPT(tasks-http): validar payloads y mapear a ProtocolRunner
 @app.route("/api/tasks/execute", methods=["POST"])
 def api_execute_task_v2():
@@ -1603,10 +1650,10 @@ def api_execute_task_v2():
         protocol_name = data.get("protocol_name")
         if not protocol_name:
             return jsonify({"error": "Se requiere 'protocol_name'"}), 400
-        # Forzar protocolo único permitido
-        if protocol_name not in ("riego_basico", "ir_posicion"):
-            logger.log(f"Protocolo no habilitado: {protocol_name}", "WARN")
-            return jsonify({"error": "Protocolo no habilitado"}), 400
+        # Validar existencia del protocolo
+        if not Protocolo.existe(protocol_name, str(PROTOCOLS_DIR)):
+            logger.log(f"Protocolo no encontrado: {protocol_name}", "WARN")
+            return jsonify({"error": f"Protocolo '{protocol_name}' no encontrado"}), 404
         
         # Parámetros opcionales
         duration_seconds = float(data.get("duration_seconds", 10.0))

@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>Reloj Labs — Cabina Única</title>
+  <title>OpUno Labs — Cabina Única</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="/static/styles.css?v=4">
   <script src="/static/js/widgets_bootstrap.js?v=1"></script>
@@ -13,9 +13,9 @@
   <header class="topbar">
     <div class="brand">
       <div class="dot"></div>
-      <h1>Reloj Labs<span class="muted"> — Cabina Única</span></h1>
+      <h1>OpUno Labs<span class="muted"> — Cabina Única</span></h1>
     </div>
-    <div class="pill" id="pill-robot">Robot: �</div>
+    <div class="pill" id="pill-robot">Robot: ●</div>
 
     <div class="pill" id="pill-serial">Serial: —</div>
     <button class="pill" id="btn_settings">Settings</button>
@@ -100,9 +100,6 @@
         </div>
       </div>
 
-
-
-
       <div class="mini-actions" style="justify-content:flex-end; margin-top:8px">
         <button id="btn_save_settings">Guardar Settings</button>
       </div>
@@ -123,44 +120,21 @@
               id="btn_overlay_reconnect" style="margin-left:8px; display:none">Reconectar</button></div>
         </div>
         <h2>Operación + Telemetría</h2>
-        <div class="control-switches">
-          <span class="muted small">Controles manuales y energías están dentro de cada widget.</span>
+
+        <!-- Grid de widgets de operación -->
+        <div class="grid two" style="gap:10px">
+          {% include 'widgets/corredera_operacion.html' %}
+          {% include 'widgets/angulo_operacion.html' %}
+          {% include 'widgets/bomba_operacion.html' %}
+          {% include 'widgets/z_control.html' %}
+          {% include 'widgets/energies.html' %}
+          {% include 'widgets/acciones_rapidas.html' %}
+          {% include 'widgets/protocol_runner.html' %}
         </div>
-
-        {# Bloque de controles original oculto para centrar en Widgets — Operación #}
-
-        {# Widget Bomba/Flujo movido a contenedor de Widgets — Operación #}
-
-        {# KPIs y barras globales eliminados para evitar duplicados; cada widget muestra su lectura #}
-
-        <!-- Widgets — Operación en una sola columna -->
-        <div class="card" id="widgets_op_container" style="margin-top:10px">
-          <h3>Widgets — Operación</h3>
-          <div id="widgets_op_all" class="grid two" style="gap:10px">
-            {% include 'widgets/corredera_operacion.html' %}
-            {% include 'widgets/angulo_operacion.html' %}
-            {% include 'widgets/z_control.html' %}
-            {% include 'widgets/bomba_operacion.html' %}
-          </div>
-        </div>
-
-        {# Controles de energías ocultos (migrables a widgets) #}
-        <!--div class="row energy-row"-->
-
-        <!--/div-->
-
-        {# Acciones rápidas ocultas (migrables a widgets) #}
-        <!--div class="row"-->
-
-        <!--/div-->
 
         {# Botones globales ocultos (se pueden reubicar via widgets) #}
       </div>
     </section>
-
-
-
-
 
   </main>
 
