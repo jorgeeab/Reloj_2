@@ -32,7 +32,8 @@ from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from contextlib import nullcontext
 
-from flask import Flask, request, jsonify, make_response, render_template, Response, stream_with_context
+from flask import Flask, request, jsonify, make_response, render_template, Response, stream_with_context, send_from_directory
+from werkzeug.exceptions import NotFound
 import logging
 from logging.handlers import RotatingFileHandler
 from flask_sock import Sock
@@ -54,9 +55,14 @@ except ImportError:
 
 # Importar el entorno del robot (EXISTENTE)
 from reloj_env import RelojEnv
-from protocolos import ProtocolRunner, Protocolo
-from task_executor import TaskExecutor, TaskDefinition, ExecutionMode, TaskStatus
-from task_scheduler import TaskScheduler, TaskSchedule, ScheduleType
+
+# Importar módulos compartidos desde reloj_core
+if str(Path(__file__).parent.parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from reloj_core import ProtocolRunner, Protocolo
+from reloj_core import TaskExecutor, TaskDefinition, ExecutionMode, TaskStatus
+from reloj_core import TaskScheduler, TaskSchedule, ScheduleType
 try:
     from pybullet_visualizer import PyBulletVisualizer
 except ImportError:
@@ -75,7 +81,6 @@ except ImportError:
     VirtualRelojEnv = None  # type: ignore
 
 from collections import deque
-import sys
 import subprocess
 
 # =============================================================================
@@ -89,6 +94,7 @@ PROTOCOLS_DIR = BASE_DIR / "protocolos"
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 LOGS_DIR = BASE_DIR / "logs"
+SHARED_STATIC_DIR = BASE_DIR.parent / "shared_static"
 
 # Crear directorios si no existen
 for directory in [DATA_DIR, PROTOCOLS_DIR, TEMPLATES_DIR, STATIC_DIR, LOGS_DIR]:
@@ -179,6 +185,9 @@ class RobotStatus:
     objective_pending: bool = False
     objective_margin_ml: float = 0.05
     flow_target_est_mls: float = 0.0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 
@@ -257,8 +266,25 @@ logger = RobotLogger()
 # Aplicación Flask
 app = Flask(__name__,
             template_folder=str(TEMPLATES_DIR),
-            static_folder=str(STATIC_DIR))
+            static_folder=None)
 sock = Sock(app)
+
+# Configurar Jinja loader para usar templates compartidos
+from jinja2 import ChoiceLoader, FileSystemLoader
+PROJECT_ROOT = BASE_DIR.parent  # Reloj_2/
+SHARED_TEMPLATES = PROJECT_ROOT / "shared_templates"
+app.jinja_loader = ChoiceLoader([
+    FileSystemLoader(str(TEMPLATES_DIR)),     # Local primero
+    FileSystemLoader(str(SHARED_TEMPLATES))   # Shared como fallback
+])
+
+@app.route('/static/<path:filename>')
+def custom_static(filename):
+    """Serve static files with fallback to shared_static"""
+    try:
+        return send_from_directory(STATIC_DIR, filename)
+    except NotFound:
+        return send_from_directory(SHARED_STATIC_DIR, filename)
 
 # Verbose flags (pueden habilitarse temporalmente para depurar)
 STATUS_DEBUG = False
@@ -2026,19 +2052,34 @@ def api_execution_stop(execution_id: str):
 @app.route("/api/serial/ports")
 def api_serial_ports():
     """API para listar puertos serial"""
-    is_virtual = bool(getattr(robot_env, "is_virtual", False))
+    # Determinar si es virtual basado en el perfil activo y el entorno
+    profile = ROBOT_PROFILES.get(active_robot_id or "real", {})
+    profile_is_virtual = profile.get("is_virtual", False)
+    env_is_virtual = bool(getattr(robot_env, "is_virtual", False))
+    
+    # Es virtual si el perfil lo dice (prioridad) o el entorno lo reporta
+    is_virtual = profile_is_virtual or env_is_virtual
+
     ports = list_serial_ports()
     if is_virtual:
         ports = ["VIRTUAL"]
+        
     ser = getattr(robot_env, "ser", None)
     open_state = bool(ser and getattr(ser, "is_open", False))
+    
     if is_virtual:
         open_state = True
-        if not getattr(robot_env, "port", None):
-            robot_env.port = "VIRTUAL"
+        if robot_env and not getattr(robot_env, "port", None):
+            try:
+                robot_env.port = "VIRTUAL"
+            except Exception:
+                pass
+
+    current_port = getattr(robot_env, "port", None) if robot_env else None
+
     return jsonify({
         "ports": ports,
-        "current": robot_env.port,
+        "current": current_port,
         "open": open_state,
         "is_virtual": is_virtual,
         "robot_id": active_robot_id

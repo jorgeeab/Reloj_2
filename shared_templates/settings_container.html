@@ -1,0 +1,31 @@
+<!-- Settings Panel Container -->
+<section class="card tabview settings-panel" id="settings_modal" data-tab="set">
+    <div class="row" style="justify-content:space-between; align-items:center">
+        <h2 style="margin:0">Settings</h2>
+        <button id="btn_close_settings">Cerrar</button>
+    </div>
+
+    <!-- Serial Connection Section -->
+    {% include 'settings/serial_connection.html' %}
+
+    <!-- Widget Settings Section -->
+    <div class="card" id="widgets_settings_container" style="margin-top:10px">
+        <h3>Widgets — Ajustes</h3>
+        <div id="widgets_settings_all" class="grid two" style="gap:10px">
+            {% block widget_settings %}
+            {# Robot-specific widget configs go here #}
+            {% include 'widgets/bomba_config.html' %}
+            {% endblock %}
+        </div>
+    </div>
+
+    <!-- Additional Settings Block (for robot-specific settings) -->
+    {% block settings_extra %}
+    {# Robot-specific extra settings go here #}
+    {% endblock %}
+
+    <!-- Save Button -->
+    <div class="mini-actions" style="justify-content:flex-end; margin-top:8px">
+        <button id="btn_save_settings">Guardar Settings</button>
+    </div>
+</section>

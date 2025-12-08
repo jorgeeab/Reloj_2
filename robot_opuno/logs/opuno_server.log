@@ -120,3 +120,290 @@
 [14:02:02] [INFO] [ws/control] sesión abierta (ctrl-1763928122888)
 [14:02:03] [INFO] [ws/telemetry] sesión abierta (tele-1763928123375)
 [14:02:12] [INFO] [control] payload: {'setpoints': {'volumen_ml': 150}, 'flow': {'caudal_bomba_mls': 5, 'usar_sensor_flujo': 0}, 'energies': {'bomba': 200}}
+[11:56:18] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[11:56:18] [INFO] Planificador iniciado.
+[11:56:18] [INFO] [Scheduler] OFF
+[11:56:18] [INFO] [Scheduler] Desactivado por defecto
+[11:56:18] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[11:56:18] [INFO] [Policy] command_policy = stop_only
+[11:56:18] [INFO] [Scheduler] OFF
+[11:56:18] [INFO] Settings aplicados al iniciar
+[11:56:18] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[11:56:18] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[11:56:18] [INFO] [Scheduler] OFF
+[11:56:18] [INFO] [Scheduler] Desactivado por defecto
+[11:56:18] [INFO] OK: Robot conectado en VIRTUAL
+[11:56:18] [INFO] Hilo de actualización de estado iniciado
+[11:56:18] [INFO] [TaskScheduler] Loop de programación iniciado
+[11:56:18] [INFO] [TaskScheduler] Programador iniciado
+[11:56:18] [INFO] [Policy] command_policy = stop_only
+[11:56:18] [INFO] [Scheduler] OFF
+[11:56:18] [INFO] Settings aplicados al iniciar
+[11:56:18] [INFO] Sistema iniciado correctamente
+[11:56:18] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[11:56:18] [INFO] Servidor iniciando en puerto 5007
+[11:56:18] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno
+[11:56:18] [INFO] Puerto serial: VIRTUAL
+[11:56:18] [INFO] Usando sistema de tareas existente de reloj_env.py
+[11:56:20] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[11:56:21] [INFO] [ws/control] sesión abierta (ctrl-1764611781250)
+[11:56:21] [INFO] [ws/telemetry] sesión abierta (tele-1764611781838)
+[11:56:22] [INFO] [ws/control] sesión abierta (ctrl-1764611782296)
+[11:56:23] [INFO] [ws/telemetry] sesión abierta (tele-1764611783745)
+[11:56:31] [INFO] [control] payload: {'setpoints': {'volumen_ml': 200}, 'flow': {'flow_target_mls': 40, 'usar_sensor_flujo': 0}, 'execute': 1}
+[11:56:37] [INFO] [control] payload: {'flow': {'flow_target_mls': 0}, 'energies': {'bomba': 0}, 'execute': 0}
+[11:56:37] [INFO] [control] payload: {'flow': {'flow_target_mls': 0}, 'energies': {'bomba': 0}, 'execute': 0}
+[11:56:39] [INFO] [control] payload: {'reset_volumen': 1}
+[11:56:39] [INFO] [control] payload: {'reset_volumen': 1}
+[11:58:46] [INFO] [ws/control] sesión cerrada (ctrl-1764611781250)
+[11:58:47] [INFO] [ws/control] sesión cerrada (ctrl-1764611782296)
+[11:58:48] [INFO] [ws/telemetry] sesión cerrada (tele-1764611781838)
+[11:58:48] [INFO] [ws/telemetry] sesión cerrada (tele-1764611783745)
+[11:58:49] [INFO] [ws/control] sesión abierta (ctrl-1764611929375)
+[11:58:49] [INFO] [ws/telemetry] sesión abierta (tele-1764611929892)
+[19:00:42] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[19:00:42] [INFO] Planificador iniciado.
+[19:00:42] [INFO] [Scheduler] OFF
+[19:00:42] [INFO] [Scheduler] Desactivado por defecto
+[19:00:42] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[19:00:42] [INFO] [Policy] command_policy = stop_only
+[19:00:42] [INFO] [Scheduler] OFF
+[19:00:42] [INFO] Settings aplicados al iniciar
+[19:00:42] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[19:00:42] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[19:00:42] [INFO] [Scheduler] OFF
+[19:00:42] [INFO] [Scheduler] Desactivado por defecto
+[19:00:42] [INFO] OK: Robot conectado en VIRTUAL
+[19:00:42] [INFO] Hilo de actualización de estado iniciado
+[19:00:42] [INFO] [TaskScheduler] Loop de programación iniciado
+[19:00:42] [INFO] [TaskScheduler] Programador iniciado
+[19:00:42] [INFO] [Policy] command_policy = stop_only
+[19:00:42] [INFO] [Scheduler] OFF
+[19:00:42] [INFO] Settings aplicados al iniciar
+[19:00:42] [INFO] Sistema iniciado correctamente
+[19:00:42] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[19:00:42] [INFO] Servidor iniciando en puerto 5007
+[19:00:42] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno
+[19:00:42] [INFO] Puerto serial: VIRTUAL
+[19:00:42] [INFO] Usando sistema de tareas existente de reloj_env.py
+[19:00:43] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[19:00:44] [INFO] [ws/telemetry] sesión abierta (tele-1764637244587)
+[19:00:47] [INFO] [ws/control] sesión abierta (ctrl-1764637247190)
+[19:00:53] [INFO] [ws/control] sesión abierta (ctrl-1764637253034)
+[19:00:53] [INFO] [ws/telemetry] sesión abierta (tele-1764637253756)
+[19:01:14] [INFO] [ws/control] sesión abierta (ctrl-1764637274840)
+[19:01:15] [INFO] [ws/telemetry] sesión abierta (tele-1764637275434)
+[19:27:14] [INFO] [ws/control] sesión cerrada (ctrl-1764637247190)
+[19:27:14] [INFO] [ws/telemetry] sesión cerrada (tele-1764637244587)
+[19:27:14] [INFO] [ws/control] sesión cerrada (ctrl-1764637253034)
+[19:27:14] [INFO] [ws/telemetry] sesión cerrada (tele-1764637253756)
+[19:27:15] [INFO] [ws/control] sesión cerrada (ctrl-1764637274840)
+[19:27:15] [INFO] [ws/telemetry] sesión cerrada (tele-1764637275434)
+[19:36:36] [INFO] [ws/control] sesión abierta (ctrl-1764639396776)
+[19:36:36] [INFO] [ws/telemetry] sesión abierta (tele-1764639396857)
+[20:11:48] [INFO] [ws/control] sesión cerrada (ctrl-1764639396776)
+[20:11:48] [ERROR] [ws/telemetry] error (tele-1764639396857): [WinError 10053] Se ha anulado una conexión establecida por el software en su equipo host
+[23:38:41] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[23:38:41] [INFO] Planificador iniciado.
+[23:38:41] [INFO] [Scheduler] OFF
+[23:38:41] [INFO] [Scheduler] Desactivado por defecto
+[23:38:41] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[23:38:41] [INFO] [Policy] command_policy = stop_only
+[23:38:41] [INFO] [Scheduler] OFF
+[23:38:41] [INFO] Settings aplicados al iniciar
+[23:38:41] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[23:38:41] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[23:38:41] [INFO] [Scheduler] OFF
+[23:38:41] [INFO] [Scheduler] Desactivado por defecto
+[23:38:41] [INFO] OK: Robot conectado en VIRTUAL
+[23:38:41] [INFO] Hilo de actualización de estado iniciado
+[23:38:41] [INFO] [TaskScheduler] Loop de programación iniciado
+[23:38:41] [INFO] [TaskScheduler] Programador iniciado
+[23:38:41] [INFO] [Policy] command_policy = stop_only
+[23:38:41] [INFO] [Scheduler] OFF
+[23:38:41] [INFO] Settings aplicados al iniciar
+[23:38:41] [INFO] Sistema iniciado correctamente
+[23:38:41] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[23:38:41] [INFO] Servidor iniciando en puerto 5007
+[23:38:41] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno
+[23:38:41] [INFO] Puerto serial: VIRTUAL
+[23:38:41] [INFO] Usando sistema de tareas existente de reloj_env.py
+[23:38:43] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[23:38:45] [INFO] [ws/control] sesión abierta (ctrl-1764653925117)
+[23:38:45] [INFO] [ws/telemetry] sesión abierta (tele-1764653925276)
+[23:38:45] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:45] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:45] [INFO] [ws/control] sesión abierta (ctrl-1764653925718)
+[23:38:46] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:46] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:46] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:46] [INFO] [ws/telemetry] sesión abierta (tele-1764653926640)
+[23:38:46] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:59:25] [INFO] [ws/control] sesión cerrada (ctrl-1764653925718)
+[23:59:25] [INFO] [ws/telemetry] sesión cerrada (tele-1764653926640)
+[00:00:01] [INFO] [ws/control] sesión cerrada (ctrl-1764653925117)
+[00:00:01] [INFO] [ws/telemetry] sesión cerrada (tele-1764653925276)
+[00:10:56] [INFO] [ws/control] sesión abierta (ctrl-1764655856918)
+[00:10:56] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[00:10:57] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[00:10:57] [INFO] [ws/telemetry] sesión abierta (tele-1764655857460)
+[00:10:57] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[00:11:53] [INFO] [ws/control] sesión cerrada (ctrl-1764655856918)
+[00:11:53] [INFO] [ws/telemetry] sesión cerrada (tele-1764655857460)
+[23:38:14] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[23:38:14] [INFO] Planificador iniciado.
+[23:38:14] [INFO] [Scheduler] OFF
+[23:38:14] [INFO] [Scheduler] Desactivado por defecto
+[23:38:14] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[23:38:14] [INFO] [Policy] command_policy = stop_only
+[23:38:14] [INFO] [Scheduler] OFF
+[23:38:14] [INFO] Settings aplicados al iniciar
+[23:38:14] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[23:38:14] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[23:38:14] [INFO] [Scheduler] OFF
+[23:38:14] [INFO] [Scheduler] Desactivado por defecto
+[23:38:14] [INFO] OK: Robot conectado en VIRTUAL
+[23:38:14] [INFO] Hilo de actualización de estado iniciado
+[23:38:14] [INFO] [TaskScheduler] Loop de programación iniciado
+[23:38:14] [INFO] [TaskScheduler] Programador iniciado
+[23:38:14] [INFO] [Policy] command_policy = stop_only
+[23:38:14] [INFO] [Scheduler] OFF
+[23:38:14] [INFO] Settings aplicados al iniciar
+[23:38:14] [INFO] Sistema iniciado correctamente
+[23:38:14] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[23:38:14] [INFO] Servidor iniciando en puerto 5007
+[23:38:14] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno
+[23:38:14] [INFO] Puerto serial: VIRTUAL
+[23:38:14] [INFO] Usando sistema de tareas existente de reloj_env.py
+[23:38:15] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[23:38:16] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:16] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:16] [INFO] [ws/control] sesión abierta (ctrl-1764826696985)
+[23:38:16] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:17] [INFO] [ws/telemetry] sesión abierta (tele-1764826697005)
+[23:38:17] [INFO] [ws/control] sesión abierta (ctrl-1764826697582)
+[23:38:17] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:18] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:18] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:38:18] [INFO] [ws/telemetry] sesión abierta (tele-1764826698059)
+[23:45:36] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[23:45:36] [INFO] Planificador iniciado.
+[23:45:36] [INFO] [Scheduler] OFF
+[23:45:36] [INFO] [Scheduler] Desactivado por defecto
+[23:45:36] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[23:45:36] [INFO] [Policy] command_policy = stop_only
+[23:45:36] [INFO] [Scheduler] OFF
+[23:45:36] [INFO] Settings aplicados al iniciar
+[23:45:36] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[23:45:36] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[23:45:36] [INFO] [Scheduler] OFF
+[23:45:36] [INFO] [Scheduler] Desactivado por defecto
+[23:45:36] [INFO] OK: Robot conectado en VIRTUAL
+[23:45:36] [INFO] Hilo de actualización de estado iniciado
+[23:45:36] [INFO] [TaskScheduler] Loop de programación iniciado
+[23:45:36] [INFO] [TaskScheduler] Programador iniciado
+[23:45:36] [INFO] [Policy] command_policy = stop_only
+[23:45:36] [INFO] [Scheduler] OFF
+[23:45:36] [INFO] Settings aplicados al iniciar
+[23:45:36] [INFO] Sistema iniciado correctamente
+[23:45:36] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[23:45:36] [INFO] Servidor iniciando en puerto 5007
+[23:45:36] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno
+[23:45:36] [INFO] Puerto serial: VIRTUAL
+[23:45:36] [INFO] Usando sistema de tareas existente de reloj_env.py
+[23:45:38] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:45:38] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:45:38] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:45:38] [INFO] [ws/control] sesión abierta (ctrl-1764827138266)
+[23:45:38] [INFO] [ws/telemetry] sesión abierta (tele-1764827138315)
+[23:45:38] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[23:45:40] [INFO] [ws/control] sesión abierta (ctrl-1764827140241)
+[23:45:40] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:45:40] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:45:40] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:45:40] [INFO] [ws/telemetry] sesión abierta (tele-1764827140643)
+[16:42:33] [INFO] [ws/control] sesión cerrada (ctrl-1764827140241)
+[16:42:33] [INFO] [ws/telemetry] sesión cerrada (tele-1764827140643)
+[16:42:36] [INFO] [ws/control] sesión cerrada (ctrl-1764826696985)
+[16:42:36] [INFO] [ws/telemetry] sesión cerrada (tele-1764826697005)
+[16:42:38] [INFO] [ws/control] sesión cerrada (ctrl-1764826697582)
+[16:42:38] [INFO] [ws/telemetry] sesión cerrada (tele-1764826698059)
+[16:42:39] [INFO] [ws/control] sesión cerrada (ctrl-1764827138266)
+[16:42:39] [INFO] [ws/telemetry] sesión cerrada (tele-1764827138315)
+[23:21:55] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[23:21:55] [INFO] Planificador iniciado.
+[23:21:55] [INFO] [Scheduler] OFF
+[23:21:55] [INFO] [Scheduler] Desactivado por defecto
+[23:21:55] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[23:21:55] [INFO] [Policy] command_policy = stop_only
+[23:21:55] [INFO] [Scheduler] OFF
+[23:21:55] [INFO] Settings aplicados al iniciar
+[23:21:55] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[23:21:55] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[23:21:55] [INFO] [Scheduler] OFF
+[23:21:55] [INFO] [Scheduler] Desactivado por defecto
+[23:21:55] [INFO] OK: Robot conectado en VIRTUAL
+[23:21:55] [INFO] Hilo de actualización de estado iniciado
+[23:21:55] [INFO] [TaskScheduler] Loop de programación iniciado
+[23:21:55] [INFO] [TaskScheduler] Programador iniciado
+[23:21:55] [INFO] [Policy] command_policy = stop_only
+[23:21:55] [INFO] [Scheduler] OFF
+[23:21:55] [INFO] Settings aplicados al iniciar
+[23:21:55] [INFO] Sistema iniciado correctamente
+[23:21:55] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[23:21:55] [INFO] Servidor iniciando en puerto 5007
+[23:21:55] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno
+[23:21:55] [INFO] Puerto serial: VIRTUAL
+[23:21:55] [INFO] Usando sistema de tareas existente de reloj_env.py
+[23:21:56] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:21:56] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:21:56] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:21:57] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[23:21:57] [INFO] [ws/control] sesión abierta (ctrl-1764912117087)
+[23:21:57] [INFO] [ws/telemetry] sesión abierta (tele-1764912117552)
+[23:21:57] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:21:57] [INFO] [ws/control] sesión abierta (ctrl-1764912117784)
+[23:21:58] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:21:58] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:21:58] [INFO] [ws/telemetry] sesión abierta (tele-1764912118281)
+[23:39:49] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[23:39:49] [INFO] Planificador iniciado.
+[23:39:49] [INFO] [Scheduler] OFF
+[23:39:49] [INFO] [Scheduler] Desactivado por defecto
+[23:39:49] [INFO] [Runtime] Entorno activo: Robot Opuno virtual PyBullet
+[23:39:49] [INFO] [Policy] command_policy = stop_only
+[23:39:49] [INFO] [Scheduler] OFF
+[23:39:49] [INFO] Settings aplicados al iniciar
+[23:39:49] [INFO] Iniciando Sistema Robot Opuno v1.0 (clon Reloj)
+[23:39:49] [INFO] Robot activo inicial: Robot Opuno virtual PyBullet (virtual)
+[23:39:49] [INFO] [Scheduler] OFF
+[23:39:49] [INFO] [Scheduler] Desactivado por defecto
+[23:39:49] [INFO] OK: Robot conectado en VIRTUAL
+[23:39:49] [INFO] Hilo de actualización de estado iniciado
+[23:39:49] [INFO] [TaskScheduler] Loop de programación iniciado
+[23:39:49] [INFO] [TaskScheduler] Programador iniciado
+[23:39:49] [INFO] [Policy] command_policy = stop_only
+[23:39:49] [INFO] [Scheduler] OFF
+[23:39:49] [INFO] Settings aplicados al iniciar
+[23:39:49] [INFO] Sistema iniciado correctamente
+[23:39:49] [INFO] Visualizador PyBullet iniciado con URDF: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno\Robot Virtual\Robot Virtual\urdf\opuno_pump.urdf (720x480)
+[23:39:49] [INFO] Servidor iniciando en puerto 5007
+[23:39:49] [INFO] Directorio base: C:\Users\jorge\Documents\Antigravity Proyects\Reloj_2\robot_opuno
+[23:39:49] [INFO] Puerto serial: VIRTUAL
+[23:39:49] [INFO] Usando sistema de tareas existente de reloj_env.py
+[23:39:51] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:39:51] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:39:51] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:39:51] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5007/
+[23:39:51] [INFO] [ws/control] sesión abierta (ctrl-1764913191323)
+[23:39:51] [INFO] [ws/telemetry] sesión abierta (tele-1764913191841)
+[23:39:53] [INFO] [ws/control] sesión abierta (ctrl-1764913193560)
+[23:39:53] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:39:53] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:39:53] [INFO] [ws/telemetry] sesión abierta (tele-1764913193921)
+[23:39:54] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:42:35] [INFO] [ws/control] sesión abierta (ctrl-1764913355081)
+[23:42:35] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:42:35] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:42:35] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[23:42:37] [INFO] [ws/telemetry] sesión abierta (tele-1764913357054)

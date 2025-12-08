@@ -125,6 +125,10 @@ class RelojEnv(gym.Env):
     def set_protocol_activator(self, fn):
         self.protocol_activator = fn
 
+    @property
+    def is_virtual(self) -> bool:
+        return False
+
     # -------------------- serial --------------------
     def _ser_open(self):
         if self.ser and self.ser.is_open: return True

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Robot Control{% endblock %}</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/styles.css?v=4">
+    {% block extra_css %}{% endblock %}
+    <script src="/static/js/widgets_bootstrap.js?v=1"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body class="theme-teal" id="bodyRoot">
+    <header class="topbar">
+        <div class="brand">
+            <div class="dot"></div>
+            <h1>{% block brand_name %}Robot Control{% endblock %}<span class="muted"> — {% block brand_subtitle
+                    %}Control Interface{% endblock %}</span></h1>
+        </div>
+        {% block header_pills %}
+        <div class="pill" id="pill-robot">Robot: ●</div>
+        <div class="pill" id="pill-serial">Serial: —</div>
+        <button class="pill" id="btn_settings">Settings</button>
+        <div class="pill warn" id="pill-rx">RX: SIN DATOS</div>
+        {% endblock %}
+    </header>
+
+    <main class="wrap">
+        <!-- Tabs Navigation -->
+        {% block tabs_navigation %}
+        <nav class="tabs" style="margin-bottom:10px">
+            <button id="tab_op" data-tab="op">Operación</button>
+            <button id="tab_set" data-tab="set">Settings</button>
+            {% block extra_tabs %}{% endblock %}
+            <div style="margin-left:auto; display:flex; gap:6px; align-items:center">
+                {% block tabs_extras %}
+                <select id="robotSel" title="Robot"
+                    style="background:var(--tab-bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 8px">
+                    <option value="">Cargando robots...</option>
+                </select>
+                <select id="themeSel" title="Tema"
+                    style="background:var(--tab-bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 8px">
+                    <option value="theme-blue">Azul</option>
+                    <option value="theme-teal">Turquesa</option>
+                    <option value="theme-purple">Morado</option>
+                </select>
+                <a class="pill" href="/manage">Gestión</a>
+                {% endblock %}
+            </div>
+        </nav>
+        {% endblock %}
+
+        <!-- Operation Tab Content -->
+        <section class="tabview" data-tab="op">
+            {% block main_content %}
+            <!-- Robot operation content goes here -->
+            {% endblock %}
+        </section>
+
+        <!-- Settings Tab Content -->
+        {% include 'settings_container.html' %}
+    </main>
+
+    {% block debug_section %}
+    <section class="wrap" style="margin-top:8px">
+        <div class="card" id="ui_debug_wrap" style="margin-bottom:8px">
+            <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px">
+                <h3 style="margin:0">Debug</h3>
+                <div class="row" style="gap:6px">
+                    <button id="dbg_clear" type="button">Limpiar</button>
+                </div>
+            </div>
+            <pre id="ui_debug_console" class="log small" style="height:140px"></pre>
+        </div>
+    </section>
+    {% endblock %}
+
+    <footer class="foot">
+        <span>{% block footer_text %}Robot Control System{% endblock %}</span>
+        <span id="toast" class="toast" hidden>ok</span>
+    </footer>
+
+    {% block scripts %}
+    <script src="/static/js/reloj.js?v=7"></script>
+    {% endblock %}
+</body>
+
+</html>

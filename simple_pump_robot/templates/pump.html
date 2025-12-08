@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{# Configuración para ocultar serial connection (robot de solo simulación) #}
+{% set show_serial_connection = false %}
+
+{% block title %}Simple Pump Robot{% endblock %}
+
+{% block brand_name %}Simple Pump{% endblock %}
+{% block brand_subtitle %}Control de Bomba{% endblock %}
+
+{% block header_pills %}
+<div class="pill" id="pill-status">Estado: Listo</div>
+{% endblock %}
+
+{% block main_content %}
+<!-- PyBullet Visualization (opcional) -->
+<div class="card">
+    <h2>Visualización</h2>
+    <div style="position: relative; margin-top: 12px;">
+        <img id="pybullet_frame" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+            style="width: 100%; height: auto; border-radius: 8px; background: #1a1a1a; min-height: 300px; object-fit: contain;"
+            alt="Visualization" />
+        <span id="pybullet_status"
+            style="display: block; margin-top: 4px; text-align: center; color: #9db3ff; font-size: 12px;">
+            Simulación simple
+        </span>
+    </div>
+</div>
+
+<!-- Pump Control Widget -->
+<div class="card">
+    <h2>Control de Bomba</h2>
+    {% include 'widgets/bomba_operacion.html' %}
+</div>
+{% endblock %}
+
+{% block widget_settings %}
+{# Solo bomba config para simple_pump #}
+{% include 'widgets/bomba_config.html' %}
+{% endblock %}
+
+{% block footer_text %}Simple Pump Robot - Sistema de Control v2.0{% endblock %}

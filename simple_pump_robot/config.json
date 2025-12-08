@@ -1,6 +1,7 @@
 {
-  "ml_per_sec": 10.0,
+  "ml_per_sec": 0.0,
   "usar_sensor_flujo": false,
-  "actuators": ["pump"]
+  "actuators": [
+    "pump"
+  ]
 }
-

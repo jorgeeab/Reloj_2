@@ -1,163 +1,45 @@
-<!doctype html>
-<html lang="es">
+{% extends "base.html" %}
 
-<head>
-  <meta charset="utf-8">
-  <title>OpUno Labs — Cabina Única</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="/static/styles.css?v=4">
-  <script src="/static/js/widgets_bootstrap.js?v=1"></script>
-</head>
+{% block title %}Reloj Labs — Cabina Única{% endblock %}
 
-<body class="theme-teal" id="bodyRoot">
-  <header class="topbar">
-    <div class="brand">
-      <div class="dot"></div>
-      <h1>OpUno Labs<span class="muted"> — Cabina Única</span></h1>
+{% block brand_name %}Reloj Labs{% endblock %}
+{% block brand_subtitle %}Cabina Única{% endblock %}
+
+{% block main_content %}
+<!-- Visualización PyBullet -->
+<div class="card">
+  <h2>Visualización PyBullet</h2>
+  {% include 'widgets/pybullet_viewer.html' %}
+</div>
+
+<!-- Operación + Telemetría -->
+<div class="card control-board" style="position:relative">
+  <div id="op_overlay" class="overlay-block" hidden>
+    <div class="overlay-content">
+      <span id="overlay_msg">Ejecución en curso…</span>
+      <button id="btn_overlay_reconnect" style="margin-left:8px; display:none">Reconectar</button>
     </div>
-    <div class="pill" id="pill-robot">Robot: ●</div>
+  </div>
+  <h2>Operación + Telemetría</h2>
 
-    <div class="pill" id="pill-serial">Serial: —</div>
-    <button class="pill" id="btn_settings">Settings</button>
-    <div class="pill warn" id="pill-rx">RX: SIN DATOS</div>
-    <a class="pill" href="/manage">Gestión</a>
-  </header>
+  <!-- Grid de widgets de operación -->
+  <div class="grid two" style="gap:10px">
+    {% include 'widgets/corredera_operacion.html' %}
+    {% include 'widgets/angulo_operacion.html' %}
+    {% include 'widgets/bomba_operacion.html' %}
+    {% include 'widgets/z_control.html' %}
+    {% include 'widgets/energies.html' %}
+    {% include 'widgets/acciones_rapidas.html' %}
+    {% include 'widgets/protocol_runner.html' %}
+  </div>
+</div>
+{% endblock %}
 
-  <main class="wrap">
-    <nav class="tabs" style="margin-bottom:10px">
-      <button id="tab_op" data-tab="op">Operación</button>
-      <button id="tab_set" data-tab="set">Settings</button>
-      <div style="margin-left:auto; display:flex; gap:6px; align-items:center">
-        <select id="robotSel" title="Robot"
-          style="background:var(--tab-bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 8px">
-          <option value="">Cargando robots...</option>
-        </select>
-        <select id="themeSel" title="Tema"
-          style="background:var(--tab-bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 8px">
-          <option value="theme-blue">Azul</option>
-          <option value="theme-teal">Turquesa</option>
-          <option value="theme-purple">Morado</option>
-        </select>
-        <a class="pill" href="/manage">Gestión</a>
-      </div>
-    </nav>
-    <!-- MODAL SETTINGS (Serial, Calibraciones, Flujo) -->
-    <section class="card tabview settings-panel" id="settings_modal" data-tab="set">
-      <div class="row" style="justify-content:space-between; align-items:center">
-        <h2 style="margin:0">Settings</h2>
-        <button id="btn_close_settings">Cerrar</button>
-      </div>
-      <div class="card" style="margin-top:10px">
-        <h3>Conexión Serial</h3>
-        <div class="row" id="serial_hw_row">
-          <div class="field">
-            <label>Puerto</label>
-            <select id="sel_port"></select>
-          </div>
-          <div class="field">
-            <label>Baudios</label>
-            <input type="number" id="sel_baud" value="115200" step="1200">
-          </div>
-          <button id="btn_toggle_serial">Conectar</button>
-          <span class="muted">Tip: cierra el IDE/monitor mientras usas esta UI.</span>
-        </div>
-        <div id="serial_virtual_msg" class="pill"
-          style="display:none; background:var(--card-bg-alt); color:var(--text); margin-top:8px">
-          Modo virtual activo — la comunicación va directo por WebSocket, no se requiere COM.
-        </div>
-        <div class="row" style="margin-top:8px">
-          <div class="field">
-            <label>Perfil de Robot</label>
-            <select id="robotSel2">
-              <option value="">Cargando robots...</option>
-            </select>
-          </div>
-          <span class="muted">Puedes alternar entre Real y Virtual desde aquí.</span>
-        </div>
-        <div id="serial_status" class="muted"></div>
-        <div id="serial_hw_alert" class="pill warn" style="display:none">Robot físico sin conexión — selecciona un
-          puerto y presiona Conectar.</div>
-        <details class="card" style="margin-top:10px">
-          <summary>Depuración Serial (RX/TX)</summary>
-          <div class="row" style="justify-content:flex-start; gap:8px">
-            <span>RX edad: <b id="rx_age_ms">0</b> ms</span>
-            <span>TX edad: <b id="tx_age_ms">0</b> ms</span>
-            <button id="btn_refresh_dbg">Refrescar</button>
-            <button id="btn_copy_tx">Copiar último TX</button>
-            <button id="btn_clear_dbg" class="warn">Limpiar</button>
-          </div>
-          <pre class="log small" id="dbg_serial"></pre>
-        </details>
-      </div>
+{% block widget_settings %}
+{# Widget configuration for Reloj #}
+{% include 'widgets/corredera_config.html' %}
+{% include 'widgets/angulo_config.html' %}
+{% include 'widgets/bomba_config.html' %}
+{% endblock %}
 
-      <!-- Zona de settings agregada por widgets modulares (una sola columna) -->
-      <div class="card" id="widgets_settings_container" style="margin-top:10px">
-        <h3>Widgets — Ajustes</h3>
-        <div id="widgets_settings_all" class="grid two" style="gap:10px">
-          {% include 'widgets/corredera_config.html' %}
-          {% include 'widgets/angulo_config.html' %}
-          {% include 'widgets/bomba_config.html' %}
-        </div>
-      </div>
-
-      <div class="mini-actions" style="justify-content:flex-end; margin-top:8px">
-        <button id="btn_save_settings">Guardar Settings</button>
-      </div>
-    </section>
-
-    <!-- OPERACIÓN + TELEMETRÍA -->
-    <section class="tabview" data-tab="op">
-      <!-- Visualización PyBullet -->
-      <div class="card">
-        <h2>Visualización PyBullet</h2>
-        {% include 'widgets/pybullet_viewer.html' %}
-      </div>
-
-      <!-- Operación + Telemetría debajo de Visualización -->
-      <div class="card control-board" style="position:relative">
-        <div id="op_overlay" class="overlay-block" hidden>
-          <div class="overlay-content"><span id="overlay_msg">Ejecución en curso…</span> <button
-              id="btn_overlay_reconnect" style="margin-left:8px; display:none">Reconectar</button></div>
-        </div>
-        <h2>Operación + Telemetría</h2>
-
-        <!-- Grid de widgets de operación -->
-        <div class="grid two" style="gap:10px">
-          {% include 'widgets/corredera_operacion.html' %}
-          {% include 'widgets/angulo_operacion.html' %}
-          {% include 'widgets/bomba_operacion.html' %}
-          {% include 'widgets/z_control.html' %}
-          {% include 'widgets/energies.html' %}
-          {% include 'widgets/acciones_rapidas.html' %}
-          {% include 'widgets/protocol_runner.html' %}
-        </div>
-
-        {# Botones globales ocultos (se pueden reubicar via widgets) #}
-      </div>
-    </section>
-
-  </main>
-
-  <!-- Debug UI (barra inferior) -->
-  <section class="wrap" style="margin-top:8px">
-    <div class="card" id="ui_debug_wrap" style="margin-bottom:8px">
-      <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px">
-        <h3 style="margin:0">Debug</h3>
-        <div class="row" style="gap:6px">
-          <button id="dbg_clear" type="button">Limpiar</button>
-        </div>
-      </div>
-      <pre id="ui_debug_console" class="log small" style="height:140px"></pre>
-    </div>
-  </section>
-
-  <footer class="foot">
-    <span>Atajos: (M) manual/auto • (H) homing X/A • (V) reset volumen</span>
-    <span id="toast" class="toast" hidden>ok</span>
-  </footer>
-
-  <script src="/static/js/reloj.js?v=7"></script>
-  <!-- Widgets modulares -->
-</body>
-
-</html>
+{% block footer_text %}Atajos: (M) manual/auto • (H) homing X/A • (V) reset volumen{% endblock %}

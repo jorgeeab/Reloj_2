@@ -1,5 +1,6 @@
-fastapi==0.111.0
-uvicorn[standard]==0.30.0
+flask==3.0.0
+flask-sock==0.7.0
+simple-websocket==1.0.0
 pyserial==3.5
 pybullet
 Pillow

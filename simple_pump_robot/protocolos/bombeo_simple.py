@@ -137,3 +137,7 @@ class BombeoSimple(gym.Env):
     def close(self):
         if self.env:
             self.env.set_energia_bomba(0)
+            # Simular comportamiento de UI: resetear volumen al finalizar
+            if hasattr(self.env, "reset_volumen"):
+                time.sleep(1.0)
+                self.env.reset_volumen()

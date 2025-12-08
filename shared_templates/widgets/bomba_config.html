@@ -1,0 +1,13 @@
+<div class="card" id="cfg_bomba">
+  <h3>Bomba simple</h3>
+  <div class="row" style="gap:8px; align-items:center">
+    <button type="button" id="wg_bomba_stop">Detener</button>
+    <button type="button" id="wg_bomba_reset">Reiniciar volumen</button>
+  </div>
+  <div class="row" style="gap:12px; align-items:center">
+    <label class="chk"><input type="checkbox" id="wg_chk_sensor_flujo"> Usar sensor de flujo</label>
+    <div class="field"><label>Caudal calibrado (ml/s)</label><input type="number" id="wg_caudal" step="0.1" value="0"></div>
+    <div class="field"><label>Umbral energía (deadband)</label><input type="number" id="wg_deadband" step="1" min="0" max="255" value="0"></div>
+    <button type="button" id="wg_btn_apply_flujo">Aplicar Flujo</button>
+  </div>
+</div>

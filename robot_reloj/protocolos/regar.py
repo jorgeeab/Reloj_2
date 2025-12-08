@@ -63,11 +63,15 @@ class Regar(ProtocoloBase):
             pass
     
     def finalize(self, env):
-        """Limpieza - detener bomba"""
+        """Limpieza - detener bomba y resetear volumen"""
         try:
+            import time
             env.set_energia_bomba(0)
             env.set_volumen_objetivo_ml(0)
             env.set_caudal_objetivo_mls(0)
+            # Simular comportamiento de UI: espera y reset
+            time.sleep(1.0)
+            env.reset_volumen()
         except:
             pass
     

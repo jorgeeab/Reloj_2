@@ -264,7 +264,7 @@ class VirtualRobotController:
                         incr = min(restante, delta_ml)
                         self.state.volumen_ml += incr
                         if restante - incr <= self._pump_margin_ml:
-                            self._target_volume = self.state.volumen_ml
+                            # self._target_volume = self.state.volumen_ml  <-- REMOVED
                             energia_aplicada = 0.0
                             flow_actual = 0.0
                     else:
@@ -276,7 +276,7 @@ class VirtualRobotController:
             if usar_sensor and objetivo_pendiente:
                 restante = max(0.0, self._target_volume - self.state.volumen_ml)
                 if restante <= self._pump_margin_ml:
-                    self._target_volume = self.state.volumen_ml
+                    # self._target_volume = self.state.volumen_ml  <-- REMOVED
                     energia_aplicada = 0.0
                     flow_actual = 0.0
             self.state.volumen_ml = max(0.0, self.state.volumen_ml)

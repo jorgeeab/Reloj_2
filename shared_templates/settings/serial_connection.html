@@ -1,0 +1,56 @@
+<!-- Serial/Arduino Connection Configuration -->
+<div class="card" style="margin-top:10px">
+    <h3>Conexión Serial</h3>
+
+    {% if show_serial_connection|default(true) %}
+    <div class="row" id="serial_hw_row">
+        <div class="field">
+            <label>Puerto</label>
+            <select id="sel_port"></select>
+        </div>
+        <div class="field">
+            <label>Baudios</label>
+            <input type="number" id="sel_baud" value="115200" step="1200">
+        </div>
+        <button id="btn_toggle_serial">Conectar</button>
+        <span class="muted">Tip: cierra el IDE/monitor mientras usas esta UI.</span>
+    </div>
+
+    <div id="serial_virtual_msg" class="pill"
+        style="display:none; background:var(--card-bg-alt); color:var(--text); margin-top:8px">
+        Modo virtual activo — la comunicación va directo por WebSocket, no se requiere COM.
+    </div>
+
+    <div class="row" style="margin-top:8px">
+        <div class="field">
+            <label>Perfil de Robot</label>
+            <select id="robotSel2">
+                <option value="">Cargando robots...</option>
+            </select>
+        </div>
+        <span class="muted">Puedes alternar entre Real y Virtual desde aquí.</span>
+    </div>
+
+    <div id="serial_status" class="muted"></div>
+    <div id="serial_hw_alert" class="pill warn" style="display:none">
+        Robot físico sin conexión — selecciona un puerto y presiona Conectar.
+    </div>
+
+    <details class="card" style="margin-top:10px">
+        <summary>Depuración Serial (RX/TX)</summary>
+        <div class="row" style="justify-content:flex-start; gap:8px">
+            <span>RX edad: <b id="rx_age_ms">0</b> ms</span>
+            <span>TX edad: <b id="tx_age_ms">0</b> ms</span>
+            <button id="btn_refresh_dbg">Refrescar</button>
+            <button id="btn_copy_tx">Copiar último TX</button>
+            <button id="btn_clear_dbg" class="warn">Limpiar</button>
+        </div>
+        <pre class="log small" id="dbg_serial"></pre>
+    </details>
+    {% else %}
+    <!-- Serial connection disabled for this robot (simulation-only) -->
+    <div class="pill" style="background:var(--card-bg-alt); color:var(--text)">
+        Este robot es solo simulación y no requiere conexión serial.
+    </div>
+    {% endif %}
+</div>
