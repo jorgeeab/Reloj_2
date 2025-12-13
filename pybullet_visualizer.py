@@ -446,8 +446,9 @@ class PyBulletVisualizer:
                 physicsClientId=self.client_id,
             )
             dur = time.time() - start_t
-            if dur > 0.1:
-                print(f"[PyBullet] Render lento: {dur*1000:.1f}ms ({self.width}x{self.height})")
+            # Mensaje de debug desactivado para evitar saturar la consola
+            # if dur > 0.1:
+            #     print(f"[PyBullet] Render lento: {dur*1000:.1f}ms ({self.width}x{self.height})")
 
             rgba = np.reshape(np.array(rgb, dtype=np.uint8), (self.height, self.width, 4))
             rgb_img = rgba[:, :, :3]

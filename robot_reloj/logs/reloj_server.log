@@ -18848,3 +18848,119 @@
 [09:50:26] [INFO] [ws/telemetry] sesión cerrada (tele-1764949649396)
 [09:50:36] [INFO] [ws/control] sesión cerrada (ctrl-1764949655048)
 [09:50:36] [INFO] [ws/telemetry] sesión cerrada (tele-1764949649355)
+[11:26:01] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[11:26:01] [INFO] Planificador iniciado.
+[11:26:01] [INFO] [Scheduler] OFF
+[11:26:01] [INFO] [Scheduler] Desactivado por defecto
+[11:26:01] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[11:26:01] [INFO] [Policy] command_policy = stop_only
+[11:26:01] [INFO] [Scheduler] OFF
+[11:26:01] [INFO] Settings aplicados al iniciar
+[11:26:01] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[11:26:01] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[11:26:01] [INFO] [Scheduler] OFF
+[11:26:01] [INFO] [Scheduler] Desactivado por defecto
+[11:26:01] [INFO] OK: Robot conectado en VIRTUAL
+[11:26:01] [INFO] Hilo de actualización de estado iniciado
+[11:26:01] [INFO] [TaskScheduler] Loop de programación iniciado
+[11:26:01] [INFO] [TaskScheduler] Programador iniciado
+[11:26:01] [INFO] [Policy] command_policy = stop_only
+[11:26:01] [INFO] [Scheduler] OFF
+[11:26:01] [INFO] Settings aplicados al iniciar
+[11:26:01] [INFO] Sistema iniciado correctamente
+[11:26:01] [INFO] [Visualizer] Intentando iniciar PyBulletVisualizer...
+[11:26:01] [INFO] Visualizador PyBullet iniciado con URDF: D:\Antigravity\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (640x360)
+[11:26:01] [INFO] Servidor iniciando en puerto 5005
+[11:26:01] [INFO] Directorio base: D:\Antigravity\Reloj_2\robot_reloj
+[11:26:01] [INFO] Puerto serial: VIRTUAL
+[11:26:01] [INFO] Usando sistema de tareas existente de reloj_env.py
+[11:26:02] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[11:26:03] [INFO] [ws/control] sesión abierta (ctrl-1765214763562)
+[11:26:03] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[11:26:03] [INFO] [ws/telemetry] sesión abierta (tele-1765214763814)
+[11:26:03] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[11:26:03] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[11:26:03] [INFO] [PyBullet/camera/load] Vista cargada
+[11:26:09] [INFO] [control] payload: {'setpoints': {'x_mm': 81, 'a_deg': 0, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[11:26:13] [INFO] [control] payload: {'setpoints': {'x_mm': 81, 'a_deg': 28, 'z_mm': 0}, 'motion': {'z_speed_deg_s': 90}, 'modo': 0}
+[11:26:17] [INFO] [PyBullet/camera/save] Vista guardada
+[11:26:20] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 1.3, 'yaw': -70.0, 'pitch': -39.0, 'up_axis': 2}
+[11:26:23] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 1.45, 'yaw': -70.0, 'pitch': -39.0, 'up_axis': 2}
+[11:26:26] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 1.45, 'yaw': -45.0, 'pitch': -39.0, 'up_axis': 2}
+[11:26:29] [INFO] [PyBullet/camera] Actualizada: {'target': [0, 0, 0.03], 'distance': 1.45, 'yaw': -110.0, 'pitch': -39.0, 'up_axis': 2}
+[12:22:54] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[12:22:54] [INFO] Planificador iniciado.
+[12:22:54] [INFO] [Scheduler] OFF
+[12:22:54] [INFO] [Scheduler] Desactivado por defecto
+[12:22:54] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[12:22:54] [INFO] [Policy] command_policy = stop_only
+[12:22:54] [INFO] [Scheduler] OFF
+[12:22:54] [INFO] Settings aplicados al iniciar
+[12:22:54] [INFO] [SharedCalendar] No hay calendario previo, iniciando nuevo
+[12:22:54] [INFO] [SharedCalendar] Inicializado (tareas: 0)
+[12:22:54] [INFO] [Calendar API] Endpoints registrados correctamente
+[12:22:54] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[12:22:54] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[12:22:54] [INFO] [Scheduler] OFF
+[12:22:54] [INFO] [Scheduler] Desactivado por defecto
+[12:22:54] [INFO] OK: Robot conectado en VIRTUAL
+[12:22:54] [INFO] Hilo de actualización de estado iniciado
+[12:22:54] [INFO] [TaskScheduler] Loop de programación iniciado
+[12:22:54] [INFO] [TaskScheduler] Programador iniciado
+[12:22:54] [INFO] [Policy] command_policy = stop_only
+[12:22:54] [INFO] [Scheduler] OFF
+[12:22:54] [INFO] Settings aplicados al iniciar
+[12:22:54] [INFO] Sistema iniciado correctamente
+[12:22:54] [INFO] [Visualizer] Intentando iniciar PyBulletVisualizer...
+[12:22:54] [INFO] Visualizador PyBullet iniciado con URDF: D:\Antigravity\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (640x360)
+[12:22:54] [INFO] Servidor iniciando en puerto 5005
+[12:22:54] [INFO] Directorio base: D:\Antigravity\Reloj_2\robot_reloj
+[12:22:54] [INFO] Puerto serial: VIRTUAL
+[12:22:54] [INFO] Usando sistema de tareas existente de reloj_env.py
+[12:22:56] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[12:22:57] [INFO] [ws/control] sesión abierta (ctrl-1765218177222)
+[12:22:57] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[12:22:57] [INFO] [ws/telemetry] sesión abierta (tele-1765218177551)
+[12:22:57] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[12:22:57] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[12:22:57] [INFO] [PyBullet/camera/load] Vista cargada
+[12:47:00] [INFO] [VirtualRelojEnv] Serial virtual conectado.
+[12:47:00] [INFO] Planificador iniciado.
+[12:47:00] [INFO] [Scheduler] OFF
+[12:47:00] [INFO] [Scheduler] Desactivado por defecto
+[12:47:00] [INFO] [Runtime] Entorno activo: Robot virtual PyBullet
+[12:47:00] [INFO] [Policy] command_policy = stop_only
+[12:47:00] [INFO] [Scheduler] OFF
+[12:47:00] [INFO] Settings aplicados al iniciar
+[12:47:00] [INFO] [SharedCalendar] No hay calendario previo, iniciando nuevo
+[12:47:00] [INFO] [SharedCalendar] Inicializado (tareas: 0)
+[12:47:00] [INFO] [Calendar API] Endpoints registrados correctamente
+[12:47:00] [INFO] Iniciando Sistema Robot Reloj v2.0 Compatible
+[12:47:00] [INFO] Robot activo inicial: Robot virtual PyBullet (virtual)
+[12:47:00] [INFO] [Scheduler] OFF
+[12:47:00] [INFO] [Scheduler] Desactivado por defecto
+[12:47:00] [INFO] OK: Robot conectado en VIRTUAL
+[12:47:00] [INFO] Hilo de actualización de estado iniciado
+[12:47:00] [INFO] [TaskScheduler] Loop de programación iniciado
+[12:47:00] [INFO] [TaskScheduler] Programador iniciado
+[12:47:00] [INFO] [Policy] command_policy = stop_only
+[12:47:00] [INFO] [Scheduler] OFF
+[12:47:00] [INFO] Settings aplicados al iniciar
+[12:47:00] [INFO] Sistema iniciado correctamente
+[12:47:00] [INFO] [Visualizer] Intentando iniciar PyBulletVisualizer...
+[12:47:00] [INFO] Visualizador PyBullet iniciado con URDF: D:\Antigravity\Reloj_2\robot_reloj\Robot Virtual\Robot Virtual\urdf\Reloj_1.xacro (640x360)
+[12:47:00] [INFO] Servidor iniciando en puerto 5005
+[12:47:00] [INFO] Directorio base: D:\Antigravity\Reloj_2\robot_reloj
+[12:47:00] [INFO] Puerto serial: VIRTUAL
+[12:47:00] [INFO] Usando sistema de tareas existente de reloj_env.py
+[12:47:00] [INFO] [ws/control] sesión abierta (ctrl-1765219620951)
+[12:47:00] [INFO] [ws/telemetry] sesión abierta (tele-1765219620982)
+[12:47:02] [INFO] WEB: Abriendo navegador automáticamente: http://127.0.0.1:5005/
+[12:47:02] [WARN] Error cargando protocolo calibrar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[12:47:02] [INFO] [ws/control] sesión abierta (ctrl-1765219622973)
+[12:47:02] [WARN] Error cargando protocolo ir_posicion: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[12:47:02] [WARN] Error cargando protocolo regar: cannot import name 'ProtocoloBase' from 'protocolos' (unknown location)
+[12:47:03] [INFO] [ws/telemetry] sesión abierta (tele-1765219623258)
+[12:47:03] [INFO] [PyBullet/camera/load] Vista cargada
+[13:27:07] [INFO] [ws/control] sesión cerrada (ctrl-1765219622973)
+[13:27:07] [ERROR] [ws/telemetry] error (tele-1765219623258): [WinError 10053] Se ha anulado una conexión establecida por el software en su equipo host

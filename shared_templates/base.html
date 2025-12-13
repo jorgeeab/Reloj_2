@@ -31,6 +31,7 @@
         {% block tabs_navigation %}
         <nav class="tabs" style="margin-bottom:10px">
             <button id="tab_op" data-tab="op">Operación</button>
+            <button id="tab_calendar" data-tab="calendar">📅 Calendario</button>
             <button id="tab_set" data-tab="set">Settings</button>
             {% block extra_tabs %}{% endblock %}
             <div style="margin-left:auto; display:flex; gap:6px; align-items:center">
@@ -60,6 +61,110 @@
 
         <!-- Settings Tab Content -->
         {% include 'settings_container.html' %}
+
+        <!-- Calendar Tab Content -->
+        <section class="tabview" data-tab="calendar">
+            <div class="card">
+                <h2 style="margin-bottom:15px">📅 Calendario de Tareas Compartido</h2>
+
+                <!-- Mini Tabs para vistas del calendario -->
+                <div style="display:flex; gap:8px; margin-bottom:15px; flex-wrap:wrap">
+                    <button class="cal-view-btn active" data-view="dashboard"
+                        style="padding:8px 16px; border-radius:6px; border:1px solid var(--border); background:var(--primary); color:white">
+                        📊 Dashboard
+                    </button>
+                    <button class="cal-view-btn" data-view="upcoming"
+                        style="padding:8px 16px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text)">
+                        ⏰ Próximas
+                    </button>
+                    <button class="cal-view-btn" data-view="all"
+                        style="padding:8px 16px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text)">
+                        📋 Todas
+                    </button>
+                    <button onclick="window.open('/calendar', '_blank')"
+                        style="padding:8px 16px; border-radius:6px; border:1px solid var(--border); background:var(--accent); color:white; margin-left:auto">
+                        🔗 Abrir Calendario Completo
+                    </button>
+                </div>
+
+                <!-- Dashboard View -->
+                <div id="cal-dashboard" class="cal-view active">
+                    <div class="row" style="gap:10px; margin-bottom:15px">
+                        <div class="card" style="flex:1; text-align:center; padding:15px">
+                            <div style="font-size:2em; font-weight:bold" id="stat-total">0</div>
+                            <div style="color:var(--muted); font-size:0.9em">Total Tareas</div>
+                        </div>
+                        <div class="card" style="flex:1; text-align:center; padding:15px">
+                            <div style="font-size:2em; font-weight:bold; color:var(--accent)" id="stat-pending">0</div>
+                            <div style="color:var(--muted); font-size:0.9em">Pendientes</div>
+                        </div>
+                        <div class="card" style="flex:1; text-align:center; padding:15px">
+                            <div style="font-size:2em; font-weight:bold; color:var(--success)" id="stat-completed">0
+                            </div>
+                            <div style="color:var(--muted); font-size:0.9em">Completadas</div>
+                        </div>
+                        <div class="card" style="flex:1; text-align:center; padding:15px">
+                            <div style="font-size:2em; font-weight:bold; color:var(--danger)" id="stat-overdue">0</div>
+                            <div style="color:var(--muted); font-size:0.9em">Vencidas</div>
+                        </div>
+                    </div>
+
+                    <h3 style="margin:15px 0 10px 0">Próximas 5 Tareas</h3>
+                    <div id="upcoming-preview" style="display:flex; flex-direction:column; gap:8px">
+                        <div style="padding:20px; text-align:center; color:var(--muted)">Cargando tareas...</div>
+                    </div>
+                </div>
+
+                <!-- Upcoming View -->
+                <div id="cal-upcoming" class="cal-view" style="display:none">
+                    <div class="row" style="gap:8px; margin-bottom:10px">
+                        <select id="filter-robot-upcoming"
+                            style="padding:8px; border-radius:6px; border:1px solid var(--border)">
+                            <option value="">Todos los robots</option>
+                            <option value="reloj">Robot Reloj</option>
+                            <option value="pump">Robot Pump</option>
+                            <option value="opuno">Robot OpUno</option>
+                        </select>
+                        <button onclick="loadCalendarUpcoming()"
+                            style="padding:8px 16px; border-radius:6px; border:1px solid var(--border); background:var(--primary); color:white">
+                            🔄 Actualizar
+                        </button>
+                    </div>
+                    <div id="upcoming-tasks" style="display:flex; flex-direction:column; gap:8px">
+                        <div style="padding:20px; text-align:center; color:var(--muted)">Cargando tareas...</div>
+                    </div>
+                </div>
+
+                <!-- All Tasks View -->
+                <div id="cal-all" class="cal-view" style="display:none">
+                    <div class="row" style="gap:8px; margin-bottom:10px; flex-wrap:wrap">
+                        <select id="filter-robot-all"
+                            style="padding:8px; border-radius:6px; border:1px solid var(--border)">
+                            <option value="">Todos los robots</option>
+                            <option value="reloj">Robot Reloj</option>
+                            <option value="pump">Robot Pump</option>
+                            <option value="opuno">Robot OpUno</option>
+                        </select>
+                        <select id="filter-state-all"
+                            style="padding:8px; border-radius:6px; border:1px solid var(--border)">
+                            <option value="">Todos los estados</option>
+                            <option value="pendiente">Pendiente</option>
+                            <option value="programada">Programada</option>
+                            <option value="ejecutando">Ejecutando</option>
+                            <option value="completada">Completada</option>
+                            <option value="fallida">Fallida</option>
+                        </select>
+                        <button onclick="loadCalendarAll()"
+                            style="padding:8px 16px; border-radius:6px; border:1px solid var(--border); background:var(--primary); color:white">
+                            🔄 Actualizar
+                        </button>
+                    </div>
+                    <div id="all-tasks" style="display:flex; flex-direction:column; gap:8px">
+                        <div style="padding:20px; text-align:center; color:var(--muted)">Cargando tareas...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     {% block debug_section %}
@@ -83,6 +188,7 @@
 
     {% block scripts %}
     <script src="/static/js/reloj.js?v=7"></script>
+    <script src="/static/js/calendar_widget.js?v=1"></script>
     {% endblock %}
 </body>
 

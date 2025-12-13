@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendario de Tareas - Sistema de Robots</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            padding: 0 20px;
+        }
+        
+        .tab {
+            padding: 15px 30px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #6c757d;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab:hover {
+            color: #667eea;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .view-container {
+            display: none;
+        }
+        
+        .view-container.active {
+            display: block;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        
+        .task-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .task-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .task-card:hover {
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .task-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .task-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .badge-reloj { background: #667eea; color: white; }
+        .badge-pump { background: #f093fb; color: white; }
+        .badge-opuno { background: #4facfe; color: white; }
+        
+        .task-meta {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        
+        .task-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .priority-urgent { color: #dc3545; }
+        .priority-alta { color: #fd7e14; }
+        .priority-media { color: #ffc107; }
+        .priority-baja { color: #28a745; }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+        }
+        
+        .calendar-day {
+            aspect-ratio: 1;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .calendar-day:hover {
+            background: #e9ecef;
+            transform: scale(1.05);
+        }
+        
+        .calendar-day.has-tasks {
+            background: linear-gradient(135deg, #667eea20, #764ba220);
+            border: 2px solid #667eea;
+        }
+        
+        .day-number {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .day-tasks {
+            font-size: 0.8rem;
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-select {
+            padding: 10px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .filter-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: #6c757d;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📅 Calendario de Tareas</h1>
+            <p>Sistema compartido por todos los robots</p>
+        </header>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+            <button class="tab" onclick="switchTab('upcoming')">⏰ Próximas</button>
+            <button class="tab" onclick="switchTab('calendar')">🗓️ Calendario</button>
+            <button class="tab" onclick="switchTab('all')">📋 Todas las Tareas</button>
+        </div>
+        
+        <div class="content">
+            <!-- Dashboard View -->
+            <div id="dashboard-view" class="view-container active">
+                <div class="stats-grid" id="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total de Tareas</h3>
+                        <div class="value" id="stat-total">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Pendientes</h3>
+                        <div class="value" id="stat-pending">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Completadas</h3>
+                        <div class="value" id="stat-completed">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Vencidas</h3>
+                        <div class="value" id="stat-overdue">0</div>
+                    </div>
+                </div>
+                
+                <h2 style="margin: 20px 0;">Próximas Tareas</h2>
+                <div id="upcoming-tasks-preview" class="task-list"></div>
+            </div>
+            
+            <!-- Upcoming View -->
+            <div id="upcoming-view" class="view-container">
+                <div class="filters">
+                    <select class="filter -select" id="filter-robot-upcoming">
+                        <option value="">Todos los robots</option>
+                        <option value="reloj">Robot Reloj</option>
+                        <option value="pump">Robot Pump</option>
+                        <option value="opuno">Robot OpUno</option>
+                    </select>
+                </div>
+                <div id="upcoming-tasks" class="task-list"></div>
+            </div>
+            
+            <!-- Calendar View -->
+            <div id="calendar-view" class="view-container">
+                <div class="filters">
+                    <button class="btn btn-primary" onclick="changeMonth(-1)">← Mes Anterior</button>
+                    <h2 id="current-month" style="margin: 0 20px;">Cargando...</h2>
+                    <button class="btn btn-primary" onclick="changeMonth(1)">Mes Siguiente →</button>
+                </div>
+                <div id="calendar-grid" class="calendar-grid"></div>
+            </div>
+            
+            <!-- All Tasks View -->
+            <div id="all-view" class="view-container">
+                <div class="filters">
+                    <select class="filter-select" id="filter-robot">
+                        <option value="">Todos los robots</option>
+                        <option value="reloj">Robot Reloj</option>
+                        <option value="pump">Robot Pump</option>
+                        <option value="opuno">Robot OpUno</option>
+                    </select>
+                    <select class="filter-select" id="filter-state">
+                        <option value="">Todos los estados</option>
+                        <option value="pendiente">Pendiente</option>
+                        <option value="programada">Programada</option>
+                        <option value="ejecutando">Ejecutando</option>
+                        <option value="completada">Completada</option>
+                        <option value="fallida">Fallida</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="loadTasks()">🔄 Actualizar</button>
+                </div>
+                <div id="all-tasks" class="task-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentMonth = new Date().getMonth() + 1;
+        let currentYear = new Date().getFullYear();
+        
+        function switchTab(view) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update views
+            document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+            document.getElementById(`${view}-view`).classList.add('active');
+            
+            // Load data for view
+            if (view === 'dashboard') loadDashboard();
+            else if (view === 'upcoming') loadUpcoming();
+            else if (view === 'calendar') loadCalendar();
+            else if (view === 'all') loadTasks();
+        }
+        
+        async function loadDashboard() {
+            try {
+                const stats = await fetch('/api/calendar/statistics').then(r => r.json());
+                document.getElementById('stat-total').textContent = stats.statistics.total_tasks;
+                document.getElementById('stat-pending').textContent = stats.statistics.by_state.pendiente || 0;
+                document.getElementById('stat-completed').textContent = stats.statistics.by_state.completada || 0;
+                document.getElementById('stat-overdue').textContent = stats.statistics.overdue_count || 0;
+                
+                const upcoming = await fetch('/api/calendar/upcoming?limit=5').then(r => r.json());
+                renderTasks(upcoming.tasks, 'upcoming-tasks-preview');
+            } catch (e) {
+                console.error('Error loading dashboard:', e);
+            }
+        }
+        
+        async function loadUpcoming() {
+            try {
+                const robot = document.getElementById('filter-robot-upcoming').value;
+                let url = '/api/calendar/upcoming?limit=20';
+                if (robot) url += `&robot_id=${robot}`;
+                
+                const data = await fetch(url).then(r => r.json());
+                renderTasks(data.tasks, 'upcoming-tasks');
+            } catch (e) {
+                console.error('Error loading upcoming:', e);
+            }
+        }
+        
+        async function loadTasks() {
+            try {
+                const robot = document.getElementById('filter-robot').value;
+                const state = document.getElementById('filter-state').value;
+                
+                let url = '/api/calendar/tasks?';
+                if (robot) url += `robot_id=${robot}&`;
+                if (state) url += `state=${state}&`;
+                
+                const data = await fetch(url).then(r => r.json());
+                renderTasks(data.tasks, 'all-tasks');
+            } catch (e) {
+                console.error('Error loading tasks:', e);
+            }
+        }
+        
+        async function loadCalendar() {
+            try {
+                const data = await fetch(`/api/calendar/view/month?year=${currentYear}&month=${currentMonth}`).then(r => r.json());
+                const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                
+                document.getElementById('current-month').textContent = `${monthNames[currentMonth - 1]} ${currentYear}`;
+                
+                const grid = document.getElementById('calendar-grid');
+                grid.innerHTML = '';
+                
+                const tasksByDay = data.view.tasks_by_day;
+                
+                for (const [dateStr, tasks] of Object.entries(tasksByDay)) {
+                    const day = new Date(dateStr).getDate();
+                    const div = document.createElement('div');
+                    div.className = 'calendar-day' + (tasks.length > 0 ? ' has-tasks' : '');
+                    div.innerHTML = `
+                        <div class="day-number">${day}</div>
+                        ${tasks.length > 0 ? `<div class="day-tasks">${tasks.length} tarea${tasks.length > 1 ? 's' : ''}</div>` : ''}
+                    `;
+                    grid.appendChild(div);
+                }
+            } catch (e) {
+                console.error('Error loading calendar:', e);
+            }
+        }
+        
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 12) {
+                currentMonth = 1;
+                currentYear++;
+            } else if (currentMonth < 1) {
+                currentMonth = 12;
+                currentYear--;
+            }
+            loadCalendar();
+        }
+        
+        function renderTasks(tasks, containerId) {
+            const container = document.getElementById(containerId);
+            
+            if (!tasks || tasks.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No hay tareas</h3>
+                        <p>No se encontraron tareas para mostrar</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = tasks.map(task => {
+                const date = new Date(task.start_datetime);
+                const dateStr = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                
+                return `
+                    <div class="task-card">
+                        <div class="task-header">
+                            <div class="task-title">${task.title}</div>
+                            <div class="task-badge badge-${task.robot_id}">${task.robot_id.toUpperCase()}</div>
+                        </div>
+                        <p>${task.description || 'Sin descripción'}</p>
+                        <div class="task-meta">
+                            <span>📅 ${dateStr}</span>
+                            <span class="priority-${task.priority}">⭐ ${task.priority}</span>
+                            <span>🔧 ${task.protocol_name || task.action_type}</span>
+                            <span>📊 ${task.state}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Load initial data
+        loadDashboard();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            const activeView = document.querySelector('.view-container.active').id.split('-')[0];
+            if (activeView === 'dashboard') loadDashboard();
+            else if (activeView === 'upcoming') loadUpcoming();
+        }, 30000);
+    </script>
+</body>
+</html>

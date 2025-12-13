@@ -31,6 +31,7 @@ if str(Path(__file__).parent.parent) not in sys.path:
 from reloj_core import ProtocolRunner, Protocolo
 from reloj_core import TaskExecutor, TaskDefinition, ExecutionMode
 from reloj_core import TaskScheduler, TaskSchedule, ScheduleType
+from reloj_core import SharedCalendar, CalendarTask, TaskPriority, TaskState, get_shared_calendar
 from jinja2 import ChoiceLoader, FileSystemLoader
 
 # =============================================================================
@@ -160,6 +161,9 @@ def custom_static(filename):
 
 # Instancia global del controlador
 pump = SimplePumpController()
+
+# Calendario compartido - Instancia única para todos los robots
+shared_calendar = None
 
 # Lock para websockets
 ws_clients = []
@@ -314,6 +318,20 @@ def ws_telemetry(ws):
         pass
     except Exception as e:
         logger.error(f"Error en ws_telemetry: {e}")
+
+# =============================================================================
+# CALENDARIO COMPARTIDO
+# =============================================================================
+
+# Inicializar calendario compartido antes del main
+SHARED_DATA_DIR = BASE_DIR.parent / "data"
+SHARED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+shared_calendar = get_shared_calendar(data_dir=SHARED_DATA_DIR, logger=logger.log)
+logger.log(f"[SharedCalendar] Inicializado (tareas: {len(shared_calendar.get_all_tasks())})")
+
+# Registrar endpoints del calendario compartido
+from reloj_core.calendar_api import register_calendar_routes
+register_calendar_routes(app, shared_calendar, logger.log)
 
 # =============================================================================
 # MAIN

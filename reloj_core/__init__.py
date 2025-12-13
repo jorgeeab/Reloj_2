@@ -9,6 +9,7 @@ Módulos:
 - protocolos: Sistema de ejecución de protocolos personalizables
 - task_executor: Ejecución de tareas con modos síncronos/asíncronos
 - task_scheduler: Programación de tareas con cron-like scheduling
+- shared_calendar: Calendario compartido para gestión unificada de tareas
 """
 
 __version__ = "1.0.0"
@@ -17,6 +18,13 @@ __version__ = "1.0.0"
 from .protocolos import ProtocolRunner, Protocolo
 from .task_executor import TaskExecutor, TaskDefinition, ExecutionMode, TaskStatus
 from .task_scheduler import TaskScheduler, TaskSchedule, ScheduleType
+from .shared_calendar import (
+    SharedCalendar, 
+    CalendarTask, 
+    TaskPriority, 
+    TaskState,
+    get_shared_calendar
+)
 
 __all__ = [
     'ProtocolRunner',
@@ -28,4 +36,9 @@ __all__ = [
     'TaskScheduler',
     'TaskSchedule',
     'ScheduleType',
+    'SharedCalendar',
+    'CalendarTask',
+    'TaskPriority',
+    'TaskState',
+    'get_shared_calendar',
 ]

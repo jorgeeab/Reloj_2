@@ -63,6 +63,7 @@ if str(Path(__file__).parent.parent) not in sys.path:
 from reloj_core import ProtocolRunner, Protocolo
 from reloj_core import TaskExecutor, TaskDefinition, ExecutionMode, TaskStatus
 from reloj_core import TaskScheduler, TaskSchedule, ScheduleType
+from reloj_core import SharedCalendar, CalendarTask, TaskPriority, TaskState, get_shared_calendar
 try:
     from pybullet_visualizer import PyBulletVisualizer
 except ImportError:
@@ -338,6 +339,9 @@ task_executor: Optional[TaskExecutor] = None
 task_scheduler: Optional[TaskScheduler] = None
 active_robot_id: Optional[str] = None
 
+# Calendario compartido - Instancia única para todos los robots
+shared_calendar: Optional[SharedCalendar] = None
+
 
 def _runtime_summary(profile_id: str) -> Dict[str, Any]:
     profile = ROBOT_PROFILES.get(profile_id, {})
@@ -533,6 +537,17 @@ def switch_robot(profile_id: str, *, start_scheduler: bool = True) -> Dict[str, 
 
 # Inicializar entorno por defecto
 switch_robot(DEFAULT_ROBOT_ID, start_scheduler=False)
+
+# Inicializar calendario compartido
+# Usar directorio data del proyecto raíz para que todos los robots lo compartan
+SHARED_DATA_DIR = BASE_DIR.parent / "data"
+SHARED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+shared_calendar = get_shared_calendar(data_dir=SHARED_DATA_DIR, logger=logger.log)
+logger.log(f"[SharedCalendar] Inicializado (tareas: {len(shared_calendar.get_all_tasks())})")
+
+# Registrar endpoints del calendario compartido
+from reloj_core.calendar_api import register_calendar_routes
+register_calendar_routes(app, shared_calendar, logger.log)
 
 def _available_robot_profiles() -> List[Dict[str, Any]]:
     return [

@@ -535,8 +535,325 @@ async def stop_task(data: StopIn):
 
 @app.get("/")
 def root():
-    # Redirige siempre a la nueva UI y agrega un parámetro para evitar caché
-    return RedirectResponse(url="/hub/index.html?v=2")
+    # Redirige a la nueva UI simplificada
+    return RedirectResponse(url="/hub/index.html")
+
+
+# ======================= ENDPOINTS DE CONTROL PARA IA =======================
+# Estos endpoints permiten controlar todos los robots de forma unificada
+
+
+class MoveRobotIn(BaseModel):
+    """Mover robot a una posición"""
+    robot_id: str
+    x_mm: Optional[float] = None
+    a_deg: Optional[float] = None
+    duration_seconds: Optional[float] = 10.0
+
+
+class WaterIn(BaseModel):
+    """Regar con volumen específico"""
+    robot_id: str
+    volume_ml: float
+    duration_seconds: Optional[float] = None
+
+
+class HomeIn(BaseModel):
+    """Enviar robot a home"""
+    robot_id: str
+
+
+class StopRobotIn(BaseModel):
+    """Detener robot"""
+    robot_id: str
+
+
+@app.post("/ai/move")
+async def ai_move_robot(data: MoveRobotIn):
+    """
+    🤖 Endpoint para IA: Mover robot a posición específica
+    
+    Ejemplo:
+    {
+        "robot_id": "reloj",
+        "x_mm": 120.5,
+        "a_deg": 45.0,
+        "duration_seconds": 10.0
+    }
+    """
+    rb = store.robots.get(data.robot_id)
+    if not rb:
+        raise HTTPException(status_code=404, detail=f"Robot {data.robot_id} no encontrado")
+    
+    # Construir payload para el robot
+    payload = {
+        "name": f"AI_Move_{data.robot_id}",
+        "protocol_name": "ir_posicion",
+        "duration_seconds": data.duration_seconds or 10.0,
+        "mode": "async",
+        "params": {}
+    }
+    
+    if data.x_mm is not None:
+        payload["params"]["x_mm"] = float(data.x_mm)
+    if data.a_deg is not None:
+        payload["params"]["a_deg"] = float(data.a_deg)
+    
+    # Enviar al robot
+    base = rb.base_url.rstrip("/")
+    headers = {"X-API-Key": rb.api_key} if rb.api_key else None
+    
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        url = base + "/api/tasks/execute"
+        res = await client.post(url, json=payload, headers=headers)
+        if res.status_code >= 300:
+            raise HTTPException(status_code=res.status_code, detail=res.text)
+        rj = res.json()
+        
+        return {
+            "status": "ok",
+            "action": "move",
+            "robot_id": data.robot_id,
+            "target": {"x_mm": data.x_mm, "a_deg": data.a_deg},
+            "execution_id": rj.get("execution_id"),
+            "robot_response": rj
+        }
+
+
+@app.post("/ai/water")
+async def ai_water(data: WaterIn):
+    """
+    🤖 Endpoint para IA: Regar con volumen específico
+    
+    Ejemplo:
+    {
+        "robot_id": "reloj",
+        "volume_ml": 150.0,
+        "duration_seconds": 15.0
+    }
+    """
+    rb = store.robots.get(data.robot_id)
+    if not rb:
+        raise HTTPException(status_code=404, detail=f"Robot {data.robot_id} no encontrado")
+    
+    payload = {
+        "name": f"AI_Water_{data.robot_id}",
+        "protocol_name": "riego_basico",
+        "duration_seconds": data.duration_seconds or (data.volume_ml / 10.0),  # ~10ml/s
+        "mode": "async",
+        "params": {
+            "volume_ml": float(data.volume_ml)
+        }
+    }
+    
+    base = rb.base_url.rstrip("/")
+    headers = {"X-API-Key": rb.api_key} if rb.api_key else None
+    
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        url = base + "/api/tasks/execute"
+        res = await client.post(url, json=payload, headers=headers)
+        if res.status_code >= 300:
+            raise HTTPException(status_code=res.status_code, detail=res.text)
+        rj = res.json()
+        
+        return {
+            "status": "ok",
+            "action": "water",
+            "robot_id": data.robot_id,
+            "volume_ml": data.volume_ml,
+            "execution_id": rj.get("execution_id"),
+            "robot_response": rj
+        }
+
+
+@app.post("/ai/home")
+async def ai_home(data: HomeIn):
+    """
+    🤖 Endpoint para IA: Enviar robot a posición home
+    
+    Ejemplo:
+    {
+        "robot_id": "reloj"
+    }
+    """
+    rb = store.robots.get(data.robot_id)
+    if not rb:
+        raise HTTPException(status_code=404, detail=f"Robot {data.robot_id} no encontrado")
+    
+    base = rb.base_url.rstrip("/")
+    headers = {"X-API-Key": rb.api_key} if rb.api_key else None
+    
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        url = base + "/api/control"
+        res = await client.post(url, json={"home": True}, headers=headers)
+        if res.status_code >= 300:
+            raise HTTPException(status_code=res.status_code, detail=res.text)
+        
+        try:
+            rj = res.json()
+        except:
+            rj = {"raw": res.text}
+        
+        return {
+            "status": "ok",
+            "action": "home",
+            "robot_id": data.robot_id,
+            "robot_response": rj
+        }
+
+
+@app.post("/ai/stop")
+async def ai_stop_robot(data: StopRobotIn):
+    """
+    🤖 Endpoint para IA: Detener robot inmediatamente
+    
+    Ejemplo:
+    {
+        "robot_id": "reloj"
+    }
+    """
+    rb = store.robots.get(data.robot_id)
+    if not rb:
+        raise HTTPException(status_code=404, detail=f"Robot {data.robot_id} no encontrado")
+    
+    base = rb.base_url.rstrip("/")
+    headers = {"X-API-Key": rb.api_key} if rb.api_key else None
+    
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        url = base + "/api/control"
+        res = await client.post(url, json={"stop": True}, headers=headers)
+        if res.status_code >= 300:
+            raise HTTPException(status_code=res.status_code, detail=res.text)
+        
+        try:
+            rj = res.json()
+        except:
+            rj = {"raw": res.text}
+        
+        return {
+            "status": "ok",
+            "action": "stop",
+            "robot_id": data.robot_id,
+            "robot_response": rj
+        }
+
+
+@app.get("/ai/status/{robot_id}")
+async def ai_get_robot_status(robot_id: str):
+    """
+    🤖 Endpoint para IA: Obtener estado actual del robot
+    
+    Retorna posición, volumen, límites, conexión serial, etc.
+    """
+    rb = store.robots.get(robot_id)
+    if not rb:
+        raise HTTPException(status_code=404, detail=f"Robot {robot_id} no encontrado")
+    
+    # Obtener status del caché
+    status = store.last_robot_status.get(robot_id, {})
+    
+    return {
+        "robot_id": robot_id,
+        "robot_name": rb.name,
+        "base_url": rb.base_url,
+        "online": status.get("ok", False),
+        "status": status.get("data", {}),
+        "runtime": _robot_runtime_flag(robot_id)
+    }
+
+
+@app.get("/ai/robots/list")
+def ai_list_robots():
+    """
+    🤖 Endpoint para IA: Listar todos los robots disponibles
+    
+    Retorna lista simple con id, nombre, tipo y estado
+    """
+    robots = []
+    for rb in store.robots.values():
+        status = store.last_robot_status.get(rb.id, {})
+        robots.append({
+            "id": rb.id,
+            "name": rb.name,
+            "kind": rb.kind,
+            "online": status.get("ok", False),
+            "runtime": _robot_runtime_flag(rb.id),
+            "base_url": rb.base_url
+        })
+    
+    return {
+        "robots": robots,
+        "total": len(robots),
+        "online": sum(1 for r in robots if r["online"])
+    }
+
+
+@app.get("/ai/plants/list")
+def ai_list_plants():
+    """
+    🤖 Endpoint para IA: Listar todas las plantas
+    
+    Retorna id, nombre, era y posición
+    """
+    plants = []
+    for plant in store.plants.values():
+        plants.append({
+            "id": plant.id_planta,
+            "era": plant.era,
+            "name": plant.nombre,
+            "position": {
+                "x_mm": plant.longitud_slider,
+                "a_deg": plant.angulo_h,
+                "a_y_deg": plant.angulo_y
+            },
+            "water_speed": plant.velocidad_agua,
+            "planted_date": plant.fecha_plantacion
+        })
+    
+    return {
+        "plants": plants,
+        "total": len(plants)
+    }
+
+
+@app.post("/ai/goto_plant")
+async def ai_goto_plant(robot_id: str, era: str, plant_id: int, duration_seconds: float = 10.0):
+    """
+    🤖 Endpoint para IA: Mover robot a posición de una planta
+    
+    Parámetros query:
+    - robot_id: ID del robot
+    - era: Era de la planta
+    - plant_id: ID de la planta
+    - duration_seconds: Duración del movimiento (opcional)
+    """
+    rb = store.robots.get(robot_id)
+    if not rb:
+        raise HTTPException(status_code=404, detail=f"Robot {robot_id} no encontrado")
+    
+    plant = store.get_plant(era, plant_id)
+    if not plant:
+        raise HTTPException(status_code=404, detail=f"Planta {era}:{plant_id} no encontrada")
+    
+    # Usar el endpoint de move con los datos de la planta
+    move_data = MoveRobotIn(
+        robot_id=robot_id,
+        x_mm=plant.longitud_slider,
+        a_deg=plant.angulo_h,
+        duration_seconds=duration_seconds
+    )
+    
+    result = await ai_move_robot(move_data)
+    result["plant"] = {
+        "id": plant.id_planta,
+        "era": plant.era,
+        "name": plant.nombre
+    }
+    
+    return result
+
+
+# ======================= FIN ENDPOINTS PARA IA =======================
 
 # ----------------------- Regimens & Activities & Calendar -----------------------
 class RegimenIn(BaseModel):
